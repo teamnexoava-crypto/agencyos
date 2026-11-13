@@ -3,40 +3,21 @@ import { tooManyRequests } from "../lib/errors";
 import { clientIp } from "../lib/request";
 import type { AppEnv } from "../types";
 
-interface RateLimitOptions {
-  /** Bucket name, e.g. "auth" or "public". */
-  name: string;
-  /** Max requests per window, per client IP. */
-  limit: number;
-  windowSeconds: number;
-}
+type LimiterName = "AUTH_LIMITER" | "PUBLIC_LIMITER";
 
 /**
- * Fixed-window rate limiter backed by Workers KV.
- *
- * KV is eventually consistent, so under a burst a few extra requests can slip through before the
- * counter propagates — acceptable for abuse throttling on auth and public-link routes (it is not a
- * billing-grade quota). Keys expire on their own, so there is nothing to clean up.
+ * Per-IP rate limiting with Cloudflare's native Rate Limiting binding (limits are configured in
+ * wrangler.jsonc). Counters live at the edge location handling the request, so the limit is enforced
+ * per location rather than globally — exactly what is wanted for throttling abuse, with no storage
+ * writes and nothing to clean up.
  */
-export function rateLimit({ name, limit, windowSeconds }: RateLimitOptions) {
+export function rateLimit(limiter: LimiterName) {
   return createMiddleware<AppEnv>(async (c, next) => {
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    const windowIndex = Math.floor(nowSeconds / windowSeconds);
-    const key = `rl:${name}:${clientIp(c)}:${windowIndex}`;
-
-    const current = Number.parseInt((await c.env.KV.get(key)) ?? "0", 10) || 0;
-    const resetIn = (windowIndex + 1) * windowSeconds - nowSeconds;
-
-    c.header("X-RateLimit-Limit", String(limit));
-    c.header("X-RateLimit-Remaining", String(Math.max(0, limit - current - 1)));
-
-    if (current >= limit) {
-      c.header("Retry-After", String(resetIn));
+    const { success } = await c.env[limiter].limit({ key: clientIp(c) });
+    if (!success) {
+      c.header("Retry-After", "60");
       throw tooManyRequests();
     }
-
-    // KV requires expirationTtl >= 60s.
-    c.executionCtx.waitUntil(c.env.KV.put(key, String(current + 1), { expirationTtl: Math.max(60, windowSeconds * 2) }));
     await next();
   });
 }

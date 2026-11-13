@@ -19,7 +19,7 @@ Cloudflare Hyperdrive.
 | API        | Hono (TypeScript), all routes under `/api`                                               |
 | Database   | Supabase Postgres via Cloudflare Hyperdrive + Drizzle ORM + Drizzle migrations           |
 | Files      | Cloudflare R2                                                                            |
-| Rate limit | Cloudflare KV (fixed-window counters)                                                    |
+| Rate limit | Cloudflare Rate Limiting binding (KV binding kept for caching)                           |
 | Frontend   | React 19 + Vite + TypeScript, React Router, TanStack Query                               |
 | UI         | Tailwind CSS v4, shadcn/ui (Radix), Lucide icons, Motion                                 |
 | Forms      | React Hook Form + Zod — schemas in `shared/` are used by both the browser and the Worker |
@@ -123,8 +123,8 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
 - **Uploads.** Size-limited, and the real file type is sniffed from magic bytes (SVG is rejected).
 - **Headers.** Strict CSP (`script-src 'self'`), HSTS, `X-Frame-Options: DENY`, `nosniff`,
   `Referrer-Policy`, `Permissions-Policy` on pages (`public/_headers`) and API responses.
-- **Rate limiting.** KV-backed, per IP, on `/api/auth/*` and public asset routes. KV is eventually
-  consistent, so limits are approximate — suitable for abuse throttling, not exact quotas.
+- **Rate limiting.** Cloudflare's native Rate Limiting binding, per IP, on `/api/auth/*` and public
+  routes. Limits are enforced per edge location, which suits abuse throttling (not exact quotas).
 - **Secrets.** Never committed. They live only on the deployed Worker and in your local `.dev.vars`.
   Until all three are set, sign-in is switched off and the login page says so.
 

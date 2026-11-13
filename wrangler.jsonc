@@ -34,11 +34,21 @@
       "bucket_name": "agencyos-uploads"
     }
   ],
+  // Reserved for edge caching in later phases. (Rate limiting moved to the native binding below:
+  // a KV counter costs one write per request, and the free plan allows only ~1,000 writes a day.)
   "kv_namespaces": [
     {
       "binding": "KV",
       "id": "3147ad97b7da4216b9fef5927a22ae4c"
     }
+  ],
+  // Cloudflare's built-in rate limiter: counted at the edge, per key, no storage writes and no cost.
+  // `namespace_id` is any unique number you choose; `period` must be 10 or 60 seconds.
+  "ratelimits": [
+    // Sign-in and session endpoints, per IP.
+    { "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } },
+    // Public, unauthenticated routes (logos now; invoice / contract / portal links later), per IP.
+    { "name": "PUBLIC_LIMITER", "namespace_id": "1002", "simple": { "limit": 300, "period": 60 } }
   ],
   // Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET) are NOT listed here: they are set
   // on the deployed Worker (dashboard → Settings → Variables and Secrets, or `wrangler secret put`)

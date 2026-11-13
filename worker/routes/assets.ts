@@ -15,7 +15,7 @@ const LOGO_FILE_PATTERN = /^[\w-]{1,64}\.(png|jpg|webp)$/;
  * strictly validated path segments.
  */
 export const assetRoutes = new Hono<AppEnv>()
-  .use(rateLimit({ name: "assets", limit: 300, windowSeconds: 60 }))
+  .use(rateLimit("PUBLIC_LIMITER"))
 
   .get("/logo/:workspaceId/:file", async (c) => {
     const { workspaceId, file } = c.req.param();

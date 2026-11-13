@@ -41,7 +41,7 @@ const loginError = (c: Context<AppEnv>, code: string) => c.redirect(`/login?erro
 
 export const authRoutes = new Hono<AppEnv>()
   // Brute-force / abuse throttle for everything under /api/auth (per IP).
-  .use(rateLimit({ name: "auth", limit: 60, windowSeconds: 60 }))
+  .use(rateLimit("AUTH_LIMITER"))
 
   .get("/config", (c) => {
     const body: AuthConfigResponse = { googleConfigured: isGoogleConfigured(c.env), devLogin: devLoginEnabled(c) };
