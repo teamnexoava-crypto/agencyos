@@ -22,7 +22,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "00000000000000000000000000000000",
+      "id": "428aa5bfd6a341bb9caffdc666f743c6",
       // Local development connects straight to this database instead (default: the Supabase CLI's
       // local Postgres). Override it by setting DATABASE_URL in .env.
       "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
