@@ -1,10 +1,14 @@
 import { defineConfig } from "drizzle-kit";
+import { localDatabaseUrl } from "./scripts/env";
 
-// Only used for `drizzle-kit generate` (schema → SQL migration files in ./drizzle).
-// Migrations are applied with Wrangler: `npm run db:migrate:local` / `npm run db:migrate:remote`.
+/**
+ * LOCAL database: `npm run db:generate` (schema → SQL in ./drizzle) and `npm run db:migrate:local`.
+ * The production database uses drizzle.remote.config.ts.
+ */
 export default defineConfig({
-  dialect: "sqlite",
+  dialect: "postgresql",
   schema: "./worker/db/schema.ts",
   out: "./drizzle",
   casing: "snake_case",
+  dbCredentials: { url: localDatabaseUrl() },
 });

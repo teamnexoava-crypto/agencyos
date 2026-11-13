@@ -1,4 +1,3 @@
-import type { BatchItem } from "drizzle-orm/batch";
 import type { CurrencyCode } from "../../shared/constants";
 import type { MembershipDTO, SessionUser, WorkspaceDTO } from "../../shared/types";
 import type { Database } from "../db";
@@ -59,18 +58,18 @@ interface NewWorkspaceOptions {
 }
 
 /**
- * Creates a workspace owned by `user`, with default expense categories, atomically (D1 batch = one
- * transaction). Returns the new workspace id.
+ * Creates a workspace owned by `user`, with default expense categories, in one transaction
+ * (all-or-nothing). Returns the new workspace id.
  */
 export async function createWorkspaceForUser(db: Database, user: UserRow, options: NewWorkspaceOptions): Promise<string> {
   const workspaceId = options.id ?? newId();
   const memberId = newId();
 
-  const statements: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]] = [
-    db.insert(workspaces).values({ id: workspaceId, name: options.name, currency: options.currency ?? "INR" }),
-    db.insert(workspaceMembers).values({ id: memberId, workspaceId, userId: user.id, role: "owner", designation: "Founder" }),
-    db.insert(expenseCategories).values(DEFAULT_EXPENSE_CATEGORIES.map((category) => ({ ...category, workspaceId }))),
-    db.insert(activityLog).values({
+  await db.transaction(async (tx) => {
+    await tx.insert(workspaces).values({ id: workspaceId, name: options.name, currency: options.currency ?? "INR" });
+    await tx.insert(workspaceMembers).values({ id: memberId, workspaceId, userId: user.id, role: "owner", designation: "Founder" });
+    await tx.insert(expenseCategories).values(DEFAULT_EXPENSE_CATEGORIES.map((category) => ({ ...category, workspaceId })));
+    await tx.insert(activityLog).values({
       workspaceId,
       type: "workspace.created",
       actorMemberId: memberId,
@@ -78,9 +77,8 @@ export async function createWorkspaceForUser(db: Database, user: UserRow, option
       entityType: "workspace",
       entityId: workspaceId,
       summary: `${user.name} created the workspace`,
-    }),
-  ];
-  await db.batch(statements);
+    });
+  });
   return workspaceId;
 }
 

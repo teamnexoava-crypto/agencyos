@@ -16,5 +16,5 @@
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["vite.config.ts", "drizzle.config.ts"]
+  "include": ["vite.config.ts", "drizzle.config.ts", "drizzle.remote.config.ts", "scripts/env.ts"]
 }

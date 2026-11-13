@@ -1,7 +1,8 @@
 /**
  * AgencyOS – Cloudflare Worker configuration.
- * Replace the placeholder IDs below after running the `wrangler d1 create` / `wrangler kv namespace create`
- * commands described in the README. Local development works with the placeholders as-is.
+ * Replace the placeholder IDs below after running the `wrangler hyperdrive create` /
+ * `wrangler kv namespace create` commands described in the README. Local development works with the
+ * placeholders as-is.
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -16,12 +17,15 @@
     // Only /api/* reaches the Worker; everything else is served straight from the edge cache.
     "run_worker_first": ["/api/*"]
   },
-  "d1_databases": [
+  // Postgres lives on Supabase. Hyperdrive is Cloudflare's connection pooler for it: create one with
+  // `wrangler hyperdrive create` (see README) and paste its id here.
+  "hyperdrive": [
     {
-      "binding": "DB",
-      "database_name": "agencyos",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "drizzle"
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      // Local development connects straight to this database instead (default: the Supabase CLI's
+      // local Postgres). Override it by setting DATABASE_URL in .env.
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
     }
   ],
   "r2_buckets": [

@@ -25,7 +25,7 @@ export function clearSessionCookie(c: Context<AppEnv>) {
   deleteCookie(c, SESSION_COOKIE, { path: "/", secure: isHttps(c) });
 }
 
-/** The database only ever sees a hash of the cookie token, so a DB leak cannot be replayed as a login. */
+/** The database only ever sees a hash of the cookie token, so a database leak cannot be replayed as a login. */
 const sessionIdFromToken = (token: string) => sha256Hex(token);
 
 export async function createSession(c: Context<AppEnv>, userId: string, activeWorkspaceId: string | null) {

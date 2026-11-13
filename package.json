@@ -15,8 +15,8 @@
     "prebuild": "npm run cf-typegen",
     "pretypecheck": "npm run cf-typegen",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:local": "drizzle-kit migrate",
+    "db:migrate:remote": "drizzle-kit migrate --config drizzle.remote.config.ts",
     "db:seed": "tsx scripts/seed.ts",
     "deploy": "npm run build && wrangler deploy"
   },
@@ -33,6 +33,7 @@
     "lucide-react": "^1.72.0",
     "motion": "^14.13.0",
     "nanoid": "^6.0.2",
+    "postgres": "^4.1.1",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

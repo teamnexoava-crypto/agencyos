@@ -1,11 +1,12 @@
 # AgencyOS
 
 Multi-tenant SaaS for agency owners, freelancers and service providers: projects, team, finances,
-invoices, contracts and e-signatures, with a client-facing share link per project. Runs entirely on
-Cloudflare (Workers + Static Assets, D1, R2, KV).
+invoices, contracts and e-signatures, with a client-facing share link per project. The app runs on
+Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
+Cloudflare Hyperdrive.
 
 > **Build status — Phase 1 of 8 complete.**
-> Done: project setup, Cloudflare config, full database schema + migration, Google login, sessions,
+> Done: project setup, Cloudflare config, full Postgres schema + migration, Google login, sessions,
 > CSRF, rate limiting, onboarding, app shell (sidebar, top bar, dark mode, page transitions).
 > Next: clients & projects → team → invoices → finance & dashboard → contracts & e-sign → client
 > portal → landing page, notifications, polish.
@@ -16,35 +17,44 @@ Cloudflare (Workers + Static Assets, D1, R2, KV).
 | ---------- | ---------------------------------------------------------------------------------------- |
 | Hosting    | Cloudflare Workers + Static Assets, deployed with Wrangler                               |
 | API        | Hono (TypeScript), all routes under `/api`                                               |
-| Database   | Cloudflare D1 (SQLite) + Drizzle ORM + Drizzle migrations                                |
+| Database   | Supabase Postgres via Cloudflare Hyperdrive + Drizzle ORM + Drizzle migrations           |
 | Files      | Cloudflare R2                                                                            |
 | Rate limit | Cloudflare KV (fixed-window counters)                                                    |
 | Frontend   | React 19 + Vite + TypeScript, React Router, TanStack Query                               |
 | UI         | Tailwind CSS v4, shadcn/ui (Radix), Lucide icons, Motion                                 |
 | Forms      | React Hook Form + Zod — schemas in `shared/` are used by both the browser and the Worker |
-| Auth       | Google OAuth 2.0 (PKCE) via `arctic`, sessions in D1, httpOnly cookies. No passwords.    |
+| Auth       | Google OAuth 2.0 (PKCE) via `arctic`, sessions in Postgres, httpOnly cookies. No passwords. |
 
 ## Quick start (local)
 
-Requires Node.js 22.22+.
+Requires Node.js 22.22+ and a local Postgres 15+. The easiest is the Supabase CLI (needs Docker),
+which starts one on port 54322 — the default this project expects:
+
+```bash
+npx supabase init && npx supabase start
+```
+
+Any other Postgres works too: put its connection string in `.env` as `DATABASE_URL`.
 
 ```bash
 npm install
 cp .dev.vars.example .dev.vars     # then edit: set SESSION_SECRET (openssl rand -base64 32)
-npm run db:migrate:local           # creates the local D1 database in .wrangler/
+cp .env.example .env               # DATABASE_URL for local Postgres
+npm run db:migrate:local           # creates the tables
 npm run db:seed                    # optional: demo workspace "Northwind Studio"
 npm run dev                        # http://localhost:5173
 ```
 
-Local D1, R2 and KV are simulated by Wrangler/Miniflare — no Cloudflare account is needed to develop.
+R2 and KV are simulated locally by Wrangler/Miniflare, and the Hyperdrive binding connects straight
+to your local Postgres — no Cloudflare or Supabase account is needed to develop.
 
 **Signing in locally.** Under `npm run dev` on `localhost`, the login page shows a **Continue as demo
 user** button, so you can work without Google credentials. That route is compiled out of production
 builds (it is registered inside an `import.meta.env.DEV` block). To test real Google sign-in locally,
 put your OAuth client ID and secret in `.dev.vars` (see [Google OAuth](#2-google-oauth-client)).
 
-To see the onboarding flow again, skip `db:seed` (or wipe local data with `rm -rf .wrangler/state`
-and re-run the migration).
+To see the onboarding flow again, skip `db:seed` (or empty the local tables:
+`delete from workspaces; delete from users;`).
 
 ## Scripts
 
@@ -56,8 +66,8 @@ and re-run the migration).
 | `npm run check`             | Type-check + ESLint                                                   |
 | `npm run cf-typegen`        | Regenerate `worker-configuration.d.ts` from `wrangler.jsonc`          |
 | `npm run db:generate`       | Generate a SQL migration in `drizzle/` from `worker/db/schema.ts`     |
-| `npm run db:migrate:local`  | Apply migrations to the local D1 database                             |
-| `npm run db:migrate:remote` | Apply migrations to the production D1 database                        |
+| `npm run db:migrate:local`  | Apply migrations to the local Postgres (`DATABASE_URL`)               |
+| `npm run db:migrate:remote` | Apply migrations to Supabase (`DATABASE_URL_REMOTE`)                  |
 | `npm run db:seed`           | Seed the local database with demo data (re-runnable)                  |
 | `npm run deploy`            | Build and deploy to Cloudflare                                        |
 
@@ -82,10 +92,11 @@ src/                    The React app
   features/               Data hooks + feature components (auth, onboarding, …)
   pages/                  Route components (lazy-loaded per route)
   router.tsx              Route table + guards
-drizzle/                Generated SQL migrations (applied with Wrangler)
+drizzle/                Generated SQL migrations (applied with drizzle-kit)
 scripts/seed.ts         Local demo data
+scripts/env.ts          Reads DATABASE_URL / DATABASE_URL_REMOTE from .env for tooling
 public/_headers         Security headers + caching for the SPA and static assets
-wrangler.jsonc          Worker config: D1, R2, KV bindings, required secrets
+wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required secrets
 ```
 
 ## How it is secured
@@ -94,9 +105,14 @@ wrangler.jsonc          Worker config: D1, R2, KV bindings, required secrets
   request; they call `tenant(c)` (`worker/lib/tenant.ts`), which derives it from the server-side
   session and builds every `WHERE` through `t.where(table, …)`, so the workspace predicate cannot be
   left out.
+- **Database exposure.** Supabase publishes every table in the `public` schema through its Data
+  API to anyone holding the project's public anon key. Row Level Security is therefore enabled on
+  every table with no policies, which denies that API everything; the Worker connects as the
+  database owner, which RLS does not restrict. The app never uses the Data API, so you can also
+  switch it off in the Supabase dashboard (step 1 below).
 - **Roles.** `owner`, `admin`, `member`. Checked on the server with `t.requireRole(…)`; the UI hides
   what a role cannot use but is never the enforcement point.
-- **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. D1 stores
+- **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores
   only its SHA-256 hash. Sessions last 30 days and roll forward once half the lifetime is used.
 - **CSRF.** State-changing requests must (1) carry an `Origin` header equal to the app's origin and
   (2) when signed in, an `X-CSRF-Token` header — an HMAC of the session id keyed by `SESSION_SECRET`.
@@ -114,15 +130,40 @@ wrangler.jsonc          Worker config: D1, R2, KV bindings, required secrets
 
 ## Deploying to Cloudflare
 
-### 1. Create the Cloudflare resources
+### 1. Supabase database
+
+1. Create a project at [supabase.com](https://supabase.com/dashboard). Pick the region closest to
+   your users (for India: Mumbai, `ap-south-1`) and save the database password.
+2. Open **Connect** and copy the **Session pooler** connection string (port `5432`). Put it in
+   `.env` as `DATABASE_URL_REMOTE`, with the password filled in (URL-encode special characters).
+3. Create the tables:
+
+```bash
+npm run db:migrate:remote
+```
+
+4. Recommended: in the project settings, under **Data API**, turn the Data API off. The app does not use it,
+   and RLS already blocks it, so this just removes an unused entry point.
+
+Do not create or edit these tables from the Supabase dashboard — schema changes go through
+`worker/db/schema.ts` and migrations, so local and production stay identical.
+
+### 1b. Cloudflare resources
 
 ```bash
 npx wrangler login
 ```
 
+Hyperdrive pools connections to Supabase so the Worker does not pay a new TLS + auth handshake on
+every request. Use the same **Session pooler** string as above (not the transaction pooler on port
+6543 — Hyperdrive does that pooling itself):
+
 ```bash
-npx wrangler d1 create agencyos
+npx wrangler hyperdrive create agencyos-db --caching-disabled --connection-string="postgresql://postgres.<project-ref>:<password>@<region>.pooler.supabase.com:5432/postgres"
 ```
+
+`--caching-disabled` matters: Hyperdrive otherwise caches read queries for up to a minute, and this
+app must never serve a stale session, permission or invoice.
 
 ```bash
 npx wrangler r2 bucket create agencyos-files
@@ -132,15 +173,16 @@ npx wrangler r2 bucket create agencyos-files
 npx wrangler kv namespace create KV
 ```
 
-Copy the IDs printed by the D1 and KV commands into `wrangler.jsonc`:
+Copy the IDs printed by the Hyperdrive and KV commands into `wrangler.jsonc`:
 
 ```jsonc
-"d1_databases": [{ "binding": "DB", "database_name": "agencyos", "database_id": "<D1 id>", "migrations_dir": "drizzle" }],
+"hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<Hyperdrive id>", "localConnectionString": "…" }],
 "kv_namespaces": [{ "binding": "KV", "id": "<KV id>" }],
 ```
 
 (R2 needs no ID — the bucket name is the reference. R2 must be enabled once on your account in the
-Cloudflare dashboard.)
+Cloudflare dashboard. If the Hyperdrive command is refused, check that Hyperdrive is available on
+your Workers plan.)
 
 ### 2. Google OAuth client
 
@@ -180,11 +222,7 @@ npx wrangler secret put SESSION_SECRET
 Paste the `openssl` output when prompted for `SESSION_SECRET`. Changing it later invalidates open
 tabs' CSRF tokens (users just need to refresh); sessions themselves stay valid.
 
-### 4. Migrate and deploy
-
-```bash
-npm run db:migrate:remote
-```
+### 4. Deploy
 
 ```bash
 npm run deploy
@@ -221,4 +259,5 @@ npm run db:migrate:remote
 ```
 
 Edit `worker/db/schema.ts`, generate, review the SQL in `drizzle/`, apply locally, test, then apply
-remotely before (or together with) the deploy that needs it.
+remotely before (or together with) the deploy that needs it. New tables must end with
+`.enableRLS()` (see "How it is secured").

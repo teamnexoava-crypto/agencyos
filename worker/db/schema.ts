@@ -1,17 +1,21 @@
 /**
- * AgencyOS database schema (Cloudflare D1 / SQLite, via Drizzle).
+ * AgencyOS database schema (Supabase Postgres, via Drizzle).
  *
  * Conventions
  *  - Column names are snake_case in SQL (Drizzle `casing: "snake_case"`), camelCase in TypeScript.
  *  - IDs are text (nanoid). Public tokens are separate, longer random strings.
  *  - Every business table carries `workspace_id` and MUST be queried through `tenant()` (worker/lib/tenant.ts).
- *  - Money is stored as integers in minor units (paise / cents). Tax rates are basis points (1800 = 18%).
- *  - Instants are `timestamp_ms` integers. Calendar dates (issue date, due date…) are ISO `YYYY-MM-DD` text
- *    so they sort lexicographically and never shift with timezones.
+ *  - Money is stored as integers in minor units (paise / cents) in BIGINT columns – a 32-bit INTEGER
+ *    would overflow at ~₹2.1 crore. Tax rates are basis points (1800 = 18%).
+ *  - Instants are `timestamptz`. Calendar dates (issue date, due date…) are `date`, read as
+ *    `YYYY-MM-DD` strings so they never shift with timezones.
  *  - `deleted_at` marks soft-deleted rows.
+ *  - Row Level Security is ENABLED on every table with no policies. The Worker connects as the
+ *    database owner (which bypasses RLS), while Supabase's auto-generated Data API (anon /
+ *    authenticated roles) is denied everything. Never add a table without `.enableRLS()`.
  */
 import { relations } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { bigint, boolean, date, doublePrecision, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import {
   ACTIVITY_TYPES,
   COMMENT_AUTHOR_TYPES,
@@ -43,22 +47,25 @@ const id = () =>
     .$defaultFn(() => newId());
 
 const createdAt = () =>
-  integer({ mode: "timestamp_ms" })
+  timestamp({ withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date());
 
 const updatedAt = () =>
-  integer({ mode: "timestamp_ms" })
+  timestamp({ withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date())
     .$onUpdateFn(() => new Date());
 
 const timestamps = () => ({ createdAt: createdAt(), updatedAt: updatedAt() });
 
-const deletedAt = () => integer({ mode: "timestamp_ms" });
+const deletedAt = () => timestamp({ withTimezone: true, mode: "date" });
 
-/** Integer amount in minor units (paise). */
-const money = () => integer().notNull().default(0);
+/** Amount in minor units (paise). BIGINT in Postgres, a plain `number` in TypeScript (safe to 2^53). */
+const money = () => bigint({ mode: "number" }).notNull().default(0);
+
+/** Calendar date without a time or timezone, as a `YYYY-MM-DD` string. */
+const day = () => date({ mode: "string" });
 
 const workspaceRef = () =>
   text()
@@ -69,7 +76,7 @@ const workspaceRef = () =>
  * Identity & tenancy
  * ---------------------------------------------------------------------------------------------- */
 
-export const users = sqliteTable(
+export const users = pgTable(
   "users",
   {
     id: id(),
@@ -81,9 +88,9 @@ export const users = sqliteTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("users_google_sub_uq").on(t.googleSub), uniqueIndex("users_email_uq").on(t.email)],
-);
+).enableRLS();
 
-export const workspaces = sqliteTable("workspaces", {
+export const workspaces = pgTable("workspaces", {
   id: id(),
   name: text().notNull(),
   /** R2 object key of the logo, e.g. `ws/<id>/logo/<file>`. */
@@ -112,12 +119,12 @@ export const workspaces = sqliteTable("workspaces", {
   waContractTemplate: text(),
   waInviteTemplate: text(),
 
-  onboardedAt: integer({ mode: "timestamp_ms" }),
+  onboardedAt: timestamp({ withTimezone: true, mode: "date" }),
   ...timestamps(),
   deletedAt: deletedAt(),
-});
+}).enableRLS();
 
-export const sessions = sqliteTable(
+export const sessions = pgTable(
   "sessions",
   {
     /** SHA-256 of the cookie token – the raw token is never stored. */
@@ -126,15 +133,15 @@ export const sessions = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     activeWorkspaceId: text().references(() => workspaces.id, { onDelete: "set null" }),
-    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp({ withTimezone: true, mode: "date" }).notNull(),
     ip: text(),
     userAgent: text(),
     createdAt: createdAt(),
   },
   (t) => [index("sessions_user_idx").on(t.userId), index("sessions_expires_idx").on(t.expiresAt)],
-);
+).enableRLS();
 
-export const workspaceMembers = sqliteTable(
+export const workspaceMembers = pgTable(
   "workspace_members",
   {
     id: id(),
@@ -146,18 +153,18 @@ export const workspaceMembers = sqliteTable(
     designation: text(),
     phone: text(),
     /** Owner/admin-only: used for profit calculations. */
-    monthlyCost: integer(),
-    hourlyRate: integer(),
+    monthlyCost: bigint({ mode: "number" }),
+    hourlyRate: bigint({ mode: "number" }),
     ...timestamps(),
-    removedAt: integer({ mode: "timestamp_ms" }),
+    removedAt: timestamp({ withTimezone: true, mode: "date" }),
   },
   (t) => [
     uniqueIndex("workspace_members_ws_user_uq").on(t.workspaceId, t.userId),
     index("workspace_members_user_idx").on(t.userId),
   ],
-);
+).enableRLS();
 
-export const invites = sqliteTable(
+export const invites = pgTable(
   "invites",
   {
     id: id(),
@@ -167,19 +174,19 @@ export const invites = sqliteTable(
     designation: text(),
     token: text().notNull(),
     invitedBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
-    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
-    acceptedAt: integer({ mode: "timestamp_ms" }),
-    revokedAt: integer({ mode: "timestamp_ms" }),
+    expiresAt: timestamp({ withTimezone: true, mode: "date" }).notNull(),
+    acceptedAt: timestamp({ withTimezone: true, mode: "date" }),
+    revokedAt: timestamp({ withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("invites_token_uq").on(t.token), index("invites_ws_idx").on(t.workspaceId)],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Clients & projects
  * ---------------------------------------------------------------------------------------------- */
 
-export const clients = sqliteTable(
+export const clients = pgTable(
   "clients",
   {
     id: id(),
@@ -197,9 +204,9 @@ export const clients = sqliteTable(
     deletedAt: deletedAt(),
   },
   (t) => [index("clients_ws_idx").on(t.workspaceId)],
-);
+).enableRLS();
 
-export const projects = sqliteTable(
+export const projects = pgTable(
   "projects",
   {
     id: id(),
@@ -207,14 +214,14 @@ export const projects = sqliteTable(
     clientId: text().references(() => clients.id, { onDelete: "set null" }),
     title: text().notNull(),
     description: text(),
-    startDate: text(),
-    dueDate: text(),
+    startDate: day(),
+    dueDate: day(),
     budget: money(),
     status: text({ enum: PROJECT_STATUSES }).notNull().default("lead"),
     priority: text({ enum: PROJECT_PRIORITIES }).notNull().default("medium"),
-    tags: text({ mode: "json" }).$type<string[]>().notNull().default([]),
+    tags: jsonb().$type<string[]>().notNull().default([]),
     /** Ordering within a kanban column. */
-    position: real().notNull().default(0),
+    position: doublePrecision().notNull().default(0),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     ...timestamps(),
     deletedAt: deletedAt(),
@@ -224,9 +231,9 @@ export const projects = sqliteTable(
     index("projects_ws_status_idx").on(t.workspaceId, t.status),
     index("projects_client_idx").on(t.clientId),
   ],
-);
+).enableRLS();
 
-export const projectMembers = sqliteTable(
+export const projectMembers = pgTable(
   "project_members",
   {
     id: id(),
@@ -244,9 +251,9 @@ export const projectMembers = sqliteTable(
     index("project_members_ws_idx").on(t.workspaceId),
     index("project_members_member_idx").on(t.memberId),
   ],
-);
+).enableRLS();
 
-export const projectSteps = sqliteTable(
+export const projectSteps = pgTable(
   "project_steps",
   {
     id: id(),
@@ -256,13 +263,13 @@ export const projectSteps = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     title: text().notNull(),
     description: text(),
-    dueDate: text(),
+    dueDate: day(),
     status: text({ enum: STEP_STATUSES }).notNull().default("pending"),
     assigneeId: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     /** Optional milestone amount – pre-fills invoice line items. */
-    amount: integer(),
-    position: real().notNull().default(0),
-    completedAt: integer({ mode: "timestamp_ms" }),
+    amount: bigint({ mode: "number" }),
+    position: doublePrecision().notNull().default(0),
+    completedAt: timestamp({ withTimezone: true, mode: "date" }),
     ...timestamps(),
   },
   (t) => [
@@ -270,9 +277,9 @@ export const projectSteps = sqliteTable(
     index("project_steps_project_idx").on(t.projectId),
     index("project_steps_assignee_idx").on(t.assigneeId),
   ],
-);
+).enableRLS();
 
-export const tasks = sqliteTable(
+export const tasks = pgTable(
   "tasks",
   {
     id: id(),
@@ -284,10 +291,10 @@ export const tasks = sqliteTable(
     title: text().notNull(),
     description: text(),
     assigneeId: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
-    dueDate: text(),
-    done: integer({ mode: "boolean" }).notNull().default(false),
-    doneAt: integer({ mode: "timestamp_ms" }),
-    position: real().notNull().default(0),
+    dueDate: day(),
+    done: boolean().notNull().default(false),
+    doneAt: timestamp({ withTimezone: true, mode: "date" }),
+    position: doublePrecision().notNull().default(0),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     ...timestamps(),
   },
@@ -296,13 +303,13 @@ export const tasks = sqliteTable(
     index("tasks_project_idx").on(t.projectId),
     index("tasks_assignee_idx").on(t.assigneeId),
   ],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Files (R2 metadata)
  * ---------------------------------------------------------------------------------------------- */
 
-export const files = sqliteTable(
+export const files = pgTable(
   "files",
   {
     id: id(),
@@ -314,7 +321,7 @@ export const files = sqliteTable(
     contentType: text().notNull(),
     size: integer().notNull(),
     /** Only files explicitly shared appear on the client portal. */
-    sharedWithClient: integer({ mode: "boolean" }).notNull().default(false),
+    sharedWithClient: boolean().notNull().default(false),
     uploadedBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     deletedAt: deletedAt(),
@@ -324,13 +331,13 @@ export const files = sqliteTable(
     index("files_project_idx").on(t.projectId),
     uniqueIndex("files_r2_key_uq").on(t.r2Key),
   ],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Finance: expenses, invoices, payments
  * ---------------------------------------------------------------------------------------------- */
 
-export const expenseCategories = sqliteTable(
+export const expenseCategories = pgTable(
   "expense_categories",
   {
     id: id(),
@@ -340,9 +347,9 @@ export const expenseCategories = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("expense_categories_ws_name_uq").on(t.workspaceId, t.name)],
-);
+).enableRLS();
 
-export const expenses = sqliteTable(
+export const expenses = pgTable(
   "expenses",
   {
     id: id(),
@@ -353,7 +360,7 @@ export const expenses = sqliteTable(
     description: text().notNull(),
     vendor: text(),
     amount: money(),
-    date: text().notNull(),
+    date: day().notNull(),
     receiptFileId: text().references(() => files.id, { onDelete: "set null" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     ...timestamps(),
@@ -364,9 +371,9 @@ export const expenses = sqliteTable(
     index("expenses_project_idx").on(t.projectId),
     index("expenses_category_idx").on(t.categoryId),
   ],
-);
+).enableRLS();
 
-export const invoices = sqliteTable(
+export const invoices = pgTable(
   "invoices",
   {
     id: id(),
@@ -377,13 +384,13 @@ export const invoices = sqliteTable(
     number: text().notNull(),
     sequence: integer().notNull(),
     status: text({ enum: INVOICE_STATUSES }).notNull().default("draft"),
-    issueDate: text().notNull(),
-    dueDate: text().notNull(),
+    issueDate: day().notNull(),
+    dueDate: day().notNull(),
     currency: text({ enum: CURRENCY_CODES }).notNull().default("INR"),
 
     discountType: text({ enum: DISCOUNT_TYPES }).notNull().default("none"),
     /** Basis points when percent, minor units when fixed. */
-    discountValue: integer().notNull().default(0),
+    discountValue: bigint({ mode: "number" }).notNull().default(0),
     taxMode: text({ enum: TAX_MODES }).notNull().default("none"),
     taxRate: integer().notNull().default(0),
 
@@ -401,10 +408,10 @@ export const invoices = sqliteTable(
 
     /** Unguessable token for /i/:token. Regenerating it revokes the old link. */
     publicToken: text().notNull(),
-    sentAt: integer({ mode: "timestamp_ms" }),
-    viewedAt: integer({ mode: "timestamp_ms" }),
-    paidAt: integer({ mode: "timestamp_ms" }),
-    cancelledAt: integer({ mode: "timestamp_ms" }),
+    sentAt: timestamp({ withTimezone: true, mode: "date" }),
+    viewedAt: timestamp({ withTimezone: true, mode: "date" }),
+    paidAt: timestamp({ withTimezone: true, mode: "date" }),
+    cancelledAt: timestamp({ withTimezone: true, mode: "date" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     ...timestamps(),
     deletedAt: deletedAt(),
@@ -417,9 +424,9 @@ export const invoices = sqliteTable(
     index("invoices_client_idx").on(t.clientId),
     index("invoices_project_idx").on(t.projectId),
   ],
-);
+).enableRLS();
 
-export const invoiceItems = sqliteTable(
+export const invoiceItems = pgTable(
   "invoice_items",
   {
     id: id(),
@@ -428,15 +435,15 @@ export const invoiceItems = sqliteTable(
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
     description: text().notNull(),
-    quantity: real().notNull().default(1),
+    quantity: doublePrecision().notNull().default(1),
     rate: money(),
     amount: money(),
     position: integer().notNull().default(0),
   },
   (t) => [index("invoice_items_ws_idx").on(t.workspaceId), index("invoice_items_invoice_idx").on(t.invoiceId)],
-);
+).enableRLS();
 
-export const payments = sqliteTable(
+export const payments = pgTable(
   "payments",
   {
     id: id(),
@@ -445,7 +452,7 @@ export const payments = sqliteTable(
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
     amount: money(),
-    date: text().notNull(),
+    date: day().notNull(),
     method: text({ enum: PAYMENT_METHODS }).notNull().default("upi"),
     reference: text(),
     notes: text(),
@@ -453,13 +460,13 @@ export const payments = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [index("payments_ws_date_idx").on(t.workspaceId, t.date), index("payments_invoice_idx").on(t.invoiceId)],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Contracts & e-signatures
  * ---------------------------------------------------------------------------------------------- */
 
-export const contractTemplates = sqliteTable(
+export const contractTemplates = pgTable(
   "contract_templates",
   {
     id: id(),
@@ -471,9 +478,9 @@ export const contractTemplates = sqliteTable(
     deletedAt: deletedAt(),
   },
   (t) => [index("contract_templates_ws_idx").on(t.workspaceId)],
-);
+).enableRLS();
 
-export const contracts = sqliteTable(
+export const contracts = pgTable(
   "contracts",
   {
     id: id(),
@@ -491,11 +498,11 @@ export const contracts = sqliteTable(
     publicToken: text().notNull(),
     /** SHA-256 (hex) of `content` at the moment of the first signature. */
     contentHash: text(),
-    sentAt: integer({ mode: "timestamp_ms" }),
-    viewedAt: integer({ mode: "timestamp_ms" }),
-    clientSignedAt: integer({ mode: "timestamp_ms" }),
-    completedAt: integer({ mode: "timestamp_ms" }),
-    lockedAt: integer({ mode: "timestamp_ms" }),
+    sentAt: timestamp({ withTimezone: true, mode: "date" }),
+    viewedAt: timestamp({ withTimezone: true, mode: "date" }),
+    clientSignedAt: timestamp({ withTimezone: true, mode: "date" }),
+    completedAt: timestamp({ withTimezone: true, mode: "date" }),
+    lockedAt: timestamp({ withTimezone: true, mode: "date" }),
     signedPdfFileId: text().references(() => files.id, { onDelete: "set null" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
     ...timestamps(),
@@ -506,10 +513,10 @@ export const contracts = sqliteTable(
     index("contracts_ws_idx").on(t.workspaceId),
     index("contracts_project_idx").on(t.projectId),
   ],
-);
+).enableRLS();
 
 /** Append-only audit trail: one row per signature event. */
-export const signatures = sqliteTable(
+export const signatures = pgTable(
   "signatures",
   {
     id: id(),
@@ -528,16 +535,16 @@ export const signatures = sqliteTable(
     userAgent: text(),
     /** SHA-256 (hex) of the exact contract content that was signed. */
     contentHash: text().notNull(),
-    signedAt: integer({ mode: "timestamp_ms" }).notNull(),
+    signedAt: timestamp({ withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [index("signatures_ws_idx").on(t.workspaceId), index("signatures_contract_idx").on(t.contractId)],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Client portal
  * ---------------------------------------------------------------------------------------------- */
 
-export const shareLinks = sqliteTable(
+export const shareLinks = pgTable(
   "share_links",
   {
     id: id(),
@@ -547,13 +554,13 @@ export const shareLinks = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     /** Unguessable token for /p/:token. Regenerating it revokes the old link. */
     token: text().notNull(),
-    enabled: integer({ mode: "boolean" }).notNull().default(true),
-    showInvoices: integer({ mode: "boolean" }).notNull().default(true),
-    showContract: integer({ mode: "boolean" }).notNull().default(true),
-    showFiles: integer({ mode: "boolean" }).notNull().default(true),
-    allowComments: integer({ mode: "boolean" }).notNull().default(true),
+    enabled: boolean().notNull().default(true),
+    showInvoices: boolean().notNull().default(true),
+    showContract: boolean().notNull().default(true),
+    showFiles: boolean().notNull().default(true),
+    allowComments: boolean().notNull().default(true),
     viewCount: integer().notNull().default(0),
-    lastViewedAt: integer({ mode: "timestamp_ms" }),
+    lastViewedAt: timestamp({ withTimezone: true, mode: "date" }),
     ...timestamps(),
   },
   (t) => [
@@ -561,9 +568,9 @@ export const shareLinks = sqliteTable(
     uniqueIndex("share_links_project_uq").on(t.projectId),
     index("share_links_ws_idx").on(t.workspaceId),
   ],
-);
+).enableRLS();
 
-export const comments = sqliteTable(
+export const comments = pgTable(
   "comments",
   {
     id: id(),
@@ -579,13 +586,13 @@ export const comments = sqliteTable(
     deletedAt: deletedAt(),
   },
   (t) => [index("comments_ws_idx").on(t.workspaceId), index("comments_project_idx").on(t.projectId, t.createdAt)],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Activity & notifications
  * ---------------------------------------------------------------------------------------------- */
 
-export const activityLog = sqliteTable(
+export const activityLog = pgTable(
   "activity_log",
   {
     id: id(),
@@ -600,13 +607,13 @@ export const activityLog = sqliteTable(
     /** Short, pre-rendered description, e.g. `Invoice INV-0042 was paid`. */
     summary: text().notNull(),
     /** True for money-related events that members must not see. */
-    financeOnly: integer({ mode: "boolean" }).notNull().default(false),
+    financeOnly: boolean().notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("activity_log_ws_created_idx").on(t.workspaceId, t.createdAt)],
-);
+).enableRLS();
 
-export const notifications = sqliteTable(
+export const notifications = pgTable(
   "notifications",
   {
     id: id(),
@@ -620,11 +627,11 @@ export const notifications = sqliteTable(
     body: text(),
     /** In-app path to open, e.g. `/app/invoices/<id>`. */
     link: text(),
-    readAt: integer({ mode: "timestamp_ms" }),
+    readAt: timestamp({ withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
   },
   (t) => [index("notifications_recipient_idx").on(t.workspaceId, t.userId, t.createdAt)],
-);
+).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
  * Relations (for Drizzle's relational query API)

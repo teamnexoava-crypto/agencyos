@@ -3,6 +3,12 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { localDatabaseUrl } from "./scripts/env";
+
+// One source of truth for the local database: DATABASE_URL (from .env) is handed to Wrangler as the
+// local connection string of the HYPERDRIVE binding, so `npm run dev`, migrations and the seed script
+// all talk to the same Postgres. Production uses the real Hyperdrive config instead.
+process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE ??= localDatabaseUrl();
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), cloudflare()],

@@ -1,5 +1,5 @@
 /**
- * Seeds the LOCAL D1 database with a demo workspace so the app has something to show.
+ * Seeds the LOCAL Postgres database (DATABASE_URL) with a demo workspace so the app has something to show.
  *
  *   npm run db:migrate:local   # once
  *   npm run db:seed            # re-runnable: wipes and recreates the demo workspace
@@ -8,10 +8,10 @@
  * Each build phase extends this file with data for the features it adds.
  */
 import { eq, inArray } from "drizzle-orm";
-import { getPlatformProxy } from "wrangler";
 import { createDb } from "../worker/db";
 import { users, workspaceMembers, workspaces } from "../worker/db/schema";
 import { createWorkspaceForUser } from "../worker/services/workspaces";
+import { isLocalDatabase, localDatabaseUrl } from "./env";
 
 const DEMO_WORKSPACE_ID = "demo_workspace";
 
@@ -25,9 +25,13 @@ const TEAMMATES = [
 ] as const;
 
 async function main() {
-  // Connects to the same local D1 file that `npm run dev` and `wrangler d1 ... --local` use.
-  const { env, dispose } = await getPlatformProxy<Pick<Env, "DB">>();
-  const db = createDb(env.DB);
+  // The same database `npm run dev` uses. Demo data never belongs in production, so anything that
+  // is not on localhost is refused unless explicitly allowed.
+  const url = localDatabaseUrl();
+  if (!isLocalDatabase(url) && !process.argv.includes("--allow-remote")) {
+    throw new Error("DATABASE_URL does not point at localhost. Re-run with `-- --allow-remote` if you really mean to seed it.");
+  }
+  const db = createDb(url);
 
   try {
     // 1. Demo owner (upsert by Google subject).
@@ -87,7 +91,7 @@ async function main() {
     console.log(`✔ Seeded "Northwind Studio" with ${TEAMMATES.length + 1} members.`);
     console.log('  Run `npm run dev` and choose "Continue as demo user" on /login.');
   } finally {
-    await dispose();
+    await db.$client.end();
   }
 }
 
