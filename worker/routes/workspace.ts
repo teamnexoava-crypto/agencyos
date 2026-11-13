@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { LOGO_MAX_BYTES } from "../../shared/constants";
+import { switchWorkspaceSchema } from "../../shared/schemas/team";
 import { createWorkspaceSchema, onboardingSchema } from "../../shared/schemas/workspace";
-import { workspaces } from "../db/schema";
+import type { WorkspaceMembershipDTO } from "../../shared/types";
+import { workspaceMembers, workspaces } from "../db/schema";
 import { ApiError, badRequest, forbidden } from "../lib/errors";
 import { newId } from "../lib/ids";
 import { sniffImage } from "../lib/images";
@@ -33,6 +35,43 @@ export const workspaceRoutes = new Hono<AppEnv>()
     const workspaceId = await createWorkspaceForUser(c.var.db, auth.user, { name });
     await setActiveWorkspace(c.var.db, auth.sessionId, workspaceId);
     return c.json({ ok: true }, 201);
+  })
+
+  /** Every workspace the signed-in user belongs to (for the workspace switcher). */
+  .get("/memberships", async (c) => {
+    const auth = requireUser(c);
+    const rows = await c.var.db
+      .select({ workspace: workspaces, role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .where(and(eq(workspaceMembers.userId, auth.user.id), isNull(workspaceMembers.removedAt), isNull(workspaces.deletedAt)))
+      .orderBy(workspaceMembers.createdAt);
+    const memberships: WorkspaceMembershipDTO[] = rows.map((row) => ({
+      workspaceId: row.workspace.id,
+      name: row.workspace.name,
+      logoUrl: logoUrlFromKey(row.workspace.logoKey),
+      role: row.role,
+      active: row.workspace.id === auth.workspace?.id,
+    }));
+    return c.json({ memberships });
+  })
+
+  /** Switches the session to another workspace the user is a member of. */
+  .post("/switch", validate("json", switchWorkspaceSchema), async (c) => {
+    const auth = requireUser(c);
+    const { workspaceId } = c.req.valid("json");
+    const [membership] = await c.var.db
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .where(
+        and(eq(workspaceMembers.userId, auth.user.id), eq(workspaceMembers.workspaceId, workspaceId), isNull(workspaceMembers.removedAt), isNull(workspaces.deletedAt)),
+      )
+      .limit(1);
+    // Same answer whether the workspace doesn't exist or the user simply isn't in it.
+    if (!membership) throw forbidden("You are not a member of that workspace.");
+    await setActiveWorkspace(c.var.db, auth.sessionId, workspaceId);
+    return c.json({ ok: true });
   })
 
   /** Completes onboarding: saves the agency profile and marks the workspace as onboarded. */

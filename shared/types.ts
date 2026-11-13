@@ -143,3 +143,76 @@ export interface ClientDetail extends ClientDTO {
   /** Minor units; filled in once invoicing exists. */
   totals: { billed: number; paid: number };
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Team
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface TeamMemberDTO extends MemberSummary {
+  phone: string | null;
+  /** Minor units. Always null for viewers who may not see finances. */
+  monthlyCost: number | null;
+  hourlyRate: number | null;
+  projectCount: number;
+  openTasks: number;
+  joinedAt: number;
+}
+
+export interface InviteDTO {
+  id: string;
+  email: string;
+  role: Role;
+  designation: string | null;
+  /** The secret part of the invite link: /invite/<token>. */
+  token: string;
+  invitedByName: string | null;
+  expiresAt: number;
+  createdAt: number;
+}
+
+export interface TeamResponse {
+  members: TeamMemberDTO[];
+  /** Pending invites – only sent to owners and admins. */
+  invites: InviteDTO[];
+  /** Workspace's WhatsApp invite message template. */
+  inviteTemplate: string;
+}
+
+export interface AssignedTask extends TaskDTO {
+  projectId: string;
+  projectTitle: string;
+}
+
+export interface AssignedStep extends StepDTO {
+  projectId: string;
+  projectTitle: string;
+}
+
+export interface MemberDetail {
+  member: TeamMemberDTO;
+  projects: ProjectSummary[];
+  /** Open tasks assigned to this person, soonest due first. */
+  tasks: AssignedTask[];
+  /** Steps assigned to this person that aren't completed yet. */
+  steps: AssignedStep[];
+}
+
+export type InviteState = "valid" | "expired" | "revoked" | "accepted" | "not_found";
+
+export interface InvitePreview {
+  state: InviteState;
+  workspaceName: string | null;
+  workspaceLogoUrl: string | null;
+  inviterName: string | null;
+  /** The address the invite was sent to – the Google account used to accept must match it. */
+  email: string | null;
+  role: Role | null;
+}
+
+export interface WorkspaceMembershipDTO {
+  workspaceId: string;
+  name: string;
+  logoUrl: string | null;
+  role: Role;
+  active: boolean;
+}

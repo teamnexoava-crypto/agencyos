@@ -1,4 +1,4 @@
-import { LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { Check, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { useTheme, type Theme } from "@/components/theme/theme-provider";
@@ -14,7 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { WorkspaceLogo } from "@/components/shared/workspace-logo";
 import { useLogout, useSession } from "@/features/auth/api";
+import { useMemberships, useSwitchWorkspace } from "@/features/team/api";
 import { errorMessage } from "@/lib/api";
 import { initials } from "@/lib/format";
 
@@ -22,6 +24,8 @@ export function UserMenu() {
   const { user, role, canManage } = useSession();
   const { theme, setTheme } = useTheme();
   const logout = useLogout();
+  const { data: memberships = [] } = useMemberships();
+  const switchWorkspace = useSwitchWorkspace();
 
   return (
     <DropdownMenu>
@@ -49,6 +53,29 @@ export function UserMenu() {
             {role}
           </Badge>
         </div>
+
+        {/* Only people who belong to more than one workspace need a switcher. */}
+        {memberships.length > 1 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            {memberships.map((item) => (
+              <DropdownMenuItem
+                key={item.workspaceId}
+                disabled={switchWorkspace.isPending}
+                onSelect={(event) => {
+                  if (item.active) return;
+                  event.preventDefault();
+                  switchWorkspace.mutate(item.workspaceId, { onError: (error) => toast.error(errorMessage(error, "Could not switch workspace.")) });
+                }}
+              >
+                <WorkspaceLogo name={item.name} logoUrl={item.logoUrl} className="size-6 rounded-md text-[10px]" />
+                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                {item.active ? <Check className="!text-primary" /> : <span className="text-xs text-muted-foreground capitalize">{item.role}</span>}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Theme</DropdownMenuLabel>

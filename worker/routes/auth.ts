@@ -10,7 +10,7 @@ import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured 
 import { appOrigin, isHttps, isLocalhost, safeRedirectPath } from "../lib/request";
 import { createSession, csrfTokenFor, destroySession, purgeExpiredSessions } from "../lib/session";
 import { rateLimit } from "../middleware/rate-limit";
-import { ensureWorkspace, upsertGoogleUser } from "../services/users";
+import { ensureWorkspace, findWorkspaceId, upsertGoogleUser } from "../services/users";
 import { toMembershipDTO, toSessionUser, toWorkspaceDTO } from "../services/workspaces";
 import type { AppEnv } from "../types";
 
@@ -94,7 +94,8 @@ export const authRoutes = new Hono<AppEnv>()
     try {
       const profile = await exchangeCode(c.env, appOrigin(c), code, codeVerifier);
       const { user } = await upsertGoogleUser(c.var.db, profile);
-      const workspaceId = await ensureWorkspace(c.var.db, user);
+      // Someone signing in to accept an invite joins that workspace instead – don't create one of their own.
+      const workspaceId = next.startsWith("/invite/") ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user);
       await createSession(c, user.id, workspaceId);
       c.executionCtx.waitUntil(purgeExpiredSessions(c.var.db));
       return c.redirect(next, 302);
@@ -146,7 +147,9 @@ if (import.meta.env.DEV) {
           picture: null,
         })
       ).user;
-    const workspaceId = await ensureWorkspace(c.var.db, user);
+    // `{ "workspace": false }` mimics signing in from an invite link: no workspace is created.
+    const skipWorkspace = typeof body === "object" && body !== null && "workspace" in body && body.workspace === false;
+    const workspaceId = skipWorkspace ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user);
     await createSession(c, user.id, workspaceId);
     return c.json({ ok: true });
   });

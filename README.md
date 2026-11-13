@@ -5,12 +5,11 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 2 of 8 complete.**
-> Done: project setup, Cloudflare config, full Postgres schema, Google login, sessions, CSRF, rate
-> limiting, onboarding, app shell · clients (CRUD, detail page) · projects (kanban board with drag and
-> drop, sortable table, search and filters, detail page) · steps / milestones (reorder, status,
-> assignee, amount, auto-calculated progress) · tasks (assign, due date, done).
-> Next: team → invoices → finance & dashboard → contracts & e-sign → client portal → landing page,
+> **Build status — Phase 3 of 8 complete.**
+> Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects (kanban,
+> table, detail, steps / milestones, tasks) · team (invite links bound to a Google email, WhatsApp
+> sharing, roles, costs, member pages with workload, removal, workspace switcher).
+> Next: invoices → finance & dashboard → contracts & e-sign → client portal → landing page,
 > notifications, polish.
 
 ## Stack
@@ -96,7 +95,7 @@ worker/                 The API (Cloudflare Worker, Hono)
   db/schema.ts            Drizzle schema – all 23 tables
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
-  routes/                 auth, workspace, members, clients, projects, assets (one file per resource)
+  routes/                 auth, workspace, members, team, invites, clients, projects, assets
   services/               Business logic shared by routes and the seed script
 src/                    The React app
   components/ui/          shadcn/ui primitives
@@ -127,6 +126,9 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
   what a role cannot use but is never the enforcement point. Members only receive projects they are
   assigned to (anything else answers 404, not 403, so existence isn't revealed), may update step
   status and manage tasks there, and are never sent budgets, milestone amounts or the client list.
+- **Invites.** An invite link carries a 32-character random token, expires after 7 days, can be
+  revoked, and can only be accepted by the Google account whose email it was created for – a
+  forwarded or leaked link is useless to anyone else. Only the owner can grant the admin role.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores

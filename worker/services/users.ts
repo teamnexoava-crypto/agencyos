@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db";
-import { users, workspaceMembers } from "../db/schema";
+import { users, workspaceMembers, workspaces } from "../db/schema";
 import type { GoogleProfile } from "../lib/google";
 import type { UserRow } from "../types";
 import { createWorkspaceForUser, defaultWorkspaceName } from "./workspaces";
@@ -42,4 +42,16 @@ export async function ensureWorkspace(db: Database, user: UserRow): Promise<stri
     .limit(1);
   if (membership) return membership.workspaceId;
   return createWorkspaceForUser(db, user, { name: defaultWorkspaceName(user.name) });
+}
+
+/** The user's first active workspace, or null – used when signing in to accept an invite (no workspace is created). */
+export async function findWorkspaceId(db: Database, user: UserRow): Promise<string | null> {
+  const [membership] = await db
+    .select({ workspaceId: workspaceMembers.workspaceId })
+    .from(workspaceMembers)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+    .where(and(eq(workspaceMembers.userId, user.id), isNull(workspaceMembers.removedAt), isNull(workspaces.deletedAt)))
+    .orderBy(workspaceMembers.createdAt)
+    .limit(1);
+  return membership?.workspaceId ?? null;
 }

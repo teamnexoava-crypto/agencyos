@@ -40,6 +40,8 @@ export const router = createBrowserRouter([
       // The landing page is the front door – keep it in the main bundle so it paints immediately.
       { path: "/", element: <LandingPage /> },
       { path: "/privacy", lazy: async () => ({ Component: (await import("@/pages/legal")).PrivacyPage }) },
+      // Invite links work signed in or out, with or without a workspace – so no guard here.
+      { path: "/invite/:token", lazy: page(() => import("@/pages/invite")) },
       { path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },
       {
         path: "/login",
@@ -82,7 +84,8 @@ export const router = createBrowserRouter([
               { index: true, lazy: page(() => import("@/pages/app/dashboard")) },
               { path: "projects", lazy: page(() => import("@/pages/app/projects")) },
               { path: "projects/:projectId", lazy: page(() => import("@/pages/app/project-detail")) },
-              { path: "team", lazy: comingSoon("TeamPage") },
+              { path: "team", lazy: page(() => import("@/pages/app/team")) },
+              { path: "team/:memberId", lazy: page(() => import("@/pages/app/member-detail")) },
               {
                 element: (
                   <ManagersOnly>

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { FileSignature, ReceiptText, Settings, UsersRound, Wallet } from "lucide-react";
+import { FileSignature, ReceiptText, Settings, Wallet } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -22,17 +22,6 @@ function ComingSoon({ title, description, icon, emptyTitle, emptyDescription, ph
     </>
   );
 }
-
-export const TeamPage = () => (
-  <ComingSoon
-    title="Team"
-    description="Invite people and control what they can see."
-    icon={UsersRound}
-    emptyTitle="It's just you so far"
-    emptyDescription="Invite teammates by link, assign them to projects and keep finances visible only to owners and admins."
-    phase={3}
-  />
-);
 
 export const InvoicesPage = () => (
   <ComingSoon
