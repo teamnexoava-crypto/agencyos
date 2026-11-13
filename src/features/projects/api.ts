@@ -41,10 +41,11 @@ export function useProjects() {
   });
 }
 
-export function useProject(id: string) {
+export function useProject(id: string, enabled = true) {
   return useQuery({
     queryKey: projectKeys.detail(id),
     queryFn: async ({ signal }) => (await api<{ project: ProjectDetail }>(`/api/projects/${id}`, { signal })).project,
+    enabled,
   });
 }
 

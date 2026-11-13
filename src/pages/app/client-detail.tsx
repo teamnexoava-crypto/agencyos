@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/features/auth/api";
 import { useClient, useDeleteClient } from "@/features/clients/api";
 import { ClientFormDialog } from "@/features/clients/client-form-dialog";
+import { useInvoices } from "@/features/invoices/api";
+import { InvoiceRows } from "@/features/invoices/invoice-list";
 import { useMemberMap } from "@/features/members/api";
 import { ProjectCard } from "@/features/projects/project-card";
 import { ProjectFormDialog } from "@/features/projects/project-form-dialog";
@@ -25,6 +27,7 @@ export default function ClientDetailPage() {
   const { data: client, isPending, error, refetch } = useClient(clientId);
   const members = useMemberMap();
   const deleteClient = useDeleteClient();
+  const invoices = useInvoices({ clientId });
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
@@ -158,10 +161,23 @@ export default function ClientDetailPage() {
           </section>
 
           <section aria-labelledby="client-invoices">
-            <h2 id="client-invoices" className="mb-3 text-sm font-semibold">
-              Invoices
-            </h2>
-            <EmptyState icon={ReceiptText} title="No invoices yet" description="Invoices you send this client will be listed here, with what's been billed and paid." className="py-10" />
+            <div className="mb-3 flex items-center justify-between">
+              <h2 id="client-invoices" className="text-sm font-semibold">
+                Invoices
+              </h2>
+              <Button asChild variant="ghost" size="sm">
+                <Link to={`/app/invoices/new?client=${client.id}`}>
+                  <Plus /> New invoice
+                </Link>
+              </Button>
+            </div>
+            {invoices.isPending ? (
+              <Skeleton className="h-24 rounded-2xl" />
+            ) : !invoices.data || invoices.data.invoices.length === 0 ? (
+              <EmptyState icon={ReceiptText} title="No invoices yet" description="Invoices you send this client will be listed here, with what's been billed and paid." className="py-10" />
+            ) : (
+              <InvoiceRows invoices={invoices.data.invoices} hide={["client"]} />
+            )}
           </section>
         </div>
 

@@ -44,7 +44,7 @@ export function AppShell() {
   const sidebarOffset = isDesktop ? (collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH) : 0;
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="min-h-dvh bg-background print:min-h-0 print:bg-white">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
@@ -66,10 +66,10 @@ export function AppShell() {
         initial={false}
         animate={{ paddingLeft: sidebarOffset }}
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-        className="flex min-h-dvh min-w-0 flex-col"
+        className="flex min-h-dvh min-w-0 flex-col print:min-h-0 print:!pl-0"
       >
         <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} onOpenSearch={() => setSearchOpen(true)} />
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-10">
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-10 print:max-w-none print:p-0">
           <PageTransition />
         </main>
       </motion.div>

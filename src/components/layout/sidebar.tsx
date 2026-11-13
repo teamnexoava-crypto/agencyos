@@ -115,7 +115,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
       initial={false}
       animate={{ width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
       transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-      className="group/sidebar fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar lg:block"
+      className="group/sidebar fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar lg:block print:!hidden"
     >
       <div className="h-full overflow-hidden">
         <AnimatePresence initial={false} mode="wait">

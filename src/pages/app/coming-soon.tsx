@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { FileSignature, ReceiptText, Settings, Wallet } from "lucide-react";
+import { FileSignature, Settings, Wallet } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -22,17 +22,6 @@ function ComingSoon({ title, description, icon, emptyTitle, emptyDescription, ph
     </>
   );
 }
-
-export const InvoicesPage = () => (
-  <ComingSoon
-    title="Invoices"
-    description="Bill clients and get paid faster."
-    icon={ReceiptText}
-    emptyTitle="No invoices yet"
-    emptyDescription="GST-ready invoices with live preview, PDF download, partial payments and one-tap WhatsApp sharing."
-    phase={4}
-  />
-);
 
 export const FinancePage = () => (
   <ComingSoon

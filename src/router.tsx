@@ -40,6 +40,8 @@ export const router = createBrowserRouter([
       // The landing page is the front door – keep it in the main bundle so it paints immediately.
       { path: "/", element: <LandingPage /> },
       { path: "/privacy", lazy: async () => ({ Component: (await import("@/pages/legal")).PrivacyPage }) },
+      // Public invoice link – what the client opens. No login, no app shell.
+      { path: "/i/:token", lazy: page(() => import("@/pages/public-invoice")) },
       // Invite links work signed in or out, with or without a workspace – so no guard here.
       { path: "/invite/:token", lazy: page(() => import("@/pages/invite")) },
       { path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },
@@ -95,7 +97,10 @@ export const router = createBrowserRouter([
                 children: [
                   { path: "clients", lazy: page(() => import("@/pages/app/clients")) },
                   { path: "clients/:clientId", lazy: page(() => import("@/pages/app/client-detail")) },
-                  { path: "invoices", lazy: comingSoon("InvoicesPage") },
+                  { path: "invoices", lazy: page(() => import("@/pages/app/invoices")) },
+                  { path: "invoices/new", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).NewInvoicePage }) },
+                  { path: "invoices/:invoiceId", lazy: page(() => import("@/pages/app/invoice-detail")) },
+                  { path: "invoices/:invoiceId/edit", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).EditInvoicePage }) },
                   { path: "finance", lazy: comingSoon("FinancePage") },
                   { path: "contracts", lazy: comingSoon("ContractsPage") },
                   { path: "settings", lazy: comingSoon("SettingsPage") },

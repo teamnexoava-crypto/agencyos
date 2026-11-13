@@ -30,6 +30,7 @@ import { useMemberMap } from "@/features/members/api";
 import { useDeleteProject, useProject, useUpdateProject } from "@/features/projects/api";
 import { STATUS_META } from "@/features/projects/meta";
 import { PriorityBadge, StatusBadge } from "@/features/projects/badges";
+import { ProjectInvoicesTab } from "@/features/invoices/project-invoices-tab";
 import { OverviewTab } from "@/features/projects/overview-tab";
 import { ProjectFormDialog } from "@/features/projects/project-form-dialog";
 import { StepsTab } from "@/features/projects/steps-tab";
@@ -58,13 +59,7 @@ const TABS: TabDef[] = [
     managersOnly: true,
     upcoming: { phase: 5, title: "No expenses yet", description: "Log project costs with categories and receipts to see what this project really earns." },
   },
-  {
-    value: "invoices",
-    label: "Invoices",
-    icon: ReceiptText,
-    managersOnly: true,
-    upcoming: { phase: 4, title: "No invoices yet", description: "Create an invoice from this project in two clicks – milestones become line items." },
-  },
+  { value: "invoices", label: "Invoices", icon: ReceiptText, managersOnly: true },
   {
     value: "contract",
     label: "Contract",
@@ -236,6 +231,11 @@ export default function ProjectDetailPage() {
         <TabsContent value="tasks">
           <TasksTab project={project} members={members} />
         </TabsContent>
+        {canManage && (
+          <TabsContent value="invoices">
+            <ProjectInvoicesTab project={project} />
+          </TabsContent>
+        )}
         {tabs
           .filter((tab) => tab.upcoming)
           .map((tab) => (

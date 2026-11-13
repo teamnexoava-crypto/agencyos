@@ -13,7 +13,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 
 export function Topbar({ onOpenMobileNav, onOpenSearch }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:gap-3 sm:px-6">
+    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:gap-3 sm:px-6 print:hidden">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileNav} aria-label="Open navigation">
         <Menu className="size-5" />
       </Button>

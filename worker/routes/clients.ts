@@ -10,6 +10,7 @@ import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
+import { clientBillingTotals } from "../services/invoices";
 import { listProjectSummaries } from "../services/projects";
 import type { AppEnv } from "../types";
 
@@ -103,8 +104,7 @@ export const clientRoutes = new Hono<AppEnv>()
     const detail: ClientDetail = {
       ...toDTO(row, clientProjects.length),
       projects: clientProjects,
-      // Billed / paid totals come from invoices, which arrive in Phase 4.
-      totals: { billed: 0, paid: 0 },
+      totals: (await clientBillingTotals(t, [row.id])).get(row.id) ?? { billed: 0, paid: 0 },
     };
     return c.json({ client: detail });
   })

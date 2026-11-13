@@ -1,4 +1,4 @@
-import type { CurrencyCode, ProjectPriority, ProjectStatus, Role, StepStatus, TaxMode } from "./constants";
+import type { CurrencyCode, DiscountType, InvoiceStatus, PaymentMethod, ProjectPriority, ProjectStatus, Role, StepStatus, TaxMode } from "./constants";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -215,4 +215,105 @@ export interface WorkspaceMembershipDTO {
   logoUrl: string | null;
   role: Role;
   active: boolean;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Invoices
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface InvoiceListItem {
+  id: string;
+  number: string;
+  status: InvoiceStatus;
+  clientId: string | null;
+  clientName: string | null;
+  projectId: string | null;
+  projectTitle: string | null;
+  issueDate: string;
+  dueDate: string;
+  currency: CurrencyCode;
+  total: number;
+  amountPaid: number;
+}
+
+export interface InvoiceItemDTO {
+  id: string;
+  description: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+}
+
+export interface PaymentDTO {
+  id: string;
+  amount: number;
+  date: string;
+  method: PaymentMethod;
+  reference: string | null;
+  notes: string | null;
+  createdAt: number;
+}
+
+/** The parties and content printed on an invoice – identical for the app, the PDF and the public page. */
+export interface InvoiceDocument {
+  number: string;
+  status: InvoiceStatus;
+  issueDate: string;
+  dueDate: string;
+  currency: CurrencyCode;
+  items: InvoiceItemDTO[];
+  discountType: DiscountType;
+  discountValue: number;
+  taxMode: TaxMode;
+  taxRate: number;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  total: number;
+  amountPaid: number;
+  notes: string | null;
+  terms: string | null;
+  bankDetails: string | null;
+  upiId: string | null;
+  projectTitle: string | null;
+  from: { name: string; logoUrl: string | null; address: string | null; gstNumber: string | null; phone: string | null; email: string | null; brandColor: string };
+  to: { name: string; company: string | null; address: string | null; gstNumber: string | null; email: string | null };
+}
+
+export interface InvoiceDetail extends InvoiceDocument {
+  id: string;
+  clientId: string | null;
+  projectId: string | null;
+  /** Client's WhatsApp number for one-tap sharing. */
+  clientWhatsapp: string | null;
+  publicToken: string;
+  payments: PaymentDTO[];
+  sentAt: number | null;
+  viewedAt: number | null;
+  paidAt: number | null;
+  createdAt: number;
+  /** Workspace's WhatsApp message template for invoices. */
+  messageTemplate: string;
+}
+
+/** Prefill values for a new invoice. */
+export interface InvoiceDefaults {
+  nextNumber: string;
+  dueDays: number;
+  taxMode: TaxMode;
+  taxRate: number;
+  notes: string | null;
+  terms: string | null;
+  bankDetails: string | null;
+  upiId: string | null;
+}
+
+export interface InvoiceSummary {
+  /** Unpaid balance across sent invoices. */
+  outstanding: number;
+  overdue: number;
+  overdueCount: number;
+  /** Payments received in the current calendar month. */
+  collectedThisMonth: number;
+  draftCount: number;
 }

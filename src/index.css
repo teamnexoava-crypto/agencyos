@@ -178,3 +178,36 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Printing (invoice → "Save as PDF"). App chrome is hidden with Tailwind's `print:hidden`; here we
+ * only set up the page and make sure colours and the document itself print faithfully.
+ * ---------------------------------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Toasts and the confetti canvas must never end up in a PDF. */
+  [data-sonner-toaster],
+  body > canvas {
+    display: none !important;
+  }
+
+  .print-area {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}

@@ -5,12 +5,12 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 3 of 8 complete.**
+> **Build status — Phase 4 of 8 complete.**
 > Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects (kanban,
-> table, detail, steps / milestones, tasks) · team (invite links bound to a Google email, WhatsApp
-> sharing, roles, costs, member pages with workload, removal, workspace switcher).
-> Next: invoices → finance & dashboard → contracts & e-sign → client portal → landing page,
-> notifications, polish.
+> table, detail, steps / milestones, tasks) · team (invites, roles, member pages) · invoices (create
+> from a project, GST, live preview, PDF, public link with viewed tracking, WhatsApp / email sharing,
+> UPI QR, partial payments).
+> Next: finance & dashboard → contracts & e-sign → client portal → landing page, notifications, polish.
 
 ## Stack
 
@@ -24,6 +24,7 @@ Cloudflare Hyperdrive.
 | Frontend   | React 19 + Vite + TypeScript, React Router, TanStack Query                               |
 | UI         | Tailwind CSS v4, shadcn/ui (Radix), Lucide icons, Motion                                 |
 | Forms      | React Hook Form + Zod — schemas in `shared/` are used by both the browser and the Worker |
+| PDF        | Print-optimised HTML: "Download PDF" opens the browser's Save-as-PDF with an A4 layout    |
 | Auth       | Google OAuth 2.0 (PKCE) via `arctic`, sessions in Postgres, httpOnly cookies. No passwords. |
 
 ## Quick start (local)
@@ -95,7 +96,8 @@ worker/                 The API (Cloudflare Worker, Hono)
   db/schema.ts            Drizzle schema – all 23 tables
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
-  routes/                 auth, workspace, members, team, invites, clients, projects, assets
+  routes/                 auth, workspace, members, team, invites, clients, projects, invoices,
+                          public (token links), assets
   services/               Business logic shared by routes and the seed script
 src/                    The React app
   components/ui/          shadcn/ui primitives
@@ -129,6 +131,12 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
 - **Invites.** An invite link carries a 32-character random token, expires after 7 days, can be
   revoked, and can only be accepted by the Google account whose email it was created for – a
   forwarded or leaked link is useless to anyone else. Only the owner can grant the admin role.
+- **Public invoice links.** `/i/<token>` uses a 32-character random token that can be reset at any
+  time. Drafts are not reachable. The endpoint returns only what is printed on the invoice – no ids,
+  no internal client notes, no WhatsApp number – and is rate-limited.
+- **Invoice totals.** Line amounts, discount, GST and totals are always recomputed on the server
+  with the same code the editor's preview uses (`shared/invoice.ts`); numbers sent by a browser are
+  never stored. Invoice numbers come from a row-locked counter, so they can't collide.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores
