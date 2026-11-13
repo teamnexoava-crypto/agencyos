@@ -16,10 +16,11 @@ export function useClients(enabled = true) {
   });
 }
 
-export function useClient(id: string) {
+export function useClient(id: string, enabled = true) {
   return useQuery({
     queryKey: clientKeys.detail(id),
     queryFn: async ({ signal }) => (await api<{ client: ClientDetail }>(`/api/clients/${id}`, { signal })).client,
+    enabled,
   });
 }
 

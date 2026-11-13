@@ -44,6 +44,8 @@ export const router = createBrowserRouter([
       { path: "/i/:token", lazy: page(() => import("@/pages/public-invoice")) },
       // Public contract link – where the client reads and signs.
       { path: "/c/:token", lazy: page(() => import("@/pages/public-contract")) },
+      // Client portal – one private page per project.
+      { path: "/p/:token", lazy: page(() => import("@/pages/public-portal")) },
       // Invite links work signed in or out, with or without a workspace – so no guard here.
       { path: "/invite/:token", lazy: page(() => import("@/pages/invite")) },
       { path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },

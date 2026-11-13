@@ -5,13 +5,12 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 6 of 8 complete.**
+> **Build status — Phase 7 of 8 complete.**
 > Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects · team ·
-> invoices and payments · expenses and receipts · dashboard · profit & loss ·
-> contracts: reusable templates with fill-in fields, rich-text drafts, public signing page
-> (draw or type), agency counter-signature, audit trail with a signature certificate, locked text
-> and versions, sealed signed copy in R2.
-> Next: client portal → landing page, notifications, settings, polish.
+> invoices and payments · expenses and receipts · dashboard · profit & loss · contracts and
+> e-signatures · project files · client portal (one private link per project with progress,
+> milestones, invoices, contract, shared files and messages).
+> Next: landing page, notifications, search, settings, polish.
 
 ## Stack
 
@@ -156,6 +155,15 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
 - **Signed PDF.** Like invoices, the PDF is the print-optimised document (browser "Save as PDF"): it
   matches what was signed exactly, in any language or script, and costs no Worker CPU. Generating
   PDFs inside the Worker would need embedded fonts and would not fit the free plan's CPU limit.
+- **Client portal.** `/p/:token` is resolved by its random token alone and can be switched off or
+  regenerated at any time. Its payload is assembled field by field in `worker/services/portal.ts`
+  (never by spreading database rows): budgets, costs, expenses, profit, tasks, assignees, step notes
+  and amounts, and client notes are simply never read into it. Each section (invoices, contract,
+  files, messages) can be switched off per project.
+- **Project files.** Uploads are limited to 20 MB and accepted only when their first bytes match an
+  allowed format (images, PDF, Office, ZIP, video, PSD, plain text); HTML, SVG and scripts are
+  rejected whatever they are named. A file is visible to the client only after an owner or admin
+  marks it so, and members can only reach files of projects they are assigned to.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores

@@ -7,6 +7,7 @@ import { notFound } from "../lib/errors";
 import { tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
+import { requireProject } from "../services/projects";
 import type { AppEnv } from "../types";
 
 /**
@@ -23,6 +24,11 @@ export const fileRoutes = new Hono<AppEnv>().use(requireAuth).get("/:id", valida
   if (!file) throw notFound("File");
   // Receipts and signed contracts are finance / legal documents: owner and admin only.
   if (file.kind !== "project_file" && file.kind !== "attachment" && !t.canSeeFinance) throw notFound("File");
+  // Project files follow the project: a member only reaches files of projects they are on.
+  if (file.kind === "project_file" && !t.canSeeFinance) {
+    if (!file.projectId) throw notFound("File");
+    await requireProject(t, file.projectId);
+  }
 
   const object = await c.env.BUCKET.get(file.r2Key);
   if (!object) throw notFound("File");

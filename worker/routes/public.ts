@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { idSchema } from "../../shared/schemas/common";
 import { clientSignSchema } from "../../shared/schemas/contract";
-import type { ContractDocument, InvoiceDocument } from "../../shared/types";
+import { portalCommentSchema } from "../../shared/schemas/portal";
+import type { CommentDTO, ContractDocument, InvoiceDocument, PortalData } from "../../shared/types";
 import type { Database } from "../db";
-import { activityLog, contracts, invoices, signatures, workspaces } from "../db/schema";
+import { activityLog, comments, contracts, files, invoices, signatures, workspaces } from "../db/schema";
 import { sha256Hex } from "../lib/crypto";
 import { ApiError, notFound } from "../lib/errors";
 import { newId } from "../lib/ids";
@@ -14,6 +16,7 @@ import { validate } from "../lib/validate";
 import { rateLimit } from "../middleware/rate-limit";
 import { buildContractDocument, parseSignatureImage, signatureKey, type ContractRow } from "../services/contracts";
 import { buildInvoiceDocument, notifyManagers } from "../services/invoices";
+import { buildPortalData, findPortal, recordPortalView, toCommentDTO } from "../services/portal";
 import type { AppEnv, WorkspaceRow } from "../types";
 
 const tokenParam = z.object({ token: z.string().regex(/^[\w-]{21,64}$/) });
@@ -224,4 +227,87 @@ export const publicRoutes = new Hono<AppEnv>()
       const body: { contract: ContractDocument } = { contract: await publicContractDocument(db, c.env.BUCKET, signed, workspace) };
       return c.json(body);
     },
-  );
+  )
+
+  /* ---------------------------------------------------------------- client portal (/p/:token) */
+
+  .get("/portal/:token", validate("param", tokenParam), async (c) => {
+    const db = c.var.db;
+    const portal = await findPortal(db, c.req.valid("param").token);
+    const viewerIsTeam = c.var.auth?.workspace?.id === portal.link.workspaceId;
+    // The page re-fetches quietly while it stays open (`?refresh=1`); only the first load is a visit.
+    if (!viewerIsTeam && c.req.query("refresh") !== "1") c.executionCtx.waitUntil(recordPortalView(db, portal.link));
+    const body: { portal: PortalData } = { portal: await buildPortalData(db, portal) };
+    return c.json(body);
+  })
+
+  /** Download of a file the agency has explicitly shared on this project's portal. */
+  .get("/portal/:token/files/:fileId", validate("param", tokenParam.extend({ fileId: idSchema })), async (c) => {
+    const db = c.var.db;
+    const { token, fileId } = c.req.valid("param");
+    const { link, project } = await findPortal(db, token);
+    if (!link.showFiles) throw notFound("File");
+    const [file] = await db
+      .select()
+      .from(files)
+      .where(
+        and(
+          eq(files.id, fileId),
+          eq(files.workspaceId, link.workspaceId),
+          eq(files.projectId, project.id),
+          eq(files.kind, "project_file"),
+          eq(files.sharedWithClient, true),
+          isNull(files.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!file) throw notFound("File");
+    const object = await c.env.BUCKET.get(file.r2Key);
+    if (!object) throw notFound("File");
+
+    const inline = file.contentType.startsWith("image/") || file.contentType === "application/pdf";
+    return new Response(object.body, {
+      headers: {
+        "Content-Type": file.contentType,
+        "Content-Length": String(object.size),
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store",
+      },
+    });
+  })
+
+  /** A message from the client. Tighter limit than page views: this writes to the database and notifies people. */
+  .post("/portal/:token/comments", rateLimit("AUTH_LIMITER"), validate("param", tokenParam), validate("json", portalCommentSchema), async (c) => {
+    const db = c.var.db;
+    const { link, project } = await findPortal(db, c.req.valid("param").token);
+    if (!link.allowComments) throw new ApiError(403, "comments_off", "Messages are switched off for this project.");
+    const input = c.req.valid("json");
+    const [row] = await db
+      .insert(comments)
+      .values({ workspaceId: link.workspaceId, projectId: project.id, authorType: "client", authorName: input.name, body: input.body })
+      .returning();
+    if (!row) throw new Error("Insert returned no row");
+
+    c.executionCtx.waitUntil(
+      Promise.all([
+        db.insert(activityLog).values({
+          workspaceId: link.workspaceId,
+          type: "comment.created",
+          actorName: input.name,
+          entityType: "project",
+          entityId: project.id,
+          projectId: project.id,
+          summary: `${input.name} left a message on ${project.title}`,
+        }),
+        notifyManagers(db, link.workspaceId, {
+          type: "comment.created",
+          title: `New message on ${project.title}`,
+          body: `${input.name}: ${input.body.slice(0, 140)}`,
+          link: `/app/projects/${project.id}?tab=client-link`,
+        }),
+      ]),
+    );
+    const body: { comment: CommentDTO } = { comment: toCommentDTO(row) };
+    return c.json(body, 201);
+  });

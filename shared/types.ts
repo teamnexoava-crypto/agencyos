@@ -499,3 +499,49 @@ export interface ContractDetail extends ContractDocument {
   signedFileId: string | null;
   messageTemplate: string;
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Project files, client link and the client portal
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface ProjectFileDTO {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  sharedWithClient: boolean;
+  uploadedBy: string | null;
+  createdAt: number;
+}
+
+export interface ShareLinkDTO {
+  token: string;
+  enabled: boolean;
+  showInvoices: boolean;
+  showContract: boolean;
+  showFiles: boolean;
+  allowComments: boolean;
+  viewCount: number;
+  lastViewedAt: number | null;
+}
+
+export interface CommentDTO {
+  id: string;
+  authorType: "client" | "member";
+  authorName: string;
+  body: string;
+  createdAt: number;
+}
+
+/** Everything the client portal shows. Hand-picked, client-safe fields only – no costs, notes, team or internal ids. */
+export interface PortalData {
+  agency: { name: string; logoUrl: string | null; brandColor: string; email: string | null; phone: string | null };
+  clientName: string | null;
+  project: { title: string; status: ProjectStatus; startDate: string | null; dueDate: string | null; progress: number };
+  steps: { title: string; status: StepStatus; dueDate: string | null; completedAt: number | null }[];
+  /** `null` when the agency has switched this section off. */
+  invoices: { number: string; status: InvoiceStatus; issueDate: string; dueDate: string; total: number; amountPaid: number; currency: CurrencyCode; token: string }[] | null;
+  contracts: { title: string; status: ContractStatus; token: string }[] | null;
+  files: { id: string; name: string; contentType: string; size: number; createdAt: number }[] | null;
+  comments: CommentDTO[] | null;
+}

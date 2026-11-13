@@ -93,3 +93,16 @@ export function timeAgo(timestamp: number, now: number): string {
   if (seconds < 30 * 86_400) return formatter.format(-Math.floor(seconds / 86_400), "day");
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(timestamp));
 }
+
+/** 1536 → "1.5 KB". */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 ? Math.round(value) : Number(value.toFixed(1))} ${units[unit] ?? "KB"}`;
+}

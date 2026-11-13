@@ -12,7 +12,7 @@ import { createDb } from "../worker/db";
 import { STARTER_TEMPLATE_HTML, STARTER_TEMPLATE_NAME, fillContractVariables } from "../shared/contract";
 import { computeInvoiceTotals } from "../shared/invoice";
 import { formatInvoiceNumber } from "../shared/schemas/workspace";
-import { clients, contractTemplates, contracts, expenseCategories, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
+import { clients, comments, contractTemplates, contracts, expenseCategories, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, shareLinks, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
 import { newPublicToken } from "../worker/lib/ids";
 import { createWorkspaceForUser } from "../worker/services/workspaces";
 import { isLocalDatabase, localDatabaseUrl } from "./env";
@@ -396,8 +396,17 @@ async function main() {
       });
     }
 
+    // Client portal: one project already has its link switched on, with a message waiting.
+    const portalProject = withClient[1] ?? withClient[0];
+    const portalToken = newPublicToken();
+    if (portalProject) {
+      await db.insert(shareLinks).values({ workspaceId: DEMO_WORKSPACE_ID, projectId: portalProject.id, token: portalToken });
+      await db.insert(comments).values({ workspaceId: DEMO_WORKSPACE_ID, projectId: portalProject.id, authorType: "client", authorName: "Arjun", body: "Thanks for the update! When can we review the next milestone?" });
+    }
+
     console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects, ${INVOICES.length} invoices, ${EXPENSES.length} expenses, ${withClient.length} contracts.`);
     console.log('  Run `npm run dev` and choose "Continue as demo user" on /login.');
+    if (portalProject) console.log(`  Client portal for "${portalProject.title}": /p/${portalToken}`);
     console.log("  Sign in as a teammate (e.g. diya@agencyos.local) with POST /api/auth/dev-login to see the member view.");
   } finally {
     await db.$client.end();

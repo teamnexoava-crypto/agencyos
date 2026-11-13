@@ -14,6 +14,7 @@ import { fileRoutes } from "./routes/files";
 import { inviteRoutes } from "./routes/invites";
 import { invoiceRoutes } from "./routes/invoices";
 import { memberRoutes } from "./routes/members";
+import { projectPortalRoutes } from "./routes/project-portal";
 import { projectRoutes } from "./routes/projects";
 import { publicRoutes } from "./routes/public";
 import { reportRoutes } from "./routes/reports";
@@ -63,6 +64,7 @@ app.route("/reports", reportRoutes);
 app.route("/public", publicRoutes);
 app.route("/clients", clientRoutes);
 app.route("/projects", projectRoutes);
+app.route("/projects", projectPortalRoutes);
 
 app.notFound((c) => {
   const body: ApiErrorBody = { error: { code: "not_found", message: "Route not found." } };

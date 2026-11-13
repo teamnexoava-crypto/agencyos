@@ -18,9 +18,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { PROJECT_STATUSES, type ProjectStatus } from "@shared/constants";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,6 +31,8 @@ import { PriorityBadge, StatusBadge } from "@/features/projects/badges";
 import { ProjectContractsTab } from "@/features/contracts/project-contracts-tab";
 import { ProjectExpensesTab } from "@/features/finance/project-expenses-tab";
 import { ProjectInvoicesTab } from "@/features/invoices/project-invoices-tab";
+import { ClientLinkTab } from "@/features/portal/client-link-tab";
+import { FilesTab } from "@/features/portal/files-tab";
 import { OverviewTab } from "@/features/projects/overview-tab";
 import { ProjectFormDialog } from "@/features/projects/project-form-dialog";
 import { StepsTab } from "@/features/projects/steps-tab";
@@ -46,8 +46,6 @@ interface TabDef {
   icon: LucideIcon;
   /** Owner/admin only. */
   managersOnly?: boolean;
-  /** Tabs whose feature ships in a later build phase. */
-  upcoming?: { phase: number; title: string; description: string };
 }
 
 const TABS: TabDef[] = [
@@ -57,19 +55,8 @@ const TABS: TabDef[] = [
   { value: "expenses", label: "Expenses", icon: Wallet, managersOnly: true },
   { value: "invoices", label: "Invoices", icon: ReceiptText, managersOnly: true },
   { value: "contract", label: "Contract", icon: FileSignature, managersOnly: true },
-  {
-    value: "files",
-    label: "Files",
-    icon: FolderOpen,
-    upcoming: { phase: 7, title: "No files yet", description: "Upload briefs, assets and deliverables, and choose which ones your client can see." },
-  },
-  {
-    value: "client-link",
-    label: "Client Link",
-    icon: Link2,
-    managersOnly: true,
-    upcoming: { phase: 7, title: "Client link not set up", description: "Share one private link where your client follows progress, invoices, the contract and files." },
-  },
+  { value: "files", label: "Files", icon: FolderOpen },
+  { value: "client-link", label: "Client Link", icon: Link2, managersOnly: true },
 ];
 
 export default function ProjectDetailPage() {
@@ -234,18 +221,14 @@ export default function ProjectDetailPage() {
             </TabsContent>
           </>
         )}
-        {tabs
-          .filter((tab) => tab.upcoming)
-          .map((tab) => (
-            <TabsContent key={tab.value} value={tab.value}>
-              <EmptyState
-                icon={tab.icon}
-                title={tab.upcoming?.title ?? ""}
-                description={tab.upcoming?.description ?? ""}
-                action={<Badge variant="outline">Arrives in build phase {tab.upcoming?.phase}</Badge>}
-              />
-            </TabsContent>
-          ))}
+        <TabsContent value="files">
+          <FilesTab project={project} members={members} />
+        </TabsContent>
+        {canManage && (
+          <TabsContent value="client-link">
+            <ClientLinkTab project={project} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {canManage && (
