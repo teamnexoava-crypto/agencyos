@@ -21,8 +21,10 @@ export class GoogleAuthError extends Error {
   }
 }
 
+/** True once all three secrets are present – until then sign-in is switched off rather than half-working. */
 export function isGoogleConfigured(env: Env): boolean {
-  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) && !env.GOOGLE_CLIENT_ID.startsWith("local-placeholder");
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.SESSION_SECRET) return false;
+  return !env.GOOGLE_CLIENT_ID.startsWith("local-placeholder");
 }
 
 const redirectUri = (origin: string) => `${origin}/api/auth/google/callback`;

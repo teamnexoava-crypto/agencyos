@@ -40,11 +40,10 @@
       "id": "3147ad97b7da4216b9fef5927a22ae4c"
     }
   ],
-  // Secrets the Worker cannot run without. Set them with `wrangler secret put <NAME>` (production)
-  // or in .dev.vars (local). Listed here so `wrangler types` and `wrangler deploy` can check them.
-  "secrets": {
-    "required": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SESSION_SECRET"]
-  },
+  // Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET) are NOT listed here: they are set
+  // on the deployed Worker (dashboard → Settings → Variables and Secrets, or `wrangler secret put`)
+  // and in .dev.vars locally. Their types are declared in worker/env.d.ts. Until they are set the app
+  // still deploys and serves pages, but sign-in reports "not configured".
   "vars": {
     // Optional: set to your canonical origin (e.g. "https://app.example.com") to pin OAuth redirects
     // and public share links to one domain. When empty, the request origin is used.

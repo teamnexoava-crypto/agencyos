@@ -125,8 +125,8 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
   `Referrer-Policy`, `Permissions-Policy` on pages (`public/_headers`) and API responses.
 - **Rate limiting.** KV-backed, per IP, on `/api/auth/*` and public asset routes. KV is eventually
   consistent, so limits are approximate — suitable for abuse throttling, not exact quotas.
-- **Secrets.** Never committed. `wrangler.jsonc` declares them under `secrets.required`, so a deploy
-  fails fast if one is missing.
+- **Secrets.** Never committed. They live only on the deployed Worker and in your local `.dev.vars`.
+  Until all three are set, sign-in is switched off and the login page says so.
 
 ## Deploying to Cloudflare
 

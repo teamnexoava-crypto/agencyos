@@ -17,6 +17,6 @@
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["scripts", "worker-configuration.d.ts"],
+  "include": ["scripts", "worker/env.d.ts", "worker-configuration.d.ts"],
   "exclude": ["scripts/env.ts"]
 }
