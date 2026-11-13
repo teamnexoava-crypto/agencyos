@@ -4,6 +4,9 @@ import type {
   CurrencyCode,
   DiscountType,
   InvoiceStatus,
+  LeadMapField,
+  LeadNoteKind,
+  LeadStage,
   NotificationType,
   PaymentMethod,
   ProjectPriority,
@@ -595,10 +598,75 @@ export interface NotificationFeed {
 }
 
 export interface SearchResult {
-  type: "project" | "client" | "invoice" | "contract";
+  type: "project" | "client" | "invoice" | "contract" | "lead";
   id: string;
   title: string;
   subtitle: string | null;
   /** In-app path. */
   to: string;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * CRM
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface LeadDTO {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  stage: LeadStage;
+  /** Minor units. Always null for members. */
+  value: number | null;
+  assigneeId: string | null;
+  followUpDate: string | null;
+  lastContactedAt: number | null;
+  sourceLabel: string | null;
+  clientId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LeadNoteDTO {
+  id: string;
+  kind: LeadNoteKind;
+  body: string;
+  authorName: string | null;
+  /** True when the viewer wrote it (or may otherwise delete it). */
+  canDelete: boolean;
+  createdAt: number;
+}
+
+export interface LeadDetail extends LeadDTO {
+  /** Sheet columns that are not mapped to a field. */
+  extra: Record<string, string>;
+  notes: LeadNoteDTO[];
+}
+
+export interface LeadSourceDTO {
+  id: string;
+  name: string;
+  /** Link that opens the sheet in Google Sheets. */
+  url: string;
+  mapping: Partial<Record<LeadMapField, string>>;
+  lastSyncedAt: number | null;
+  lastSyncError: string | null;
+  rowsImported: number;
+}
+
+/** What a sheet looks like before it is connected: its columns, a few rows and a suggested mapping. */
+export interface SheetPreview {
+  headers: string[];
+  sampleRows: string[][];
+  rowCount: number;
+  suggestedMapping: Partial<Record<LeadMapField, string>>;
+}
+
+export interface SyncResult {
+  source: LeadSourceDTO;
+  /** New leads created by this sync. */
+  added: number;
+  /** Rows already imported earlier (or empty). */
+  skipped: number;
 }

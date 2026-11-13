@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, FileSignature, FolderKanban, LoaderCircle, ReceiptText, Search, UserRound, type LucideIcon } from "lucide-react";
+import { CornerDownLeft, FileSignature, FolderKanban, LoaderCircle, ReceiptText, Search, UserRound, UserRoundSearch, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { SearchResult } from "@shared/types";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -19,6 +19,7 @@ const RESULT_META: Record<SearchResult["type"], { icon: LucideIcon; label: strin
   client: { icon: UserRound, label: "Client" },
   invoice: { icon: ReceiptText, label: "Invoice" },
   contract: { icon: FileSignature, label: "Contract" },
+  lead: { icon: UserRoundSearch, label: "Lead" },
 };
 
 interface Entry {
@@ -135,7 +136,7 @@ export function QuickNav({ open, onOpenChange }: QuickNavProps) {
                 if (target) go(target.to);
               }
             }}
-            placeholder="Search projects, clients, invoices…"
+            placeholder="Search projects, leads, clients, invoices…"
             role="combobox"
             aria-expanded="true"
             aria-controls="quick-nav-list"

@@ -8,4 +8,6 @@ interface Env {
   GOOGLE_CLIENT_SECRET: string;
   /** 32+ random bytes; keys the CSRF token HMAC. */
   SESSION_SECRET: string;
+  /** Local development only: origin of a stub that serves sheet CSV (the real one is docs.google.com). */
+  SHEETS_TEST_ORIGIN?: string;
 }

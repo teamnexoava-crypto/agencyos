@@ -1,14 +1,4 @@
-import {
-  FileSignature,
-  FolderKanban,
-  LayoutDashboard,
-  ReceiptText,
-  Settings,
-  Users,
-  UsersRound,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { FileSignature, FolderKanban, LayoutDashboard, ReceiptText, Settings, UserRoundSearch, Users, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import type { Role } from "@shared/constants";
 
 export interface NavItem {
@@ -38,6 +28,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Work",
     items: [
       { label: "Projects", to: "/app/projects", icon: FolderKanban, keywords: "kanban board milestones tasks" },
+      { label: "CRM", to: "/app/crm", icon: UserRoundSearch, keywords: "leads pipeline sales enquiries follow-up google sheet" },
       { label: "Clients", to: "/app/clients", icon: Users, roles: MANAGERS, keywords: "customers contacts" },
       { label: "Team", to: "/app/team", icon: UsersRound, keywords: "members invite roles" },
     ],

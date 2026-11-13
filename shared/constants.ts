@@ -82,6 +82,8 @@ export const ACTIVITY_TYPES = [
   "contract.signed",
   "comment.created",
   "file.uploaded",
+  "lead.created",
+  "lead.won",
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
@@ -93,6 +95,7 @@ export const NOTIFICATION_TYPES = [
   "task.assigned",
   "comment.created",
   "member.joined",
+  "lead.assigned",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -112,3 +115,22 @@ export const DEFAULT_WA_CONTRACT_TEMPLATE =
   "Hi {client_name}, please review and sign the agreement for {project}: {contract_link}";
 export const DEFAULT_WA_INVITE_TEMPLATE =
   "Hi! {inviter_name} invited you to join {agency_name} on AgencyOS. Accept here: {invite_link}";
+
+/* ------------------------------------------------------------------------------------------------
+ * CRM
+ * ---------------------------------------------------------------------------------------------- */
+
+export const LEAD_STAGES = ["new", "contacted", "qualified", "proposal", "won", "lost"] as const;
+export type LeadStage = (typeof LEAD_STAGES)[number];
+
+/** What a timeline entry on a lead is. "system" entries are written by the app (stage changes, imports). */
+export const LEAD_NOTE_KINDS = ["note", "call", "message", "meeting", "system"] as const;
+export type LeadNoteKind = (typeof LEAD_NOTE_KINDS)[number];
+
+/** Lead fields a sheet column can be mapped to. Every other column is kept as an extra detail. */
+export const LEAD_MAP_FIELDS = ["name", "phone", "email", "company"] as const;
+export type LeadMapField = (typeof LEAD_MAP_FIELDS)[number];
+
+/** Per Google Sheet: keeps a sync small enough to run inside one request. */
+export const SHEET_MAX_ROWS = 2000;
+export const SHEET_MAX_BYTES = 1024 * 1024;

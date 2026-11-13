@@ -5,11 +5,11 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — all 8 phases complete.**
+> **Build status — all 8 phases complete, plus a CRM.**
 > Google login and onboarding · clients · projects with milestones and tasks · team and roles ·
 > invoices and payments · expenses and receipts · dashboard and profit & loss · contracts with
 > e-signatures · project files · client portal · notifications · global search · settings ·
-> marketing landing page.
+> marketing landing page · CRM (lead pipeline, notes and follow-ups, Google Sheets import).
 
 ## Stack
 
@@ -94,10 +94,10 @@ shared/                 Code used by BOTH the browser and the Worker
   types.ts                API response types
 worker/                 The API (Cloudflare Worker, Hono)
   index.ts                App entry: security headers, middleware order, routes, error handler
-  db/schema.ts            Drizzle schema – all 23 tables
+  db/schema.ts            Drizzle schema – all 26 tables
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
-  routes/                 auth, workspace (+ settings), members, team, invites, clients, projects,
+  routes/                 auth, workspace (+ settings), members, team, invites, clients, crm, projects,
                           project-portal (files, client link, messages), invoices, contracts,
                           expenses, files, reports, notifications, search,
                           public (token links: /i, /c, /p), assets
@@ -173,6 +173,13 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
 - **Deleting a workspace.** Owner only, and the request must repeat the workspace name. All stored
   objects under `ws/<id>/` are removed from R2, then the workspace row is deleted and every table
   cascades from it.
+- **CRM and Google Sheets.** Owners and admins see every lead; a member only the leads assigned to
+  them, without deal values. A sheet is connected by pasting its link (it must be shared as "Anyone
+  with the link – Viewer"); no Google permission is requested from the user's account. Only the
+  spreadsheet id and tab number are taken from the pasted link, and the CSV export URL is rebuilt on
+  `docs.google.com` from those two values, so the Worker cannot be pointed at another host. Downloads
+  are capped at 1 MB / 2,000 rows. Syncing only ever adds rows: a lead is matched by e-mail or phone
+  and never imported twice, edits made in the CRM are kept, and deleted leads do not come back.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores

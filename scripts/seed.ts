@@ -12,7 +12,7 @@ import { createDb } from "../worker/db";
 import { STARTER_TEMPLATE_HTML, STARTER_TEMPLATE_NAME, fillContractVariables } from "../shared/contract";
 import { computeInvoiceTotals } from "../shared/invoice";
 import { formatInvoiceNumber } from "../shared/schemas/workspace";
-import { clients, comments, contractTemplates, contracts, expenseCategories, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, shareLinks, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
+import { clients, comments, contractTemplates, contracts, expenseCategories, leadNotes, leads, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, shareLinks, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
 import { newPublicToken } from "../worker/lib/ids";
 import { createWorkspaceForUser } from "../worker/services/workspaces";
 import { isLocalDatabase, localDatabaseUrl } from "./env";
@@ -404,7 +404,42 @@ async function main() {
       await db.insert(comments).values({ workspaceId: DEMO_WORKSPACE_ID, projectId: portalProject.id, authorType: "client", authorName: "Arjun", body: "Thanks for the update! When can we review the next milestone?" });
     }
 
-    console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects, ${INVOICES.length} invoices, ${EXPENSES.length} expenses, ${withClient.length} contracts.`);
+    // CRM: a small pipeline with follow-ups, so the board has something in every column.
+    const LEADS: [string, string | null, string, string | null, "new" | "contacted" | "qualified" | "proposal" | "won" | "lost", number | null, number | null, string, string | undefined][] = [
+      ["Rohan Verma", "Verma Sweets", "+91 98111 22334", "rohan@vermasweets.example", "new", 6000000, 0, "Website form", undefined],
+      ["Sneha Iyer", "Iyer Yoga Studio", "+91 98222 33445", null, "new", null, null, "Instagram", "Kabir Rao"],
+      ["Amit Shah", "Shah Electronics", "+91 98333 44556", "amit@shahelectronics.example", "contacted", 12000000, -1, "Website form", "Aarav Mehta"],
+      ["Farah Khan", "Khan Interiors", "+91 98444 55667", "farah@khaninteriors.example", "qualified", 25000000, 2, "Referral", "Aarav Mehta"],
+      ["Vikram Rao", "Rao Logistics", "+91 98555 66778", "vikram@raologistics.example", "proposal", 45000000, 4, "LinkedIn", undefined],
+      ["Meera Joshi", "Joshi Bakes", "+91 98666 77889", null, "won", 8000000, null, "Referral", undefined],
+      ["Kunal Desai", null, "+91 98777 88990", null, "lost", 3000000, null, "Website form", undefined],
+    ];
+    for (const [name, company, phone, email, stage, value, followUpIn, sourceLabel, owner] of LEADS) {
+      const [lead] = await db
+        .insert(leads)
+        .values({
+          workspaceId: DEMO_WORKSPACE_ID,
+          name,
+          company,
+          phone,
+          email,
+          stage,
+          value,
+          sourceLabel,
+          followUpDate: followUpIn === null ? null : day(followUpIn),
+          assigneeId: memberId(owner),
+          closedAt: stage === "won" || stage === "lost" ? new Date() : null,
+          createdBy: ownerMemberId,
+        })
+        .returning({ id: leads.id });
+      if (!lead) continue;
+      await db.insert(leadNotes).values([
+        { workspaceId: DEMO_WORKSPACE_ID, leadId: lead.id, kind: "system", body: "Lead added", authorName: DEMO_OWNER.name, authorMemberId: ownerMemberId },
+        ...(stage === "new" ? [] : [{ workspaceId: DEMO_WORKSPACE_ID, leadId: lead.id, kind: "call" as const, body: "Had a first call. They want a quote and a rough timeline.", authorName: DEMO_OWNER.name, authorMemberId: ownerMemberId }]),
+      ]);
+    }
+
+    console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects, ${INVOICES.length} invoices, ${EXPENSES.length} expenses, ${withClient.length} contracts, ${LEADS.length} leads.`);
     console.log('  Run `npm run dev` and choose "Continue as demo user" on /login.');
     if (portalProject) console.log(`  Client portal for "${portalProject.title}": /p/${portalToken}`);
     console.log("  Sign in as a teammate (e.g. diya@agencyos.local) with POST /api/auth/dev-login to see the member view.");

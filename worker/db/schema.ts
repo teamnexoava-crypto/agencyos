@@ -25,6 +25,8 @@ import {
   DISCOUNT_TYPES,
   FILE_KINDS,
   INVOICE_STATUSES,
+  LEAD_NOTE_KINDS,
+  LEAD_STAGES,
   NOTIFICATION_TYPES,
   PAYMENT_METHODS,
   PROJECT_PRIORITIES,
@@ -586,6 +588,88 @@ export const comments = pgTable(
     deletedAt: deletedAt(),
   },
   (t) => [index("comments_ws_idx").on(t.workspaceId), index("comments_project_idx").on(t.projectId, t.createdAt)],
+).enableRLS();
+
+/* ------------------------------------------------------------------------------------------------
+ * CRM: lead sources (Google Sheets), leads and their notes
+ * ---------------------------------------------------------------------------------------------- */
+
+/** A Google Sheet that leads are imported from. */
+export const leadSources = pgTable(
+  "lead_sources",
+  {
+    id: id(),
+    workspaceId: workspaceRef(),
+    name: text().notNull(),
+    /** Spreadsheet id, or the "published to web" id when `published` is true. */
+    sheetId: text().notNull(),
+    published: boolean().notNull().default(false),
+    gid: text().notNull().default("0"),
+    /** Which sheet column (by header text) feeds which lead field. */
+    mapping: jsonb().$type<Partial<Record<"name" | "phone" | "email" | "company", string>>>().notNull().default({}),
+    lastSyncedAt: timestamp({ withTimezone: true, mode: "date" }),
+    /** NULL when the last sync worked; otherwise a short message for the user. */
+    lastSyncError: text(),
+    rowsImported: integer().notNull().default(0),
+    createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    ...timestamps(),
+    deletedAt: deletedAt(),
+  },
+  (t) => [index("lead_sources_ws_idx").on(t.workspaceId)],
+).enableRLS();
+
+export const leads = pgTable(
+  "leads",
+  {
+    id: id(),
+    workspaceId: workspaceRef(),
+    sourceId: text().references(() => leadSources.id, { onDelete: "set null" }),
+    /** Identity of the sheet row this lead came from – the same row is never imported twice. */
+    sourceKey: text(),
+    /** Where the lead came from, as shown to people ("Google Sheet: Website form", "Referral"…). */
+    sourceLabel: text(),
+    name: text().notNull(),
+    company: text(),
+    email: text(),
+    phone: text(),
+    stage: text({ enum: LEAD_STAGES }).notNull().default("new"),
+    /** Expected deal value in minor units. Owner / admin only. */
+    value: bigint({ mode: "number" }),
+    assigneeId: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    followUpDate: day(),
+    lastContactedAt: timestamp({ withTimezone: true, mode: "date" }),
+    /** Sheet columns that are not mapped to a field, kept as they were. */
+    extra: jsonb().$type<Record<string, string>>().notNull().default({}),
+    /** Set when the lead has been turned into a client. */
+    clientId: text().references(() => clients.id, { onDelete: "set null" }),
+    closedAt: timestamp({ withTimezone: true, mode: "date" }),
+    createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    ...timestamps(),
+    deletedAt: deletedAt(),
+  },
+  (t) => [
+    index("leads_ws_stage_idx").on(t.workspaceId, t.stage),
+    index("leads_assignee_idx").on(t.assigneeId),
+    uniqueIndex("leads_source_key_uq").on(t.sourceId, t.sourceKey),
+  ],
+).enableRLS();
+
+/** Timeline of a lead: notes people write, logged calls / messages / meetings, and system entries. */
+export const leadNotes = pgTable(
+  "lead_notes",
+  {
+    id: id(),
+    workspaceId: workspaceRef(),
+    leadId: text()
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    kind: text({ enum: LEAD_NOTE_KINDS }).notNull().default("note"),
+    body: text().notNull(),
+    authorMemberId: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    authorName: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("lead_notes_ws_idx").on(t.workspaceId), index("lead_notes_lead_idx").on(t.leadId, t.createdAt)],
 ).enableRLS();
 
 /* ------------------------------------------------------------------------------------------------
