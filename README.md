@@ -166,7 +166,7 @@ npx wrangler hyperdrive create agencyos-db --caching-disabled --connection-strin
 app must never serve a stale session, permission or invoice.
 
 ```bash
-npx wrangler r2 bucket create agencyos-files
+npx wrangler r2 bucket create agencyos-uploads
 ```
 
 ```bash
