@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, LoaderCircle, PencilLine, Plus, Trash2 } from "lucide-react";
+import { Eye, LoaderCircle, PencilLine, Plus, Trash2, UserPlus } from "lucide-react";
 import { Controller, useFieldArray, useForm, useWatch, type FieldPath } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/features/auth/api";
+import { ClientFormDialog } from "@/features/clients/client-form-dialog";
 import { ApiError, errorMessage } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ import { useSaveInvoice } from "./api";
 import { InvoiceDocument } from "./invoice-document";
 
 const NO_PROJECT = "__none__";
+const NEW_CLIENT = "__new_client__";
 const DISCOUNT_LABEL = { none: "No discount", percent: "Percent (%)", fixed: "Fixed amount" } as const;
 const TAX_LABEL = { none: "No tax", cgst_sgst: "GST (CGST + SGST)", igst: "GST (IGST)" } as const;
 const optional = <span className="font-normal text-muted-foreground">(optional)</span>;
@@ -78,6 +80,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
   const { workspace } = useSession();
   const save = useSaveInvoice(invoiceId);
   const [mobileView, setMobileView] = useState<"form" | "preview">("form");
+  const [newClientOpen, setNewClientOpen] = useState(false);
 
   const form = useForm<InvoiceInput>({ resolver: zodResolver(invoiceSchema), defaultValues: initialValues });
   const items = useFieldArray({ control: form.control, name: "items" });
@@ -185,10 +188,17 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                   name="clientId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Client</FormLabel>
+                      <div className="flex items-center justify-between gap-3">
+                        <FormLabel>Client</FormLabel>
+                        <button type="button" onClick={() => setNewClientOpen(true)} className="-my-1 inline-flex items-center gap-1 rounded-sm text-[13px] leading-none font-medium text-primary hover:underline">
+                          <Plus className="size-3.5" /> New client
+                        </button>
+                      </div>
                       <Select
                         value={field.value}
                         onValueChange={(value) => {
+                          // "Add a new client" is an action, not a choice: open the form and keep the current selection.
+                          if (value === NEW_CLIENT) return setNewClientOpen(true);
                           field.onChange(value);
                           // A project belongs to one client – drop it if it no longer matches.
                           const project = projects.find((item) => item.id === form.getValues("projectId"));
@@ -197,10 +207,13 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose a client" />
+                            <SelectValue placeholder={clients.length === 0 ? "Add your first client" : "Choose a client"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value={NEW_CLIENT} className="font-medium text-primary">
+                            <UserPlus className="size-4" /> Add a new client
+                          </SelectItem>
                           {clients.map((client) => (
                             <SelectItem key={client.id} value={client.id}>
                               {client.name}
@@ -556,6 +569,16 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
           </div>
         </div>
       </form>
+      {/* Outside the invoice <form>: saving the client must not submit the invoice. */}
+      <ClientFormDialog
+        open={newClientOpen}
+        onOpenChange={setNewClientOpen}
+        onSaved={(client) => {
+          form.setValue("clientId", client.id, { shouldDirty: true, shouldValidate: true });
+          // A project belongs to one client – a brand-new client has none yet.
+          form.setValue("projectId", "");
+        }}
+      />
     </Form>
   );
 }

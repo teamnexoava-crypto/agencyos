@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, Plus, UserPlus } from "lucide-react";
 import { useForm, useWatch, type FieldPath } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -10,11 +11,13 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClients } from "@/features/clients/api";
+import { ClientFormDialog } from "@/features/clients/client-form-dialog";
 import { useProjects } from "@/features/projects/api";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useContractTemplates, useCreateContract } from "./api";
 
 const NONE = "__none__";
+const NEW_CLIENT = "__new_client__";
 const optional = <span className="font-normal text-muted-foreground">(optional)</span>;
 
 interface CreateContractDialogProps {
@@ -30,6 +33,7 @@ function CreateForm({ project, onOpenChange }: Omit<CreateContractDialogProps, "
   const { data: projects = [] } = useProjects();
   const { data: templates = [], isPending: templatesLoading } = useContractTemplates();
   const create = useCreateContract();
+  const [newClientOpen, setNewClientOpen] = useState(false);
 
   const form = useForm<ContractCreateInput>({
     resolver: zodResolver(contractCreateSchema),
@@ -65,20 +69,29 @@ function CreateForm({ project, onOpenChange }: Omit<CreateContractDialogProps, "
               name="clientId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Client</FormLabel>
+                  <div className="flex items-center justify-between gap-3">
+                    <FormLabel>Client</FormLabel>
+                    <button type="button" onClick={() => setNewClientOpen(true)} className="-my-1 inline-flex items-center gap-1 rounded-sm text-[13px] leading-none font-medium text-primary hover:underline">
+                      <Plus className="size-3.5" /> New client
+                    </button>
+                  </div>
                   <Select
                     value={field.value}
                     onValueChange={(value) => {
+                      if (value === NEW_CLIENT) return setNewClientOpen(true);
                       field.onChange(value);
                       form.setValue("projectId", "");
                     }}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a client" />
+                        <SelectValue placeholder={clients.length === 0 ? "Add your first client" : "Choose a client"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value={NEW_CLIENT} className="font-medium text-primary">
+                        <UserPlus className="size-4" /> Add a new client
+                      </SelectItem>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
                           {client.name}
@@ -169,6 +182,15 @@ function CreateForm({ project, onOpenChange }: Omit<CreateContractDialogProps, "
           </Button>
         </DialogFooter>
       </form>
+      {/* Outside the contract <form>: saving the client must not submit the contract. */}
+      <ClientFormDialog
+        open={newClientOpen}
+        onOpenChange={setNewClientOpen}
+        onSaved={(client) => {
+          form.setValue("clientId", client.id, { shouldDirty: true, shouldValidate: true });
+          form.setValue("projectId", "");
+        }}
+      />
     </Form>
   );
 }

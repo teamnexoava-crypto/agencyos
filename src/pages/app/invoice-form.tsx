@@ -1,9 +1,7 @@
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router";
 import type { InvoiceInput } from "@shared/schemas/invoice";
-import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClients } from "@/features/clients/api";
 import { useInvoice, useInvoiceDefaults } from "@/features/invoices/api";
@@ -59,19 +57,6 @@ export function NewInvoicePage() {
     body = <ErrorState onRetry={() => void Promise.all([defaults.refetch(), clients.refetch(), projects.refetch()])} />;
   } else if (loading || !defaults.data || !clients.data || !projects.data) {
     body = <FormSkeleton />;
-  } else if (clients.data.length === 0) {
-    body = (
-      <EmptyState
-        icon={Users}
-        title="Add a client first"
-        description="Every invoice is billed to a client. Add one, then come back to create the invoice."
-        action={
-          <Button asChild>
-            <Link to="/app/clients">Go to clients</Link>
-          </Button>
-        }
-      />
-    );
   } else {
     const today = todayIso();
     // Milestones that carry an amount become the line items ("create invoice from a project").
