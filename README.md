@@ -5,12 +5,13 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 5 of 8 complete.**
+> **Build status — Phase 6 of 8 complete.**
 > Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects · team ·
-> invoices and payments · expenses with categories and receipts · dashboard (KPIs, revenue vs
-> expenses, profit trend, project status, top clients, deadlines, overdue invoices, activity) ·
-> profit & loss by month, project, client and category with CSV export.
-> Next: contracts & e-sign → client portal → landing page, notifications, polish.
+> invoices and payments · expenses and receipts · dashboard · profit & loss ·
+> contracts: reusable templates with fill-in fields, rich-text drafts, public signing page
+> (draw or type), agency counter-signature, audit trail with a signature certificate, locked text
+> and versions, sealed signed copy in R2.
+> Next: client portal → landing page, notifications, settings, polish.
 
 ## Stack
 
@@ -25,6 +26,7 @@ Cloudflare Hyperdrive.
 | UI         | Tailwind CSS v4, shadcn/ui (Radix), Lucide icons, Motion                                 |
 | Forms      | React Hook Form + Zod — schemas in `shared/` are used by both the browser and the Worker |
 | Charts     | Recharts, with a colour-blind-validated palette defined as CSS tokens                    |
+| Contracts  | Tiptap editor, signature_pad, SHA-256 fingerprints via Web Crypto                      |
 | PDF        | Print-optimised HTML: "Download PDF" opens the browser's Save-as-PDF with an A4 layout    |
 | Auth       | Google OAuth 2.0 (PKCE) via `arctic`, sessions in Postgres, httpOnly cookies. No passwords. |
 
@@ -98,7 +100,7 @@ worker/                 The API (Cloudflare Worker, Hono)
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
   routes/                 auth, workspace, members, team, invites, clients, projects, invoices,
-                          expenses, files, reports, public (token links), assets
+                          contracts, expenses, files, reports, public (token links), assets
   services/               Business logic shared by routes and the seed script
 src/                    The React app
   components/ui/          shadcn/ui primitives
@@ -143,6 +145,17 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
   activity feed they get excludes money events and projects they are not on.
 - **Private files.** Receipts live in R2 under random keys and are only served through
   `/api/files/:id`, which looks the file up inside the caller's workspace and checks their role.
+- **Contracts and e-signatures.** Contract text is rebuilt from an allow-list of tags with no
+  attributes on every write (`shared/contract.ts`), so nothing scriptable can be stored. A contract
+  can only be edited while it is a draft. Signing records the signer's name, email, IP address,
+  user agent, time and the SHA-256 of the exact text, and the client's request must carry the hash of
+  the text they were shown. Signature images are size-limited PNGs checked by magic bytes and kept
+  in R2. When both parties have signed, a self-contained sealed copy (text, signatures, certificate)
+  is written to R2 and served only as a download to owners and admins. Changing a signed contract
+  means creating a new version; the signed one stays on record.
+- **Signed PDF.** Like invoices, the PDF is the print-optimised document (browser "Save as PDF"): it
+  matches what was signed exactly, in any language or script, and costs no Worker CPU. Generating
+  PDFs inside the Worker would need embedded fonts and would not fit the free plan's CPU limit.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores

@@ -30,6 +30,8 @@ export const fileRoutes = new Hono<AppEnv>().use(requireAuth).get("/:id", valida
   const inline = file.contentType.startsWith("image/") || file.contentType === "application/pdf";
   return new Response(object.body, {
     headers: {
+      // Stored HTML (sealed contract copies) is only ever handed over as a download, never rendered on our origin.
+      "X-Content-Type-Options": "nosniff",
       "Content-Type": file.contentType,
       "Content-Length": String(object.size),
       "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`,

@@ -30,6 +30,7 @@ import { useMemberMap } from "@/features/members/api";
 import { useDeleteProject, useProject, useUpdateProject } from "@/features/projects/api";
 import { STATUS_META } from "@/features/projects/meta";
 import { PriorityBadge, StatusBadge } from "@/features/projects/badges";
+import { ProjectContractsTab } from "@/features/contracts/project-contracts-tab";
 import { ProjectExpensesTab } from "@/features/finance/project-expenses-tab";
 import { ProjectInvoicesTab } from "@/features/invoices/project-invoices-tab";
 import { OverviewTab } from "@/features/projects/overview-tab";
@@ -55,13 +56,7 @@ const TABS: TabDef[] = [
   { value: "tasks", label: "Tasks", icon: ListChecks },
   { value: "expenses", label: "Expenses", icon: Wallet, managersOnly: true },
   { value: "invoices", label: "Invoices", icon: ReceiptText, managersOnly: true },
-  {
-    value: "contract",
-    label: "Contract",
-    icon: FileSignature,
-    managersOnly: true,
-    upcoming: { phase: 6, title: "No contract yet", description: "Send an agreement for e-signature and keep the signed PDF with its audit trail here." },
-  },
+  { value: "contract", label: "Contract", icon: FileSignature, managersOnly: true },
   {
     value: "files",
     label: "Files",
@@ -233,6 +228,9 @@ export default function ProjectDetailPage() {
             </TabsContent>
             <TabsContent value="invoices">
               <ProjectInvoicesTab project={project} />
+            </TabsContent>
+            <TabsContent value="contract">
+              <ProjectContractsTab project={project} />
             </TabsContent>
           </>
         )}

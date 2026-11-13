@@ -42,6 +42,8 @@ export const router = createBrowserRouter([
       { path: "/privacy", lazy: async () => ({ Component: (await import("@/pages/legal")).PrivacyPage }) },
       // Public invoice link – what the client opens. No login, no app shell.
       { path: "/i/:token", lazy: page(() => import("@/pages/public-invoice")) },
+      // Public contract link – where the client reads and signs.
+      { path: "/c/:token", lazy: page(() => import("@/pages/public-contract")) },
       // Invite links work signed in or out, with or without a workspace – so no guard here.
       { path: "/invite/:token", lazy: page(() => import("@/pages/invite")) },
       { path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },
@@ -102,7 +104,8 @@ export const router = createBrowserRouter([
                   { path: "invoices/:invoiceId", lazy: page(() => import("@/pages/app/invoice-detail")) },
                   { path: "invoices/:invoiceId/edit", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).EditInvoicePage }) },
                   { path: "finance", lazy: page(() => import("@/pages/app/finance")) },
-                  { path: "contracts", lazy: comingSoon("ContractsPage") },
+                  { path: "contracts", lazy: page(() => import("@/pages/app/contracts")) },
+                  { path: "contracts/:contractId", lazy: page(() => import("@/pages/app/contract-detail")) },
                   { path: "settings", lazy: comingSoon("SettingsPage") },
                 ],
               },

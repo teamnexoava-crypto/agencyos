@@ -9,9 +9,10 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { createDb } from "../worker/db";
+import { STARTER_TEMPLATE_HTML, STARTER_TEMPLATE_NAME, fillContractVariables } from "../shared/contract";
 import { computeInvoiceTotals } from "../shared/invoice";
 import { formatInvoiceNumber } from "../shared/schemas/workspace";
-import { clients, expenseCategories, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
+import { clients, contractTemplates, contracts, expenseCategories, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
 import { newPublicToken } from "../worker/lib/ids";
 import { createWorkspaceForUser } from "../worker/services/workspaces";
 import { isLocalDatabase, localDatabaseUrl } from "./env";
@@ -364,7 +365,38 @@ async function main() {
       })),
     );
 
-    console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects, ${INVOICES.length} invoices, ${EXPENSES.length} expenses.`);
+    // Contracts: the starter template, one draft and one that is out for signature (open its link to try signing).
+    const [template] = await db.insert(contractTemplates).values({ workspaceId: DEMO_WORKSPACE_ID, name: STARTER_TEMPLATE_NAME, content: STARTER_TEMPLATE_HTML }).returning({ id: contractTemplates.id });
+    const longDay = (iso: string | null) => (iso ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)) : "");
+    const contractProjects = await db.select().from(projects).where(eq(projects.workspaceId, DEMO_WORKSPACE_ID)).limit(20);
+    const withClient = contractProjects.filter((project) => project.clientId !== null && project.budget > 0).slice(0, 2);
+    for (const [index, project] of withClient.entries()) {
+      const [client] = await db.select().from(clients).where(eq(clients.id, project.clientId as string)).limit(1);
+      const sent = index === 1;
+      await db.insert(contracts).values({
+        workspaceId: DEMO_WORKSPACE_ID,
+        clientId: project.clientId,
+        projectId: project.id,
+        templateId: template?.id ?? null,
+        title: `${project.title} – service agreement`,
+        content: fillContractVariables(STARTER_TEMPLATE_HTML, {
+          client_name: client?.name ?? "",
+          client_company: client?.company ?? "",
+          project_title: project.title,
+          amount: new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(project.budget / 100),
+          start_date: longDay(project.startDate),
+          due_date: longDay(project.dueDate),
+          agency_name: "Northwind Studio",
+          today: longDay(day(0)),
+        }),
+        status: sent ? "sent" : "draft",
+        sentAt: sent ? new Date() : null,
+        publicToken: newPublicToken(),
+        createdBy: ownerMemberId,
+      });
+    }
+
+    console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects, ${INVOICES.length} invoices, ${EXPENSES.length} expenses, ${withClient.length} contracts.`);
     console.log('  Run `npm run dev` and choose "Continue as demo user" on /login.');
     console.log("  Sign in as a teammate (e.g. diya@agencyos.local) with POST /api/auth/dev-login to see the member view.");
   } finally {

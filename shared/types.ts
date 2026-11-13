@@ -1,4 +1,18 @@
-import type { ActivityType, CurrencyCode, DiscountType, InvoiceStatus, PaymentMethod, ProjectPriority, ProjectStatus, Role, StepStatus, TaxMode } from "./constants";
+import type {
+  ActivityType,
+  ContractStatus,
+  CurrencyCode,
+  DiscountType,
+  InvoiceStatus,
+  PaymentMethod,
+  ProjectPriority,
+  ProjectStatus,
+  Role,
+  SignatureMethod,
+  SignerRole,
+  StepStatus,
+  TaxMode,
+} from "./constants";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -409,4 +423,79 @@ export interface ProjectFinance {
   expenses: number;
   /** received − expenses */
   profit: number;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Contracts & e-signatures
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface ContractTemplateDTO {
+  id: string;
+  name: string;
+  content: string;
+  updatedAt: number;
+}
+
+export interface ContractListItem {
+  id: string;
+  title: string;
+  status: ContractStatus;
+  version: number;
+  clientId: string | null;
+  clientName: string | null;
+  projectId: string | null;
+  projectTitle: string | null;
+  sentAt: number | null;
+  completedAt: number | null;
+  updatedAt: number;
+}
+
+/** One entry of the audit trail. */
+export interface ContractSignatureDTO {
+  role: SignerRole;
+  name: string;
+  email: string | null;
+  method: SignatureMethod;
+  /** The signature itself, as a PNG data URI. */
+  image: string;
+  signedAt: number;
+  ip: string | null;
+  userAgent: string | null;
+  /** SHA-256 of the exact text that was signed. */
+  contentHash: string;
+}
+
+/** Everything printed on a contract – the same for the app and the public signing page. */
+export interface ContractDocument {
+  reference: string;
+  title: string;
+  /** Sanitised HTML. */
+  content: string;
+  status: ContractStatus;
+  version: number;
+  /** SHA-256 of `content` as it is right now. */
+  contentHash: string;
+  agency: { name: string; logoUrl: string | null; brandColor: string; address: string | null; email: string | null; phone: string | null };
+  client: { name: string; company: string | null; email: string | null };
+  projectTitle: string | null;
+  sentAt: number | null;
+  viewedAt: number | null;
+  completedAt: number | null;
+  signatures: ContractSignatureDTO[];
+}
+
+export interface ContractDetail extends ContractDocument {
+  id: string;
+  clientId: string | null;
+  projectId: string | null;
+  publicToken: string;
+  clientWhatsapp: string | null;
+  createdAt: number;
+  updatedAt: number;
+  /** The newer version that replaced this one, if any. */
+  nextVersionId: string | null;
+  previousVersionId: string | null;
+  /** File id of the sealed signed copy (present once both parties have signed). */
+  signedFileId: string | null;
+  messageTemplate: string;
 }

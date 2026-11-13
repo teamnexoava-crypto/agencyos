@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { FileSignature, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -22,17 +22,6 @@ function ComingSoon({ title, description, icon, emptyTitle, emptyDescription, ph
     </>
   );
 }
-
-export const ContractsPage = () => (
-  <ComingSoon
-    title="Contracts"
-    description="Agreements and e-signatures."
-    icon={FileSignature}
-    emptyTitle="No contracts yet"
-    emptyDescription="Reusable templates, a public signing page and a signed PDF with a full audit trail."
-    phase={6}
-  />
-);
 
 export const SettingsPage = () => (
   <ComingSoon
