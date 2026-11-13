@@ -30,6 +30,7 @@ import {
   toTaskDTO,
   type ProjectRow,
 } from "../services/projects";
+import { projectFinance } from "../services/reports";
 import type { AppEnv } from "../types";
 
 const projectParam = z.object({ projectId: idSchema });
@@ -47,8 +48,10 @@ const STATUS_LABELS: Record<ProjectRow["status"], string> = {
 };
 
 async function loadDetail(t: Tenant, project: ProjectRow): Promise<ProjectDetail> {
-  const [summaries, stepRows, taskRows] = await Promise.all([
+  const [summaries, finance, stepRows, taskRows] = await Promise.all([
     summarizeProjects(t, [project]),
+    // Money is computed (and sent) only for owners and admins.
+    t.canSeeFinance ? projectFinance(t, project.id) : Promise.resolve(null),
     t.db
       .select()
       .from(projectSteps)
@@ -67,6 +70,7 @@ async function loadDetail(t: Tenant, project: ProjectRow): Promise<ProjectDetail
     description: project.description,
     steps: stepRows.map((row) => toStepDTO(t, row)),
     tasks: taskRows.map(toTaskDTO),
+    finance,
   };
 }
 

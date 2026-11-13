@@ -1,4 +1,4 @@
-import type { CurrencyCode, DiscountType, InvoiceStatus, PaymentMethod, ProjectPriority, ProjectStatus, Role, StepStatus, TaxMode } from "./constants";
+import type { ActivityType, CurrencyCode, DiscountType, InvoiceStatus, PaymentMethod, ProjectPriority, ProjectStatus, Role, StepStatus, TaxMode } from "./constants";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -136,6 +136,8 @@ export interface ProjectDetail extends ProjectSummary {
   description: string | null;
   steps: StepDTO[];
   tasks: TaskDTO[];
+  /** Null for members. */
+  finance: ProjectFinance | null;
 }
 
 export interface ClientDetail extends ClientDTO {
@@ -316,4 +318,95 @@ export interface InvoiceSummary {
   /** Payments received in the current calendar month. */
   collectedThisMonth: number;
   draftCount: number;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Finance: expenses, dashboard, profit & loss
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface ExpenseCategoryDTO {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface ExpenseDTO {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  vendor: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  projectId: string | null;
+  projectTitle: string | null;
+  /** Present when a receipt is attached – download from /api/files/<id>. */
+  receipt: { fileId: string; name: string } | null;
+}
+
+export interface MonthlyPoint {
+  /** YYYY-MM */
+  month: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: ActivityType;
+  summary: string;
+  projectId: string | null;
+  createdAt: number;
+}
+
+export interface DeadlineItem {
+  kind: "project" | "step" | "task";
+  id: string;
+  title: string;
+  projectId: string;
+  projectTitle: string;
+  dueDate: string;
+}
+
+export interface DashboardData {
+  /** Money figures – null for members, who never see finances. */
+  finance: {
+    revenue: number;
+    expenses: number;
+    profit: number;
+    /** Unpaid balance on sent invoices, as of now (not limited to the selected range). */
+    outstanding: number;
+    monthly: MonthlyPoint[];
+    topClients: { clientId: string; name: string; revenue: number }[];
+    overdueInvoices: { id: string; number: string; clientName: string | null; dueDate: string; balance: number }[];
+  } | null;
+  activeProjects: number;
+  teamSize: number;
+  /** For members: their own open tasks. */
+  myOpenTasks: number;
+  projectStatus: Record<ProjectStatus, number>;
+  deadlines: DeadlineItem[];
+  activity: ActivityItem[];
+  /** True until the workspace has its first client or project – drives the "get started" checklist. */
+  isEmpty: boolean;
+}
+
+export interface ProfitAndLoss {
+  totals: { revenue: number; expenses: number; profit: number };
+  byMonth: MonthlyPoint[];
+  byProject: { projectId: string | null; title: string; clientName: string | null; revenue: number; expenses: number; profit: number }[];
+  byClient: { clientId: string | null; name: string; revenue: number; expenses: number; profit: number }[];
+  byCategory: { categoryId: string | null; name: string; color: string; amount: number }[];
+  /** Sum of active members' monthly cost – lets the UI estimate salaries when they aren't logged as expenses. */
+  teamMonthlyCost: number;
+}
+
+/** Money summary for one project (owner/admin only). */
+export interface ProjectFinance {
+  invoiced: number;
+  received: number;
+  expenses: number;
+  /** received − expenses */
+  profit: number;
 }

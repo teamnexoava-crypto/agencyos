@@ -2,12 +2,12 @@ import type { ProjectPriority, ProjectStatus, StepStatus } from "@shared/constan
 import type { DueTone } from "@/lib/format";
 
 /** Display metadata for project statuses – order here is the kanban column order. */
-export const STATUS_META: Record<ProjectStatus, { label: string; dot: string; badge: string }> = {
-  lead: { label: "Lead", dot: "bg-slate-400", badge: "bg-slate-500/10 text-slate-600 dark:text-slate-300" },
-  in_progress: { label: "In Progress", dot: "bg-indigo-500", badge: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300" },
-  on_hold: { label: "On Hold", dot: "bg-amber-500", badge: "bg-amber-500/12 text-amber-700 dark:text-amber-300" },
-  completed: { label: "Completed", dot: "bg-emerald-500", badge: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" },
-  cancelled: { label: "Cancelled", dot: "bg-rose-500", badge: "bg-rose-500/10 text-rose-600 dark:text-rose-300" },
+export const STATUS_META: Record<ProjectStatus, { label: string; dot: string; badge: string; color: string }> = {
+  lead: { label: "Lead", dot: "bg-(--status-lead)", badge: "bg-sky-500/10 text-sky-700 dark:text-sky-300", color: "var(--status-lead)" },
+  in_progress: { label: "In Progress", dot: "bg-(--status-in-progress)", badge: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300", color: "var(--status-in-progress)" },
+  on_hold: { label: "On Hold", dot: "bg-(--status-on-hold)", badge: "bg-amber-500/12 text-amber-700 dark:text-amber-300", color: "var(--status-on-hold)" },
+  completed: { label: "Completed", dot: "bg-(--status-completed)", badge: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", color: "var(--status-completed)" },
+  cancelled: { label: "Cancelled", dot: "bg-(--status-cancelled)", badge: "bg-rose-500/10 text-rose-600 dark:text-rose-300", color: "var(--status-cancelled)" },
 };
 
 export const PRIORITY_META: Record<ProjectPriority, { label: string; badge: string; rank: number }> = {

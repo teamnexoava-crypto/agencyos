@@ -161,23 +161,54 @@ export function OverviewTab({ project, members, onOpenTab }: OverviewTabProps) {
         </Button>
       </Card>
 
-      {/* Money is only ever sent to owners and admins – for members `budget` arrives as null. */}
-      {canManage && project.budget !== null && (
-        <Card title="Budget" icon={Wallet} index={3}>
-          <p className="tabular text-3xl font-semibold tracking-tight">{formatMoney(project.budget, workspace.currency)}</p>
+      {/* Money is only ever sent to owners and admins – for members `budget` and `finance` arrive as null. */}
+      {canManage && project.budget !== null && project.finance && (
+        <Card title="Budget & profit" icon={Wallet} index={3}>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">{project.finance.profit >= 0 ? "Profit so far" : "Loss so far"}</p>
+              <p className={cn("text-3xl font-semibold tracking-tight", project.finance.profit >= 0 ? "text-success" : "text-destructive")}>
+                {formatMoney(Math.abs(project.finance.profit), workspace.currency)}
+              </p>
+            </div>
+            <p className="text-right text-xs text-muted-foreground">
+              Budget
+              <span className="tabular block text-sm font-medium text-foreground">{formatMoney(project.budget, workspace.currency)}</span>
+            </p>
+          </div>
+          {project.budget > 0 && (
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                <span>Spent vs budget</span>
+                <span className="tabular">{Math.round((project.finance.expenses / project.budget) * 100)}%</span>
+              </div>
+              {/* Meter: the fill turns to the danger colour once spending passes the budget. */}
+              <div className="h-2 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${formatMoney(project.finance.expenses, workspace.currency)} spent of a ${formatMoney(project.budget, workspace.currency)} budget`}>
+                <div
+                  className={cn("h-full rounded-full", project.finance.expenses > project.budget ? "bg-destructive" : "bg-primary")}
+                  style={{ width: `${Math.min(100, (project.finance.expenses / project.budget) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
           <dl className="mt-4 space-y-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Invoiced</dt>
+              <dd className="tabular font-medium">{formatMoney(project.finance.invoiced, workspace.currency)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Received</dt>
+              <dd className="tabular font-medium">{formatMoney(project.finance.received, workspace.currency)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">Expenses</dt>
+              <dd className="tabular font-medium">{formatMoney(project.finance.expenses, workspace.currency)}</dd>
+            </div>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-muted-foreground">Milestone amounts</dt>
               <dd className="tabular font-medium">{formatMoney(milestoneTotal, workspace.currency)}</dd>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">Unallocated</dt>
-              <dd className={cn("tabular font-medium", project.budget - milestoneTotal < 0 && "text-destructive")}>
-                {formatMoney(project.budget - milestoneTotal, workspace.currency)}
-              </dd>
-            </div>
           </dl>
-          <p className="mt-3 text-xs text-muted-foreground">Spend and profit appear here once expenses and invoices are tracked.</p>
         </Card>
       )}
 

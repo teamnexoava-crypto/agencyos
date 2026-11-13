@@ -65,3 +65,31 @@ export function dueLabel(iso: string, done = false): { text: string; tone: DueTo
   if (days <= 7) return { text: `Due in ${days} days`, tone: "soon" };
   return { text: `Due ${formatDate(iso)}`, tone: "normal" };
 }
+
+/** Compact amount for chart axes: ₹45K, ₹1.2L, ₹3.1Cr (Indian units for INR; K / M elsewhere). */
+export function formatMoneyCompact(minor: number, currency: string): string {
+  const value = minor / 100;
+  const symbol = new Intl.NumberFormat(LOCALES[currency] ?? "en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(0).replace(/[\d\s.,]/g, "");
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  const trim = (n: number) => String(Number(n.toFixed(1)));
+  if (currency === "INR") {
+    if (abs >= 1e7) return `${sign}${symbol}${trim(abs / 1e7)}Cr`;
+    if (abs >= 1e5) return `${sign}${symbol}${trim(abs / 1e5)}L`;
+  } else if (abs >= 1e6) {
+    return `${sign}${symbol}${trim(abs / 1e6)}M`;
+  }
+  if (abs >= 1e3) return `${sign}${symbol}${trim(abs / 1e3)}K`;
+  return `${sign}${symbol}${trim(abs)}`;
+}
+
+/** "3 hours ago", "yesterday" – for activity feeds. `now` is passed in so rendering stays pure. */
+export function timeAgo(timestamp: number, now: number): string {
+  const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
+  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return formatter.format(-Math.floor(seconds / 60), "minute");
+  if (seconds < 86_400) return formatter.format(-Math.floor(seconds / 3600), "hour");
+  if (seconds < 30 * 86_400) return formatter.format(-Math.floor(seconds / 86_400), "day");
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(timestamp));
+}

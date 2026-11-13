@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { FileSignature, Settings, Wallet } from "lucide-react";
+import { FileSignature, Settings } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -22,17 +22,6 @@ function ComingSoon({ title, description, icon, emptyTitle, emptyDescription, ph
     </>
   );
 }
-
-export const FinancePage = () => (
-  <ComingSoon
-    title="Finance"
-    description="Income, expenses and profit at a glance."
-    icon={Wallet}
-    emptyTitle="Nothing to report yet"
-    emptyDescription="Track expenses and see profit & loss by month, project and client — with CSV export."
-    phase={5}
-  />
-);
 
 export const ContractsPage = () => (
   <ComingSoon

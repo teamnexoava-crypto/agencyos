@@ -101,7 +101,7 @@ export const router = createBrowserRouter([
                   { path: "invoices/new", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).NewInvoicePage }) },
                   { path: "invoices/:invoiceId", lazy: page(() => import("@/pages/app/invoice-detail")) },
                   { path: "invoices/:invoiceId/edit", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).EditInvoicePage }) },
-                  { path: "finance", lazy: comingSoon("FinancePage") },
+                  { path: "finance", lazy: page(() => import("@/pages/app/finance")) },
                   { path: "contracts", lazy: comingSoon("ContractsPage") },
                   { path: "settings", lazy: comingSoon("SettingsPage") },
                 ],

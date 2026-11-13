@@ -30,6 +30,7 @@ import { useMemberMap } from "@/features/members/api";
 import { useDeleteProject, useProject, useUpdateProject } from "@/features/projects/api";
 import { STATUS_META } from "@/features/projects/meta";
 import { PriorityBadge, StatusBadge } from "@/features/projects/badges";
+import { ProjectExpensesTab } from "@/features/finance/project-expenses-tab";
 import { ProjectInvoicesTab } from "@/features/invoices/project-invoices-tab";
 import { OverviewTab } from "@/features/projects/overview-tab";
 import { ProjectFormDialog } from "@/features/projects/project-form-dialog";
@@ -52,13 +53,7 @@ const TABS: TabDef[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "steps", label: "Steps", icon: ListOrdered },
   { value: "tasks", label: "Tasks", icon: ListChecks },
-  {
-    value: "expenses",
-    label: "Expenses",
-    icon: Wallet,
-    managersOnly: true,
-    upcoming: { phase: 5, title: "No expenses yet", description: "Log project costs with categories and receipts to see what this project really earns." },
-  },
+  { value: "expenses", label: "Expenses", icon: Wallet, managersOnly: true },
   { value: "invoices", label: "Invoices", icon: ReceiptText, managersOnly: true },
   {
     value: "contract",
@@ -232,9 +227,14 @@ export default function ProjectDetailPage() {
           <TasksTab project={project} members={members} />
         </TabsContent>
         {canManage && (
-          <TabsContent value="invoices">
-            <ProjectInvoicesTab project={project} />
-          </TabsContent>
+          <>
+            <TabsContent value="expenses">
+              <ProjectExpensesTab project={project} />
+            </TabsContent>
+            <TabsContent value="invoices">
+              <ProjectInvoicesTab project={project} />
+            </TabsContent>
+          </>
         )}
         {tabs
           .filter((tab) => tab.upcoming)

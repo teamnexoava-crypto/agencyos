@@ -9,7 +9,10 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { createDb } from "../worker/db";
-import { clients, projectMembers, projectSteps, projects, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
+import { computeInvoiceTotals } from "../shared/invoice";
+import { formatInvoiceNumber } from "../shared/schemas/workspace";
+import { clients, expenseCategories, expenses, invoiceItems, invoices, payments, projectMembers, projectSteps, projects, tasks, users, workspaceMembers, workspaces } from "../worker/db/schema";
+import { newPublicToken } from "../worker/lib/ids";
 import { createWorkspaceForUser } from "../worker/services/workspaces";
 import { isLocalDatabase, localDatabaseUrl } from "./env";
 
@@ -99,6 +102,51 @@ const PROJECTS: ProjectSeed[] = [
     steps: [["Campaign concept", "completed", -30, 20_000_00]],
     tasks: [],
   },
+];
+
+type PaymentSeed = [amount: number, daysAgo: number, method: "upi" | "bank_transfer" | "cash" | "card"];
+
+interface InvoiceSeed {
+  client: (typeof CLIENTS)[number]["key"];
+  /** Index into PROJECTS, or null. */
+  project: number | null;
+  issuedDaysAgo: number;
+  dueInDays: number;
+  lines: [description: string, quantity: number, rate: number][];
+  taxMode: "none" | "cgst_sgst" | "igst";
+  status: "draft" | "sent" | "viewed";
+  payments: PaymentSeed[];
+}
+
+/** Six months of billing so the dashboard and P&L have a believable history. */
+const INVOICES: InvoiceSeed[] = [
+  { client: "zenfit", project: 2, issuedDaysAgo: 165, dueInDays: 15, lines: [["Moodboards & discovery", 1, 20_000_00]], taxMode: "igst", status: "viewed", payments: [[23_600_00, 158, "upi"]] },
+  { client: "kiran", project: 1, issuedDaysAgo: 140, dueInDays: 15, lines: [["Requirements workshop", 1, 50_000_00]], taxMode: "igst", status: "viewed", payments: [[59_000_00, 131, "bank_transfer"]] },
+  { client: "zenfit", project: 2, issuedDaysAgo: 118, dueInDays: 15, lines: [["Logo concepts", 1, 50_000_00]], taxMode: "igst", status: "viewed", payments: [[59_000_00, 104, "upi"]] },
+  { client: "pixel", project: 4, issuedDaysAgo: 96, dueInDays: 10, lines: [["Technical SEO audit", 1, 15_000_00]], taxMode: "none", status: "viewed", payments: [[15_000_00, 90, "upi"]] },
+  { client: "kiran", project: 1, issuedDaysAgo: 82, dueInDays: 15, lines: [["Clickable prototype", 1, 1_00_000_00]], taxMode: "igst", status: "viewed", payments: [[1_18_000_00, 70, "bank_transfer"]] },
+  { client: "zenfit", project: 2, issuedDaysAgo: 60, dueInDays: 15, lines: [["Brand guidelines", 1, 50_000_00]], taxMode: "igst", status: "viewed", payments: [[59_000_00, 48, "card"]] },
+  { client: "bloom", project: 0, issuedDaysAgo: 44, dueInDays: 15, lines: [["Discovery & sitemap", 1, 30_000_00], ["Visual design", 1, 70_000_00]], taxMode: "cgst_sgst", status: "viewed", payments: [[1_18_000_00, 33, "upi"]] },
+  { client: "kiran", project: 1, issuedDaysAgo: 30, dueInDays: 15, lines: [["Core app build – milestone 1", 1, 1_75_000_00]], taxMode: "igst", status: "viewed", payments: [[1_00_000_00, 12, "bank_transfer"]] },
+  { client: "pixel", project: 4, issuedDaysAgo: 28, dueInDays: 10, lines: [["Keyword map", 1, 15_000_00]], taxMode: "none", status: "sent", payments: [] },
+  { client: "bloom", project: 0, issuedDaysAgo: 6, dueInDays: 15, lines: [["Front-end build", 1, 90_000_00]], taxMode: "cgst_sgst", status: "sent", payments: [] },
+  { client: "zenfit", project: 3, issuedDaysAgo: 0, dueInDays: 15, lines: [["Membership portal – advance (30%)", 1, 1_14_000_00]], taxMode: "igst", status: "draft", payments: [] },
+];
+
+/** [description, category, amount, daysAgo, project index or null, vendor] */
+const EXPENSES: [string, string, number, number, number | null, string | null][] = [
+  ...[150, 120, 90, 60, 30, 2].flatMap((daysAgo): [string, string, number, number, number | null, string | null][] => [
+    ["Studio rent", "Rent", 35_000_00, daysAgo, null, "WeWork"],
+    ["Design & dev tools", "Software", 8_400_00, daysAgo - 1, null, "Figma, GitHub, Notion"],
+  ]),
+  ["Stock photography", "Software", 4_200_00, 100, 2, "Shutterstock"],
+  ["Freelance illustrator", "Freelancers", 18_000_00, 75, 2, "Ananya K."],
+  ["Android test devices", "Office", 22_500_00, 68, 1, "Croma"],
+  ["Play Console fee", "Taxes & fees", 2_100_00, 40, 1, "Google"],
+  ["Menu photo shoot", "Freelancers", 12_000_00, 25, 0, "Lens & Light"],
+  ["Client workshop travel", "Travel", 6_800_00, 21, 1, "IndiGo"],
+  ["LinkedIn ads", "Marketing", 9_000_00, 14, null, "LinkedIn"],
+  ["Hosting (staging)", "Software", 1_900_00, 5, 0, "Cloudflare"],
 ];
 
 const TEAMMATES = [
@@ -246,7 +294,77 @@ async function main() {
       }
     }
 
-    console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects.`);
+    // 6. Invoices with payments, and expenses.
+    const projectIds = await db
+      .select({ id: projects.id, title: projects.title })
+      .from(projects)
+      .where(eq(projects.workspaceId, DEMO_WORKSPACE_ID));
+    const projectIdAt = (index: number | null) => (index === null ? null : (projectIds.find((row) => row.title === PROJECTS[index]?.title)?.id ?? null));
+
+    for (const [index, seed] of INVOICES.entries()) {
+      const items = seed.lines.map(([description, quantity, rate]) => ({ description, quantity, rate }));
+      const totals = computeInvoiceTotals({ items, discountType: "none", discountValue: 0, taxMode: seed.taxMode, taxRate: 1800 });
+      const amountPaid = seed.payments.reduce((total, [amount]) => total + amount, 0);
+      const issuedAt = new Date(Date.now() - seed.issuedDaysAgo * 86_400_000);
+      const status = amountPaid >= totals.total ? "paid" : amountPaid > 0 ? "partially_paid" : seed.status;
+
+      const [invoice] = await db
+        .insert(invoices)
+        .values({
+          workspaceId: DEMO_WORKSPACE_ID,
+          clientId: clientIds.get(seed.client) ?? null,
+          projectId: projectIdAt(seed.project),
+          number: formatInvoiceNumber("NWS", index + 1),
+          sequence: index + 1,
+          status,
+          issueDate: day(-seed.issuedDaysAgo),
+          dueDate: day(-seed.issuedDaysAgo + seed.dueInDays),
+          currency: "INR",
+          taxMode: seed.taxMode,
+          taxRate: seed.taxMode === "none" ? 0 : 1800,
+          subtotal: totals.subtotal,
+          taxAmount: totals.taxAmount,
+          total: totals.total,
+          amountPaid,
+          terms: "Payment due within 15 days.",
+          bankDetails: "Northwind Studio LLP\nHDFC Bank · A/C 50200012345678\nIFSC HDFC0001234",
+          upiId: "northwind@upi",
+          publicToken: newPublicToken(),
+          sentAt: seed.status === "draft" ? null : issuedAt,
+          viewedAt: seed.status === "viewed" ? new Date(issuedAt.getTime() + 3_600_000) : null,
+          paidAt: status === "paid" ? new Date(Date.now() - (seed.payments.at(-1)?.[1] ?? 0) * 86_400_000) : null,
+          createdBy: ownerMemberId,
+          createdAt: issuedAt,
+        })
+        .returning({ id: invoices.id });
+      if (!invoice) throw new Error("Could not create invoice");
+
+      await db.insert(invoiceItems).values(
+        items.map((item, position) => ({ workspaceId: DEMO_WORKSPACE_ID, invoiceId: invoice.id, ...item, amount: totals.lineAmounts[position] ?? 0, position })),
+      );
+      if (seed.payments.length > 0) {
+        await db.insert(payments).values(
+          seed.payments.map(([amount, daysAgo, method]) => ({ workspaceId: DEMO_WORKSPACE_ID, invoiceId: invoice.id, amount, date: day(-daysAgo), method, createdBy: ownerMemberId })),
+        );
+      }
+    }
+    await db.update(workspaces).set({ invoiceNextNumber: INVOICES.length + 1 }).where(eq(workspaces.id, DEMO_WORKSPACE_ID));
+
+    const categoryRows = await db.select({ id: expenseCategories.id, name: expenseCategories.name }).from(expenseCategories).where(eq(expenseCategories.workspaceId, DEMO_WORKSPACE_ID));
+    await db.insert(expenses).values(
+      EXPENSES.map(([description, category, amount, daysAgo, project, vendor]) => ({
+        workspaceId: DEMO_WORKSPACE_ID,
+        description,
+        categoryId: categoryRows.find((row) => row.name === category)?.id ?? null,
+        amount,
+        date: day(-Math.max(0, daysAgo)),
+        projectId: projectIdAt(project),
+        vendor,
+        createdBy: ownerMemberId,
+      })),
+    );
+
+    console.log(`✔ Seeded "Northwind Studio": ${TEAMMATES.length + 1} members, ${CLIENTS.length} clients, ${PROJECTS.length} projects, ${INVOICES.length} invoices, ${EXPENSES.length} expenses.`);
     console.log('  Run `npm run dev` and choose "Continue as demo user" on /login.');
     console.log("  Sign in as a teammate (e.g. diya@agencyos.local) with POST /api/auth/dev-login to see the member view.");
   } finally {

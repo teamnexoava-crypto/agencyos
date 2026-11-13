@@ -5,12 +5,12 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 4 of 8 complete.**
-> Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects (kanban,
-> table, detail, steps / milestones, tasks) · team (invites, roles, member pages) · invoices (create
-> from a project, GST, live preview, PDF, public link with viewed tracking, WhatsApp / email sharing,
-> UPI QR, partial payments).
-> Next: finance & dashboard → contracts & e-sign → client portal → landing page, notifications, polish.
+> **Build status — Phase 5 of 8 complete.**
+> Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects · team ·
+> invoices and payments · expenses with categories and receipts · dashboard (KPIs, revenue vs
+> expenses, profit trend, project status, top clients, deadlines, overdue invoices, activity) ·
+> profit & loss by month, project, client and category with CSV export.
+> Next: contracts & e-sign → client portal → landing page, notifications, polish.
 
 ## Stack
 
@@ -24,6 +24,7 @@ Cloudflare Hyperdrive.
 | Frontend   | React 19 + Vite + TypeScript, React Router, TanStack Query                               |
 | UI         | Tailwind CSS v4, shadcn/ui (Radix), Lucide icons, Motion                                 |
 | Forms      | React Hook Form + Zod — schemas in `shared/` are used by both the browser and the Worker |
+| Charts     | Recharts, with a colour-blind-validated palette defined as CSS tokens                    |
 | PDF        | Print-optimised HTML: "Download PDF" opens the browser's Save-as-PDF with an A4 layout    |
 | Auth       | Google OAuth 2.0 (PKCE) via `arctic`, sessions in Postgres, httpOnly cookies. No passwords. |
 
@@ -97,7 +98,7 @@ worker/                 The API (Cloudflare Worker, Hono)
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
   routes/                 auth, workspace, members, team, invites, clients, projects, invoices,
-                          public (token links), assets
+                          expenses, files, reports, public (token links), assets
   services/               Business logic shared by routes and the seed script
 src/                    The React app
   components/ui/          shadcn/ui primitives
@@ -137,6 +138,11 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
 - **Invoice totals.** Line amounts, discount, GST and totals are always recomputed on the server
   with the same code the editor's preview uses (`shared/invoice.ts`); numbers sent by a browser are
   never stored. Invoice numbers come from a row-locked counter, so they can't collide.
+- **Finance visibility.** Revenue, expenses, profit, member costs, budgets and receipts are computed
+  and sent only for owners and admins. A member's dashboard request returns `finance: null`, and the
+  activity feed they get excludes money events and projects they are not on.
+- **Private files.** Receipts live in R2 under random keys and are only served through
+  `/api/files/:id`, which looks the file up inside the caller's workspace and checks their role.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores

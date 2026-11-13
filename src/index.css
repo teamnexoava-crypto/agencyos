@@ -38,6 +38,18 @@
   --sidebar-border: oklch(0.915 0.006 264);
 
   --shadow-color: 240 30% 20%;
+
+  /* Data-visualisation palette. Validated for colour-blind separation and contrast on this surface;
+     the dark block below holds the same hues re-stepped for the dark surface. Order matters. */
+  --chart-1: #2a78d6; /* revenue */
+  --chart-2: #eb6834; /* expenses */
+  --chart-3: #1baf7a; /* profit */
+  --chart-grid: oklch(0.93 0.004 264);
+  --status-lead: #2a78d6;
+  --status-in-progress: #6250d6;
+  --status-on-hold: #eda100;
+  --status-completed: #1baf7a;
+  --status-cancelled: #e34948;
 }
 
 .dark {
@@ -69,6 +81,16 @@
   --sidebar-border: oklch(1 0 0 / 0.08);
 
   --shadow-color: 240 50% 2%;
+
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-grid: oklch(1 0 0 / 0.07);
+  --status-lead: #3987e5;
+  --status-in-progress: #9085e9;
+  --status-on-hold: #c98500;
+  --status-completed: #199e70;
+  --status-cancelled: #e66767;
 }
 
 @theme inline {
