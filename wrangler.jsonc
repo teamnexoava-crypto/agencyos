@@ -1,0 +1,52 @@
+/**
+ * AgencyOS – Cloudflare Worker configuration.
+ * Replace the placeholder IDs below after running the `wrangler d1 create` / `wrangler kv namespace create`
+ * commands described in the README. Local development works with the placeholders as-is.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agencyos",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    // Every non-asset, non-API path falls back to index.html so React Router can handle it.
+    "not_found_handling": "single-page-application",
+    // Only /api/* reaches the Worker; everything else is served straight from the edge cache.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agencyos",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "agencyos-files"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "00000000000000000000000000000000"
+    }
+  ],
+  // Secrets the Worker cannot run without. Set them with `wrangler secret put <NAME>` (production)
+  // or in .dev.vars (local). Listed here so `wrangler types` and `wrangler deploy` can check them.
+  "secrets": {
+    "required": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SESSION_SECRET"]
+  },
+  "vars": {
+    // Optional: set to your canonical origin (e.g. "https://app.example.com") to pin OAuth redirects
+    // and public share links to one domain. When empty, the request origin is used.
+    "APP_URL": ""
+  },
+  "observability": {
+    "enabled": true
+  }
+}
