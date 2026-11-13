@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { and, eq, type SQL } from "drizzle-orm";
-import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { FINANCE_ROLES, type Role } from "../../shared/constants";
 import type { AppEnv, AuthContext, WorkspaceContext } from "../types";
 import { forbidden, unauthorized } from "./errors";
@@ -36,7 +36,7 @@ export function tenant(c: Context<AppEnv>) {
     db: c.var.db,
     workspaceId,
     /** Builds `workspace_id = <current> AND ...conditions` for a tenant-owned table. */
-    where<T extends { workspaceId: SQLiteColumn }>(table: T, ...conditions: (SQL | undefined)[]): SQL {
+    where<T extends { workspaceId: PgColumn }>(table: T, ...conditions: (SQL | undefined)[]): SQL {
       // `and()` only returns undefined when given no conditions; we always pass at least one.
       return and(eq(table.workspaceId, workspaceId), ...conditions) as SQL;
     },

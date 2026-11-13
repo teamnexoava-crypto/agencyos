@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { FileSignature, FolderKanban, ReceiptText, Settings, Users, UsersRound, Wallet } from "lucide-react";
+import { FileSignature, ReceiptText, Settings, UsersRound, Wallet } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -22,28 +22,6 @@ function ComingSoon({ title, description, icon, emptyTitle, emptyDescription, ph
     </>
   );
 }
-
-export const ProjectsPage = () => (
-  <ComingSoon
-    title="Projects"
-    description="Plan, track and deliver client work."
-    icon={FolderKanban}
-    emptyTitle="No projects yet"
-    emptyDescription="Kanban board, milestones, tasks and a client share link for every project."
-    phase={2}
-  />
-);
-
-export const ClientsPage = () => (
-  <ComingSoon
-    title="Clients"
-    description="Everyone you work with, in one place."
-    icon={Users}
-    emptyTitle="No clients yet"
-    emptyDescription="Store contact details, GST numbers and WhatsApp numbers, and see what each client has been billed."
-    phase={2}
-  />
-);
 
 export const TeamPage = () => (
   <ComingSoon

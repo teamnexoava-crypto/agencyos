@@ -5,11 +5,13 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 1 of 8 complete.**
-> Done: project setup, Cloudflare config, full Postgres schema + migration, Google login, sessions,
-> CSRF, rate limiting, onboarding, app shell (sidebar, top bar, dark mode, page transitions).
-> Next: clients & projects → team → invoices → finance & dashboard → contracts & e-sign → client
-> portal → landing page, notifications, polish.
+> **Build status — Phase 2 of 8 complete.**
+> Done: project setup, Cloudflare config, full Postgres schema, Google login, sessions, CSRF, rate
+> limiting, onboarding, app shell · clients (CRUD, detail page) · projects (kanban board with drag and
+> drop, sortable table, search and filters, detail page) · steps / milestones (reorder, status,
+> assignee, amount, auto-calculated progress) · tasks (assign, due date, done).
+> Next: team → invoices → finance & dashboard → contracts & e-sign → client portal → landing page,
+> notifications, polish.
 
 ## Stack
 
@@ -53,6 +55,17 @@ user** button, so you can work without Google credentials. That route is compile
 builds (it is registered inside an `import.meta.env.DEV` block). To test real Google sign-in locally,
 put your OAuth client ID and secret in `.dev.vars` (see [Google OAuth](#2-google-oauth-client)).
 
+To see the app as a teammate (members only see their own projects and never see budgets), sign in
+as one of the seeded users from the browser console on `/login`:
+
+```js
+await fetch("/api/auth/dev-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "diya@agencyos.local" }) });
+```
+
+Seeded teammates: `aarav@` (admin), `diya@` and `kabir@` (members), all `@agencyos.local`. Any other
+`…@agencyos.local` address creates a fresh user with an empty workspace – handy for checking that
+one workspace can never see another's data.
+
 To see the onboarding flow again, skip `db:seed` (or empty the local tables:
 `delete from workspaces; delete from users;`).
 
@@ -83,7 +96,7 @@ worker/                 The API (Cloudflare Worker, Hono)
   db/schema.ts            Drizzle schema – all 23 tables
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
-  routes/                 auth, workspace, assets (one file per resource)
+  routes/                 auth, workspace, members, clients, projects, assets (one file per resource)
   services/               Business logic shared by routes and the seed script
 src/                    The React app
   components/ui/          shadcn/ui primitives
@@ -111,7 +124,11 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
   database owner, which RLS does not restrict. The app never uses the Data API, so you can also
   switch it off in the Supabase dashboard (step 1 below).
 - **Roles.** `owner`, `admin`, `member`. Checked on the server with `t.requireRole(…)`; the UI hides
-  what a role cannot use but is never the enforcement point.
+  what a role cannot use but is never the enforcement point. Members only receive projects they are
+  assigned to (anything else answers 404, not 403, so existence isn't revealed), may update step
+  status and manage tasks there, and are never sent budgets, milestone amounts or the client list.
+- **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
+  caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores
   only its SHA-256 hash. Sessions last 30 days and roll forward once half the lifetime is used.
 - **CSRF.** State-changing requests must (1) carry an `Origin` header equal to the app's origin and

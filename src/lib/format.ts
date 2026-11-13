@@ -17,3 +17,51 @@ export function greeting(date = new Date()): string {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Money & dates
+ * ---------------------------------------------------------------------------------------------- */
+
+const LOCALES: Record<string, string> = { INR: "en-IN", USD: "en-US", EUR: "en-IE", GBP: "en-GB", AED: "en-AE", AUD: "en-AU", CAD: "en-CA", SGD: "en-SG" };
+
+/** Formats an amount held in minor units (paise), e.g. 2500000 → "₹25,000". Paise shown only when present. */
+export function formatMoney(minor: number, currency: string): string {
+  return new Intl.NumberFormat(LOCALES[currency] ?? "en-IN", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: minor % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(minor / 100);
+}
+
+/** Today's calendar date in the user's timezone as YYYY-MM-DD. */
+export function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/** "2026-11-13" → "13 Nov 2026" (year dropped when it is the current year). Timezone-safe. */
+export function formatDate(iso: string): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  const sameYear = iso.slice(0, 4) === todayIso().slice(0, 4);
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" }).format(date);
+}
+
+/** Whole days from today to `iso` (negative = in the past). */
+export function daysUntil(iso: string): number {
+  const ms = Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${todayIso()}T00:00:00Z`);
+  return Math.round(ms / 86_400_000);
+}
+
+export type DueTone = "overdue" | "soon" | "normal" | "done";
+
+/** Human due-date label with urgency, e.g. { text: "Due in 3 days", tone: "soon" }. */
+export function dueLabel(iso: string, done = false): { text: string; tone: DueTone } {
+  if (done) return { text: formatDate(iso), tone: "done" };
+  const days = daysUntil(iso);
+  if (days < 0) return { text: `Overdue by ${-days} day${days === -1 ? "" : "s"}`, tone: "overdue" };
+  if (days === 0) return { text: "Due today", tone: "soon" };
+  if (days === 1) return { text: "Due tomorrow", tone: "soon" };
+  if (days <= 7) return { text: `Due in ${days} days`, tone: "soon" };
+  return { text: `Due ${formatDate(iso)}`, tone: "normal" };
+}

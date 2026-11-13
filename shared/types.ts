@@ -1,4 +1,4 @@
-import type { CurrencyCode, Role, TaxMode } from "./constants";
+import type { CurrencyCode, ProjectPriority, ProjectStatus, Role, StepStatus, TaxMode } from "./constants";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -54,4 +54,92 @@ export interface AuthConfigResponse {
   googleConfigured: boolean;
   /** True only under `npm run dev` on localhost. */
   devLogin: boolean;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Members, clients, projects
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface MemberSummary {
+  /** workspace_members id – the id used for assignments. */
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  role: Role;
+  designation: string | null;
+}
+
+export interface ClientDTO {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  gstNumber: string | null;
+  address: string | null;
+  notes: string | null;
+  projectCount: number;
+  createdAt: number;
+}
+
+export interface ProjectSummary {
+  id: string;
+  title: string;
+  clientId: string | null;
+  clientName: string | null;
+  status: ProjectStatus;
+  priority: ProjectPriority;
+  startDate: string | null;
+  dueDate: string | null;
+  /** Minor units. `null` when the viewer may not see finances (members). */
+  budget: number | null;
+  tags: string[];
+  position: number;
+  /** 0–100, derived from completed steps. */
+  progress: number;
+  stepCount: number;
+  stepsDone: number;
+  taskCount: number;
+  tasksDone: number;
+  memberIds: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StepDTO {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  status: StepStatus;
+  assigneeId: string | null;
+  /** Minor units. `null` when unset or hidden from the viewer. */
+  amount: number | null;
+  position: number;
+  completedAt: number | null;
+}
+
+export interface TaskDTO {
+  id: string;
+  title: string;
+  assigneeId: string | null;
+  dueDate: string | null;
+  done: boolean;
+  doneAt: number | null;
+  position: number;
+  createdAt: number;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  description: string | null;
+  steps: StepDTO[];
+  tasks: TaskDTO[];
+}
+
+export interface ClientDetail extends ClientDTO {
+  projects: ProjectSummary[];
+  /** Minor units; filled in once invoicing exists. */
+  totals: { billed: number; paid: number };
 }

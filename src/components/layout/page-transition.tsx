@@ -13,18 +13,14 @@ function FrozenOutlet() {
   return frozen;
 }
 
-/** Top-level section of the path, so /app/projects → /app/projects/123 doesn't replay the transition. */
-function transitionKey(pathname: string): string {
-  return pathname.split("/").slice(0, 3).join("/");
-}
-
 /** Fade + slight slide between pages. `MotionConfig reducedMotion="user"` (main.tsx) disables the slide. */
 export function PageTransition() {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
-        key={transitionKey(location.pathname)}
+        // Keyed by path only: switching ?tab= inside a page must not replay the transition.
+        key={location.pathname}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}

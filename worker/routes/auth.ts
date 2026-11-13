@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { Context } from "hono";
 import type { AuthConfigResponse, MeResponse } from "../../shared/types";
+import { users } from "../db/schema";
 import { timingSafeEqual } from "../lib/crypto";
 import { forbidden, notFound } from "../lib/errors";
 import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured } from "../lib/google";
@@ -119,16 +121,31 @@ export const authRoutes = new Hono<AppEnv>()
  * deployed Worker. Under `npm run dev` it additionally requires a localhost hostname.
  */
 if (import.meta.env.DEV) {
+  /**
+   * Body (optional): `{ "email": "diya@agencyos.local" }` signs in as that seeded teammate, which is
+   * how roles and tenant isolation are tested locally. An unknown email creates a brand-new dev user
+   * with their own workspace. With no body you are the demo owner.
+   */
   authRoutes.post("/dev-login", async (c) => {
     if (!isLocalhost(c)) throw notFound("Route");
     if (c.var.auth) throw forbidden("Already signed in.");
 
-    const { user } = await upsertGoogleUser(c.var.db, {
-      sub: "dev:demo",
-      email: "demo@agencyos.local",
-      name: "Demo Owner",
-      picture: null,
-    });
+    const body: unknown = await c.req.json().catch(() => null);
+    const requested = typeof body === "object" && body !== null && "email" in body ? String(body.email).toLowerCase() : null;
+    const email = requested && /^[\w.+-]+@agencyos\.local$/.test(requested) ? requested : "demo@agencyos.local";
+    const handle = email.split("@")[0] ?? "demo";
+
+    const [existing] = await c.var.db.select().from(users).where(eq(users.email, email)).limit(1);
+    const user =
+      existing ??
+      (
+        await upsertGoogleUser(c.var.db, {
+          sub: `dev:${handle}`,
+          email,
+          name: handle === "demo" ? "Demo Owner" : `${handle.charAt(0).toUpperCase()}${handle.slice(1)} Tester`,
+          picture: null,
+        })
+      ).user;
     const workspaceId = await ensureWorkspace(c.var.db, user);
     await createSession(c, user.id, workspaceId);
     return c.json({ ok: true });

@@ -7,6 +7,9 @@ import { requestContext } from "./middleware/context";
 import { csrfProtection } from "./middleware/csrf";
 import { assetRoutes } from "./routes/assets";
 import { authRoutes } from "./routes/auth";
+import { clientRoutes } from "./routes/clients";
+import { memberRoutes } from "./routes/members";
+import { projectRoutes } from "./routes/projects";
 import { workspaceRoutes } from "./routes/workspace";
 import type { AppEnv } from "./types";
 
@@ -41,6 +44,9 @@ app.use(csrfProtection);
 app.get("/health", (c) => c.json({ ok: true }));
 app.route("/auth", authRoutes);
 app.route("/workspace", workspaceRoutes);
+app.route("/members", memberRoutes);
+app.route("/clients", clientRoutes);
+app.route("/projects", projectRoutes);
 
 app.notFound((c) => {
   const body: ApiErrorBody = { error: { code: "not_found", message: "Route not found." } };

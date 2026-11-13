@@ -80,7 +80,8 @@ export const router = createBrowserRouter([
             lazy: async () => ({ Component: (await import("@/components/layout/app-shell")).AppShell }),
             children: [
               { index: true, lazy: page(() => import("@/pages/app/dashboard")) },
-              { path: "projects", lazy: comingSoon("ProjectsPage") },
+              { path: "projects", lazy: page(() => import("@/pages/app/projects")) },
+              { path: "projects/:projectId", lazy: page(() => import("@/pages/app/project-detail")) },
               { path: "team", lazy: comingSoon("TeamPage") },
               {
                 element: (
@@ -89,7 +90,8 @@ export const router = createBrowserRouter([
                   </ManagersOnly>
                 ),
                 children: [
-                  { path: "clients", lazy: comingSoon("ClientsPage") },
+                  { path: "clients", lazy: page(() => import("@/pages/app/clients")) },
+                  { path: "clients/:clientId", lazy: page(() => import("@/pages/app/client-detail")) },
                   { path: "invoices", lazy: comingSoon("InvoicesPage") },
                   { path: "finance", lazy: comingSoon("FinancePage") },
                   { path: "contracts", lazy: comingSoon("ContractsPage") },
