@@ -21,6 +21,7 @@ import { BrandLogo, GoogleIcon } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/features/auth/api";
+import { Pricing } from "@/features/landing/pricing";
 import { cn } from "@/lib/utils";
 
 const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
@@ -450,41 +451,8 @@ export default function LandingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
-          <SectionHeading eyebrow="Pricing" title="Free while we're in early access" text="Use everything today at no cost. Paid plans will be announced before anything changes." />
-          <div className="mx-auto mt-12 grid max-w-3xl gap-4 md:grid-cols-2">
-            <Reveal>
-              <div className="flex h-full flex-col rounded-2xl border-2 border-primary bg-card p-6 shadow-lift">
-                <p className="flex items-center justify-between">
-                  <span className="font-semibold">Early access</span>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">Available now</span>
-                </p>
-                <p className="mt-4 flex items-baseline gap-1.5">
-                  <span className="tabular text-4xl font-semibold tracking-tight">₹0</span>
-                  <span className="text-sm text-muted-foreground">per month</span>
-                </p>
-                <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-                  {["Projects, clients and team", "Invoices, payments and expenses", "Contracts with e-signatures", "Client portal for every project", "Dashboard and profit & loss"].map((item) => (
-                    <li key={item} className="flex items-center gap-2.5">
-                      <Check className="size-4 shrink-0 text-primary" /> {item}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-6 [&>*]:w-full">
-                  <GetStarted signedIn={signedIn} size="default" />
-                </div>
-              </div>
-            </Reveal>
-            <Reveal delay={0.08}>
-              <div className="flex h-full flex-col rounded-2xl border bg-card p-6 shadow-soft">
-                <p className="flex items-center justify-between">
-                  <span className="font-semibold">Pro</span>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">Coming later</span>
-                </p>
-                <p className="mt-4 text-4xl font-semibold tracking-tight text-muted-foreground">—</p>
-                <p className="mt-6 flex-1 text-sm text-muted-foreground">For growing agencies that need more. Pricing and details will be shared here when it's ready – early-access users will be the first to know.</p>
-              </div>
-            </Reveal>
-          </div>
+          <SectionHeading eyebrow="Pricing" title="Simple pricing that grows with you" text="Start free and upgrade when your agency does. One flat price per workspace – no per-user surprises." />
+          <Pricing signedIn={signedIn} />
         </section>
 
         {/* FAQ */}
