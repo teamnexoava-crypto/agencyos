@@ -101,7 +101,14 @@ export default function LandingPage() {
       <footer className="relative border-t">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:px-8">
           <span>© {new Date().getFullYear()} AgencyOS</span>
-          <span>Hosted on Cloudflare Workers</span>
+          <span className="flex gap-5">
+            <Link to="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link to="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+          </span>
         </div>
       </footer>
     </div>

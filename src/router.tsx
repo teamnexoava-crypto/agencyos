@@ -39,6 +39,8 @@ export const router = createBrowserRouter([
     children: [
       // The landing page is the front door – keep it in the main bundle so it paints immediately.
       { path: "/", element: <LandingPage /> },
+      { path: "/privacy", lazy: async () => ({ Component: (await import("@/pages/legal")).PrivacyPage }) },
+      { path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },
       {
         path: "/login",
         element: (

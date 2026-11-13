@@ -93,7 +93,15 @@ export default function LoginPage() {
           )}
 
           <p className="mt-6 text-center text-xs text-balance text-muted-foreground">
-            By continuing you agree to our Terms of Service and Privacy Policy.
+            By continuing you agree to our{" "}
+            <Link to="/terms" className="underline underline-offset-2 hover:text-foreground">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
+              Privacy Policy
+            </Link>
+            .
           </p>
         </motion.div>
       </main>

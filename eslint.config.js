@@ -23,7 +23,7 @@ export default defineConfig([
   },
   {
     // shadcn/ui files export variants/hooks next to components, and route modules export a router.
-    files: ["src/components/ui/**", "src/router.tsx", "src/pages/app/coming-soon.tsx"],
+    files: ["src/components/ui/**", "src/router.tsx", "src/pages/app/coming-soon.tsx", "src/pages/legal.tsx"],
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
