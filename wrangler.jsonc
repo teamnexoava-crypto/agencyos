@@ -37,7 +37,7 @@
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "00000000000000000000000000000000"
+      "id": "3147ad97b7da4216b9fef5927a22ae4c"
     }
   ],
   // Secrets the Worker cannot run without. Set them with `wrangler secret put <NAME>` (production)
