@@ -140,7 +140,7 @@ export const projectRoutes = new Hono<AppEnv>()
     if (!project) throw new Error("Insert returned no row");
 
     await setProjectMembers(t, project.id, input.memberIds);
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, {
         type: "project.created",
         summary: `${t.user.name} created project "${project.title}"`,
@@ -187,7 +187,7 @@ export const projectRoutes = new Hono<AppEnv>()
 
     if (input.memberIds) await setProjectMembers(t, project.id, input.memberIds);
     if (input.status !== undefined && input.status !== existing.status) {
-      c.executionCtx.waitUntil(logStatusChange(t, project, input.status));
+      c.var.defer(logStatusChange(t, project, input.status));
     }
     return c.json({ project: await loadDetail(t, project) });
   })
@@ -213,7 +213,7 @@ export const projectRoutes = new Hono<AppEnv>()
       }
     });
 
-    if (status !== existing.status) c.executionCtx.waitUntil(logStatusChange(t, existing, status));
+    if (status !== existing.status) c.var.defer(logStatusChange(t, existing, status));
     return c.json({ ok: true });
   })
 
@@ -324,7 +324,7 @@ export const projectRoutes = new Hono<AppEnv>()
     if (!step) throw notFound("Step");
 
     if (statusChanged && step.status === "completed") {
-      c.executionCtx.waitUntil(
+      c.var.defer(
         logActivity(t, {
           type: "step.completed",
           summary: `${t.user.name} completed "${step.title}" in ${project.title}`,
@@ -379,7 +379,7 @@ export const projectRoutes = new Hono<AppEnv>()
 
     const assignee = assignees[0];
     if (assignee && assignee.userId !== t.user.id) {
-      c.executionCtx.waitUntil(
+      c.var.defer(
         notify(t.db, {
           workspaceId: t.workspaceId,
           userId: assignee.userId,
@@ -424,7 +424,7 @@ export const projectRoutes = new Hono<AppEnv>()
 
     const assignee = assignees[0];
     if (assignee && assignee.id !== existing.assigneeId && assignee.userId !== t.user.id) {
-      c.executionCtx.waitUntil(
+      c.var.defer(
         notify(t.db, {
           workspaceId: t.workspaceId,
           userId: assignee.userId,

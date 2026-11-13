@@ -200,7 +200,7 @@ export const invoiceRoutes = new Hono<AppEnv>()
       return created;
     });
 
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, {
         type: "invoice.created",
         summary: `${t.user.name} created invoice ${invoice.number} for ${money(invoice.total, invoice.currency)}`,
@@ -253,7 +253,7 @@ export const invoiceRoutes = new Hono<AppEnv>()
       .where(t.where(invoices, eq(invoices.id, existing.id)))
       .returning();
     if (!invoice) throw notFound("Invoice");
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "invoice.sent", summary: `${t.user.name} sent invoice ${invoice.number}`, entityType: "invoice", entityId: invoice.id, projectId: invoice.projectId, financeOnly: true }),
     );
     return c.json({ invoice: await loadDetail(t, invoice) });
@@ -344,7 +344,7 @@ export const invoiceRoutes = new Hono<AppEnv>()
     });
 
     const fullyPaid = invoice.status === "paid";
-    c.executionCtx.waitUntil(
+    c.var.defer(
       Promise.all([
         logActivity(t, {
           type: fullyPaid ? "invoice.paid" : "invoice.payment_recorded",

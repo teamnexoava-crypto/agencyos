@@ -229,7 +229,7 @@ export const contractRoutes = new Hono<AppEnv>()
       .returning();
     if (!row) throw new Error("Insert returned no row");
 
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "contract.created", summary: `${t.user.name} drafted the contract "${row.title}"`, entityType: "contract", entityId: row.id, projectId: row.projectId, financeOnly: true }),
     );
     return c.json({ contract: await loadDetail(t, c.env.BUCKET, row) }, 201);
@@ -256,7 +256,7 @@ export const contractRoutes = new Hono<AppEnv>()
     if (contract.status !== "draft") return c.json({ contract: await loadDetail(t, c.env.BUCKET, contract) }); // already sent: nothing to do
     if (contractText(contract.content).length === 0) throw new ApiError(400, "empty_contract", "Write the agreement text before sending it.");
     const updated = await transition(t, contract, ["draft"], { status: "sent", sentAt: new Date(), viewedAt: null });
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "contract.sent", summary: `${t.user.name} sent the contract "${updated.title}" for signature`, entityType: "contract", entityId: updated.id, projectId: updated.projectId, financeOnly: true }),
     );
     return c.json({ contract: await loadDetail(t, c.env.BUCKET, updated) });
@@ -335,7 +335,7 @@ export const contractRoutes = new Hono<AppEnv>()
         return row;
       });
     } catch (error) {
-      c.executionCtx.waitUntil(c.env.BUCKET.delete(key));
+      c.var.defer(c.env.BUCKET.delete(key));
       throw error;
     }
 
@@ -346,7 +346,7 @@ export const contractRoutes = new Hono<AppEnv>()
       console.error("Failed to write the sealed contract copy", error);
     }
 
-    c.executionCtx.waitUntil(
+    c.var.defer(
       Promise.all([
         logActivity(t, { type: "contract.signed", summary: `"${completed.title}" is fully signed`, entityType: "contract", entityId: completed.id, projectId: completed.projectId, financeOnly: true }),
         notifyManagers(t.db, t.workspaceId, { type: "contract.signed", title: `"${completed.title}" is fully signed`, body: `${input.name} counter-signed. The signed copy is ready.`, link: `/app/contracts/${completed.id}` }, t.user.id),

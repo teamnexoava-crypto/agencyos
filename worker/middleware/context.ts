@@ -6,18 +6,35 @@ import type { AppEnv } from "../types";
 
 /**
  * Attaches a per-request Drizzle client and (if a valid session cookie is present) the caller's
- * AuthContext. The database connection is released once the response and any `waitUntil()` work
- * that has already issued its queries are done.
+ * AuthContext.
+ *
+ * Work that should happen after the response (activity log, notifications, storage clean-up) goes
+ * through `c.var.defer(promise)` rather than `executionCtx.waitUntil` directly: the database
+ * connection is only closed once every deferred task has settled, so a task that runs several
+ * queries in a row never finds the connection already gone.
  */
 export const requestContext = createMiddleware<AppEnv>(async (c, next) => {
   const db = createDb(c.env.HYPERDRIVE.connectionString);
+  const deferred: Promise<unknown>[] = [];
   c.set("db", db);
+  c.set("defer", (task) => {
+    deferred.push(
+      task.catch((error: unknown) => {
+        console.error("Deferred task failed", error);
+      }),
+    );
+  });
   try {
     c.set("auth", await loadAuthContext(c));
     await next();
   } finally {
-    // `end()` lets in-flight queries finish (up to 5s) before closing the sockets.
-    c.executionCtx.waitUntil(db.$client.end({ timeout: 5 }));
+    c.executionCtx.waitUntil(
+      (async () => {
+        // A task may defer further tasks while it runs; array iteration picks up items added along the way.
+        for (const task of deferred) await task;
+        await db.$client.end({ timeout: 5 });
+      })(),
+    );
   }
 });
 

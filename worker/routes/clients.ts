@@ -91,7 +91,7 @@ export const clientRoutes = new Hono<AppEnv>()
       })
       .returning();
     if (!row) throw new Error("Insert returned no row");
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "client.created", summary: `${t.user.name} added client ${row.name}`, entityType: "client", entityId: row.id }),
     );
     return c.json({ client: toDTO(row, 0) }, 201);

@@ -70,7 +70,7 @@ export const publicRoutes = new Hono<AppEnv>()
         .returning();
       if (updated) {
         invoice = updated;
-        c.executionCtx.waitUntil(
+        c.var.defer(
           Promise.all([
             db.insert(activityLog).values({
               workspaceId: invoice.workspaceId,
@@ -114,7 +114,7 @@ export const publicRoutes = new Hono<AppEnv>()
         .returning();
       if (updated) {
         contract = updated;
-        c.executionCtx.waitUntil(
+        c.var.defer(
           Promise.all([
             db.insert(activityLog).values({
               workspaceId: contract.workspaceId,
@@ -199,11 +199,11 @@ export const publicRoutes = new Hono<AppEnv>()
           return row;
         });
       } catch (error) {
-        c.executionCtx.waitUntil(c.env.BUCKET.delete(key));
+        c.var.defer(c.env.BUCKET.delete(key));
         throw error;
       }
 
-      c.executionCtx.waitUntil(
+      c.var.defer(
         Promise.all([
           db.insert(activityLog).values({
             workspaceId: signed.workspaceId,
@@ -236,7 +236,7 @@ export const publicRoutes = new Hono<AppEnv>()
     const portal = await findPortal(db, c.req.valid("param").token);
     const viewerIsTeam = c.var.auth?.workspace?.id === portal.link.workspaceId;
     // The page re-fetches quietly while it stays open (`?refresh=1`); only the first load is a visit.
-    if (!viewerIsTeam && c.req.query("refresh") !== "1") c.executionCtx.waitUntil(recordPortalView(db, portal.link));
+    if (!viewerIsTeam && c.req.query("refresh") !== "1") c.var.defer(recordPortalView(db, portal.link));
     const body: { portal: PortalData } = { portal: await buildPortalData(db, portal) };
     return c.json(body);
   })
@@ -289,7 +289,7 @@ export const publicRoutes = new Hono<AppEnv>()
       .returning();
     if (!row) throw new Error("Insert returned no row");
 
-    c.executionCtx.waitUntil(
+    c.var.defer(
       Promise.all([
         db.insert(activityLog).values({
           workspaceId: link.workspaceId,

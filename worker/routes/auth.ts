@@ -97,7 +97,7 @@ export const authRoutes = new Hono<AppEnv>()
       // Someone signing in to accept an invite joins that workspace instead – don't create one of their own.
       const workspaceId = next.startsWith("/invite/") ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user);
       await createSession(c, user.id, workspaceId);
-      c.executionCtx.waitUntil(purgeExpiredSessions(c.var.db));
+      c.var.defer(purgeExpiredSessions(c.var.db));
       return c.redirect(next, 302);
     } catch (error) {
       if (error instanceof GoogleAuthError) {

@@ -5,12 +5,11 @@ invoices, contracts and e-signatures, with a client-facing share link per projec
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
 
-> **Build status — Phase 7 of 8 complete.**
-> Done: setup, Postgres schema, Google login, onboarding, app shell · clients · projects · team ·
-> invoices and payments · expenses and receipts · dashboard · profit & loss · contracts and
-> e-signatures · project files · client portal (one private link per project with progress,
-> milestones, invoices, contract, shared files and messages).
-> Next: landing page, notifications, search, settings, polish.
+> **Build status — all 8 phases complete.**
+> Google login and onboarding · clients · projects with milestones and tasks · team and roles ·
+> invoices and payments · expenses and receipts · dashboard and profit & loss · contracts with
+> e-signatures · project files · client portal · notifications · global search · settings ·
+> marketing landing page.
 
 ## Stack
 
@@ -98,8 +97,10 @@ worker/                 The API (Cloudflare Worker, Hono)
   db/schema.ts            Drizzle schema – all 23 tables
   lib/                    session, tenant scoping, Google OAuth, crypto, validation, errors
   middleware/             request context (db + session), CSRF, rate limiting
-  routes/                 auth, workspace, members, team, invites, clients, projects, invoices,
-                          contracts, expenses, files, reports, public (token links), assets
+  routes/                 auth, workspace (+ settings), members, team, invites, clients, projects,
+                          project-portal (files, client link, messages), invoices, contracts,
+                          expenses, files, reports, notifications, search,
+                          public (token links: /i, /c, /p), assets
   services/               Business logic shared by routes and the seed script
 src/                    The React app
   components/ui/          shadcn/ui primitives
@@ -164,6 +165,14 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
   allowed format (images, PDF, Office, ZIP, video, PSD, plain text); HTML, SVG and scripts are
   rejected whatever they are named. A file is visible to the client only after an owner or admin
   marks it so, and members can only reach files of projects they are assigned to.
+- **Background work.** Anything done after the response (activity log, notifications, storage
+  clean-up) goes through `c.var.defer()`, which keeps the per-request database connection open until
+  the task has finished.
+- **Search and notifications.** Search escapes `%` and `_`, and only returns what the caller's role
+  may see (members: their own projects). Notifications are read and marked per user, per workspace.
+- **Deleting a workspace.** Owner only, and the request must repeat the workspace name. All stored
+  objects under `ws/<id>/` are removed from R2, then the workspace row is deleted and every table
+  cascades from it.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores
@@ -278,6 +287,10 @@ tabs' CSRF tokens (users just need to refresh); sessions themselves stay valid.
 
 ### 4. Deploy
 
+Either connect the GitHub repository in the Cloudflare dashboard (Workers & Pages → Create →
+Import a repository; build command `npm run build`, deploy command `npx wrangler deploy`) so that
+every push to `main` deploys automatically, or deploy from your machine:
+
 ```bash
 npm run deploy
 ```
@@ -315,3 +328,16 @@ npm run db:migrate:remote
 Edit `worker/db/schema.ts`, generate, review the SQL in `drizzle/`, apply locally, test, then apply
 remotely before (or together with) the deploy that needs it. New tables must end with
 `.enableRLS()` (see "How it is secured").
+
+## Before you take paying customers
+
+- **Database plan.** Supabase's free plan pauses inactive projects and keeps no backups. Move to a
+  paid plan (daily backups) before real customer data depends on it.
+- **Workers plan.** The free plan allows 100,000 requests a day and 10 ms of CPU per request, which
+  is plenty to start. The paid plan removes those limits.
+- **Legal pages.** `/privacy` and `/terms` are starter drafts. Put your business name and contact
+  email in them and have them reviewed.
+- **Billing.** There is no subscription billing in the app – everyone uses it for free. Charging
+  customers needs a payment provider (Razorpay or Stripe) and a plans/limits layer on top.
+- **Custom domain.** Recommended before launch, so links sent to clients carry your own name.
+

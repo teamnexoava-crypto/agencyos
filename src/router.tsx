@@ -3,7 +3,6 @@ import { createBrowserRouter, Navigate, Outlet, useRouteError } from "react-rout
 import { ErrorState } from "@/components/shared/error-state";
 import { useSession } from "@/features/auth/api";
 import { RedirectIfAuthenticated, RequireAuth } from "@/features/auth/guards";
-import type * as ComingSoonPages from "@/pages/app/coming-soon";
 import LandingPage from "@/pages/landing";
 import NotFoundPage from "@/pages/not-found";
 
@@ -27,10 +26,6 @@ function ManagersOnly({ children }: { children: ReactNode }) {
  * waits for the chunk before switching pages, so there is no spinner flash between routes.
  */
 const page = (load: () => Promise<{ default: ComponentType }>) => async () => ({ Component: (await load()).default });
-const comingSoon = (name: keyof typeof ComingSoonPages) => async () => ({
-  Component: (await import("@/pages/app/coming-soon"))[name],
-});
-
 export const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
@@ -108,7 +103,7 @@ export const router = createBrowserRouter([
                   { path: "finance", lazy: page(() => import("@/pages/app/finance")) },
                   { path: "contracts", lazy: page(() => import("@/pages/app/contracts")) },
                   { path: "contracts/:contractId", lazy: page(() => import("@/pages/app/contract-detail")) },
-                  { path: "settings", lazy: comingSoon("SettingsPage") },
+                  { path: "settings", lazy: page(() => import("@/pages/app/settings")) },
                 ],
               },
               { path: "*", element: <NotFoundPage /> },

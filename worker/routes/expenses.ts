@@ -149,7 +149,7 @@ export const expenseRoutes = new Hono<AppEnv>()
       })
       .returning();
     if (!row) throw new Error("Insert returned no row");
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "expense.created", summary: `${t.user.name} logged an expense: ${row.description}`, entityType: "expense", entityId: row.id, projectId: row.projectId, financeOnly: true }),
     );
     const [expense] = await loadExpenses(t, { id: row.id });
@@ -184,7 +184,7 @@ export const expenseRoutes = new Hono<AppEnv>()
       .update(expenses)
       .set({ deletedAt: new Date() })
       .where(t.where(expenses, eq(expenses.id, existing.id)));
-    if (existing.receiptFileId) c.executionCtx.waitUntil(dropReceipt(t, c.env.BUCKET, existing.receiptFileId));
+    if (existing.receiptFileId) c.var.defer(dropReceipt(t, c.env.BUCKET, existing.receiptFileId));
     return c.json({ ok: true });
   })
 
@@ -232,7 +232,7 @@ export const expenseRoutes = new Hono<AppEnv>()
         .update(expenses)
         .set({ receiptFileId: stored.id, updatedAt: new Date() })
         .where(t.where(expenses, eq(expenses.id, existing.id)));
-      if (existing.receiptFileId) c.executionCtx.waitUntil(dropReceipt(t, c.env.BUCKET, existing.receiptFileId));
+      if (existing.receiptFileId) c.var.defer(dropReceipt(t, c.env.BUCKET, existing.receiptFileId));
 
       const [expense] = await loadExpenses(t, { id: existing.id });
       return c.json({ expense }, 201);

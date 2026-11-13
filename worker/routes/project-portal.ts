@@ -128,7 +128,7 @@ export const projectPortalRoutes = new Hono<AppEnv>()
         .returning();
       if (!row) throw new Error("Insert returned no row");
 
-      c.executionCtx.waitUntil(
+      c.var.defer(
         logActivity(t, { type: "file.uploaded", summary: `${t.user.name} uploaded "${row.name}" to ${project.title}`, entityType: "file", entityId: row.id, projectId: project.id }),
       );
       return c.json({ file: toFileDTO(row) }, 201);
@@ -161,7 +161,7 @@ export const projectPortalRoutes = new Hono<AppEnv>()
       .update(files)
       .set({ deletedAt: new Date(), sharedWithClient: false })
       .where(t.where(files, eq(files.id, file.id)));
-    c.executionCtx.waitUntil(c.env.BUCKET.delete(file.r2Key));
+    c.var.defer(c.env.BUCKET.delete(file.r2Key));
     return c.json({ ok: true });
   })
 

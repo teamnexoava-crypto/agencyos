@@ -1,23 +1,82 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { and, eq, isNull } from "drizzle-orm";
-import { LOGO_MAX_BYTES } from "../../shared/constants";
+import { and, eq, isNull, max } from "drizzle-orm";
+import { DEFAULT_WA_CONTRACT_TEMPLATE, DEFAULT_WA_INVITE_TEMPLATE, DEFAULT_WA_INVOICE_TEMPLATE, LOGO_MAX_BYTES } from "../../shared/constants";
+import { deleteWorkspaceSchema, settingsInvoicingSchema, settingsMessagesSchema, settingsProfileSchema } from "../../shared/schemas/settings";
 import { switchWorkspaceSchema } from "../../shared/schemas/team";
 import { createWorkspaceSchema, onboardingSchema } from "../../shared/schemas/workspace";
-import type { WorkspaceMembershipDTO } from "../../shared/types";
-import { workspaceMembers, workspaces } from "../db/schema";
+import type { WorkspaceMembershipDTO, WorkspaceSettings } from "../../shared/types";
+import { invoices, workspaceMembers, workspaces } from "../db/schema";
 import { ApiError, badRequest, forbidden } from "../lib/errors";
 import { newId } from "../lib/ids";
 import { sniffImage } from "../lib/images";
 import { setActiveWorkspace } from "../lib/session";
-import { requireUser, tenant } from "../lib/tenant";
+import { requireUser, tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { createWorkspaceForUser, logoUrlFromKey, toWorkspaceDTO } from "../services/workspaces";
-import type { AppEnv } from "../types";
+import type { AppEnv, WorkspaceRow } from "../types";
 
 /** "" → null so optional text columns stay NULL instead of holding empty strings. */
 const emptyToNull = (value: string): string | null => (value === "" ? null : value);
+
+/** One above the highest invoice number already issued – the counter may never go below this. */
+async function minNextInvoiceNumber(t: Tenant): Promise<number> {
+  const [row] = await t.db
+    .select({ value: max(invoices.sequence) })
+    .from(invoices)
+    .where(t.where(invoices));
+  return (row?.value ?? 0) + 1;
+}
+
+async function toSettings(t: Tenant, ws: WorkspaceRow): Promise<WorkspaceSettings> {
+  return {
+    name: ws.name,
+    logoUrl: logoUrlFromKey(ws.logoKey),
+    currency: ws.currency,
+    email: ws.email ?? "",
+    phone: ws.phone ?? "",
+    website: ws.website ?? "",
+    address: ws.address ?? "",
+    gstNumber: ws.gstNumber ?? "",
+    brandColor: ws.brandColor,
+    invoicePrefix: ws.invoicePrefix,
+    invoiceNextNumber: ws.invoiceNextNumber,
+    invoiceMinNextNumber: await minNextInvoiceNumber(t),
+    invoiceDueDays: ws.invoiceDueDays,
+    defaultTaxMode: ws.defaultTaxMode,
+    defaultTaxRate: ws.defaultTaxRate,
+    invoiceNotes: ws.invoiceNotes ?? "",
+    invoiceTerms: ws.invoiceTerms ?? "",
+    bankDetails: ws.bankDetails ?? "",
+    upiId: ws.upiId ?? "",
+    waInvoiceTemplate: ws.waInvoiceTemplate ?? "",
+    waContractTemplate: ws.waContractTemplate ?? "",
+    waInviteTemplate: ws.waInviteTemplate ?? "",
+    defaults: { waInvoiceTemplate: DEFAULT_WA_INVOICE_TEMPLATE, waContractTemplate: DEFAULT_WA_CONTRACT_TEMPLATE, waInviteTemplate: DEFAULT_WA_INVITE_TEMPLATE },
+  };
+}
+
+async function saveSettings(t: Tenant, values: Partial<typeof workspaces.$inferInsert>) {
+  const [updated] = await t.db
+    .update(workspaces)
+    .set({ ...values, updatedAt: new Date() })
+    .where(eq(workspaces.id, t.workspaceId))
+    .returning();
+  if (!updated) throw new ApiError(500, "update_failed", "Could not save your settings.");
+  return { settings: await toSettings(t, updated), workspace: toWorkspaceDTO(updated) };
+}
+
+/** Removes every stored object of a workspace (logo, receipts, project files, signatures, sealed contracts). */
+async function purgeWorkspaceObjects(bucket: R2Bucket, workspaceId: string): Promise<void> {
+  let cursor: string | undefined;
+  for (let page = 0; page < 50; page++) {
+    const listing = await bucket.list({ prefix: `ws/${workspaceId}/`, cursor, limit: 1000 });
+    if (listing.objects.length > 0) await bucket.delete(listing.objects.map((object) => object.key));
+    if (!listing.truncated) return;
+    cursor = listing.cursor;
+  }
+}
 
 export const workspaceRoutes = new Hono<AppEnv>()
   .use(requireAuth)
@@ -132,7 +191,7 @@ export const workspaceRoutes = new Hono<AppEnv>()
 
       // Each upload gets a fresh key (so URLs are immutable + cacheable); drop the previous object.
       const previousKey = t.workspace.logoKey;
-      if (previousKey) c.executionCtx.waitUntil(c.env.BUCKET.delete(previousKey));
+      if (previousKey) c.var.defer(c.env.BUCKET.delete(previousKey));
 
       return c.json({ logoUrl: logoUrlFromKey(key) }, 201);
     },
@@ -144,7 +203,84 @@ export const workspaceRoutes = new Hono<AppEnv>()
     const previousKey = t.workspace.logoKey;
     if (previousKey) {
       await t.db.update(workspaces).set({ logoKey: null }).where(eq(workspaces.id, t.workspaceId));
-      c.executionCtx.waitUntil(c.env.BUCKET.delete(previousKey));
+      c.var.defer(c.env.BUCKET.delete(previousKey));
     }
+    return c.json({ ok: true });
+  })
+
+  /* ---------------------------------------------------------------- settings (owner / admin) */
+
+  .get("/settings", async (c) => {
+    const t = tenant(c);
+    t.requireRole("owner", "admin");
+    return c.json({ settings: await toSettings(t, t.workspace) });
+  })
+
+  .put("/settings/profile", validate("json", settingsProfileSchema), async (c) => {
+    const t = tenant(c);
+    t.requireRole("owner", "admin");
+    const input = c.req.valid("json");
+    return c.json(
+      await saveSettings(t, {
+        name: input.name,
+        email: emptyToNull(input.email),
+        phone: emptyToNull(input.phone),
+        website: emptyToNull(input.website),
+        address: emptyToNull(input.address),
+        gstNumber: emptyToNull(input.gstNumber),
+        brandColor: input.brandColor.toLowerCase(),
+      }),
+    );
+  })
+
+  .put("/settings/invoicing", validate("json", settingsInvoicingSchema), async (c) => {
+    const t = tenant(c);
+    t.requireRole("owner", "admin");
+    const input = c.req.valid("json");
+    const minimum = await minNextInvoiceNumber(t);
+    if (input.invoiceNextNumber < minimum) {
+      throw new ApiError(400, "validation_error", "That invoice number is already used.", { invoiceNextNumber: `Must be ${minimum} or higher – earlier numbers are already used` });
+    }
+    return c.json(
+      await saveSettings(t, {
+        invoicePrefix: input.invoicePrefix,
+        invoiceNextNumber: input.invoiceNextNumber,
+        invoiceDueDays: input.invoiceDueDays,
+        defaultTaxMode: input.defaultTaxMode,
+        defaultTaxRate: input.defaultTaxMode === "none" ? t.workspace.defaultTaxRate : input.defaultTaxRate,
+        invoiceNotes: emptyToNull(input.invoiceNotes),
+        invoiceTerms: emptyToNull(input.invoiceTerms),
+        bankDetails: emptyToNull(input.bankDetails),
+        upiId: emptyToNull(input.upiId),
+      }),
+    );
+  })
+
+  .put("/settings/messages", validate("json", settingsMessagesSchema), async (c) => {
+    const t = tenant(c);
+    t.requireRole("owner", "admin");
+    const input = c.req.valid("json");
+    return c.json(
+      await saveSettings(t, {
+        waInvoiceTemplate: emptyToNull(input.waInvoiceTemplate),
+        waContractTemplate: emptyToNull(input.waContractTemplate),
+        waInviteTemplate: emptyToNull(input.waInviteTemplate),
+      }),
+    );
+  })
+
+  /**
+   * Deletes the workspace and everything in it, for good. Owner only, and only when the request
+   * repeats the workspace name. Stored files go first, then the database row (every table hangs off
+   * it with ON DELETE CASCADE).
+   */
+  .delete("/", validate("json", deleteWorkspaceSchema), async (c) => {
+    const t = tenant(c);
+    t.requireRole("owner");
+    if (c.req.valid("json").confirmName.trim() !== t.workspace.name) {
+      throw new ApiError(400, "validation_error", "The name doesn't match.", { confirmName: "Type the workspace name exactly" });
+    }
+    await purgeWorkspaceObjects(c.env.BUCKET, t.workspaceId);
+    await t.db.delete(workspaces).where(eq(workspaces.id, t.workspaceId));
     return c.json({ ok: true });
   });

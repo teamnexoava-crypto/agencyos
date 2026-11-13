@@ -130,7 +130,7 @@ export const inviteRoutes = new Hono<AppEnv>()
     if (invite.invitedBy) {
       const [inviter] = await db.select({ userId: workspaceMembers.userId }).from(workspaceMembers).where(eq(workspaceMembers.id, invite.invitedBy)).limit(1);
       if (inviter) {
-        c.executionCtx.waitUntil(
+        c.var.defer(
           notify(db, {
             workspaceId: workspace.id,
             userId: inviter.userId,

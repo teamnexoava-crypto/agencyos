@@ -27,5 +27,7 @@ export interface AppEnv {
   Variables: {
     db: Database;
     auth: AuthContext | null;
+    /** Runs a task after the response, keeping the database connection open until it has finished. */
+    defer: (task: Promise<unknown>) => void;
   };
 }

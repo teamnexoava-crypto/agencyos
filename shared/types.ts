@@ -4,6 +4,7 @@ import type {
   CurrencyCode,
   DiscountType,
   InvoiceStatus,
+  NotificationType,
   PaymentMethod,
   ProjectPriority,
   ProjectStatus,
@@ -544,4 +545,60 @@ export interface PortalData {
   contracts: { title: string; status: ContractStatus; token: string }[] | null;
   files: { id: string; name: string; contentType: string; size: number; createdAt: number }[] | null;
   comments: CommentDTO[] | null;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Settings, notifications and search
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface WorkspaceSettings {
+  name: string;
+  logoUrl: string | null;
+  currency: CurrencyCode;
+  email: string;
+  phone: string;
+  website: string;
+  address: string;
+  gstNumber: string;
+  brandColor: string;
+  invoicePrefix: string;
+  invoiceNextNumber: number;
+  /** The lowest number the counter can be set to (one above the highest invoice already issued). */
+  invoiceMinNextNumber: number;
+  invoiceDueDays: number;
+  defaultTaxMode: TaxMode;
+  defaultTaxRate: number;
+  invoiceNotes: string;
+  invoiceTerms: string;
+  bankDetails: string;
+  upiId: string;
+  /** "" when the built-in message is in use. */
+  waInvoiceTemplate: string;
+  waContractTemplate: string;
+  waInviteTemplate: string;
+  defaults: { waInvoiceTemplate: string; waContractTemplate: string; waInviteTemplate: string };
+}
+
+export interface NotificationDTO {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  createdAt: number;
+}
+
+export interface NotificationFeed {
+  notifications: NotificationDTO[];
+  unread: number;
+}
+
+export interface SearchResult {
+  type: "project" | "client" | "invoice" | "contract";
+  id: string;
+  title: string;
+  subtitle: string | null;
+  /** In-app path. */
+  to: string;
 }

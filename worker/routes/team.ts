@@ -205,7 +205,7 @@ export const teamRoutes = new Hono<AppEnv>()
       await tx.delete(projectMembers).where(and(eq(projectMembers.workspaceId, t.workspaceId), eq(projectMembers.memberId, target.member.id)));
     });
 
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "member.removed", summary: `${t.user.name} removed ${target.name} from the workspace`, entityType: "member", entityId: target.member.id }),
     );
     return c.json({ ok: true });
@@ -247,7 +247,7 @@ export const teamRoutes = new Hono<AppEnv>()
       .returning();
     if (!invite) throw new Error("Insert returned no row");
 
-    c.executionCtx.waitUntil(
+    c.var.defer(
       logActivity(t, { type: "member.invited", summary: `${t.user.name} invited ${invite.email}`, entityType: "invite", entityId: invite.id }),
     );
     const dto: InviteDTO = {
