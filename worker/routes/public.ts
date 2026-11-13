@@ -95,7 +95,8 @@ export const publicRoutes = new Hono<AppEnv>()
 
     // `clientWhatsapp` is for the agency's share button only – never sent to the public page.
     const { clientWhatsapp: _omit, ...document } = await buildInvoiceDocument(db, invoice, workspace);
-    const body: { invoice: InvoiceDocument } = { invoice: document };
+    // Line items are numbered for the page; their database ids stay private.
+    const body: { invoice: InvoiceDocument } = { invoice: { ...document, items: document.items.map((item, index) => ({ ...item, id: String(index + 1) })) } };
     return c.json(body);
   })
 

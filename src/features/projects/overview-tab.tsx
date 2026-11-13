@@ -16,44 +16,47 @@ import { cn } from "@/lib/utils";
 import { useSetProjectMembers } from "./api";
 import { DUE_TONE_CLASS } from "./meta";
 
-function TeamDialog({ project, open, onOpenChange }: { project: ProjectDetail; open: boolean; onOpenChange: (open: boolean) => void }) {
+function TeamForm({ project, onClose }: { project: ProjectDetail; onClose: () => void }) {
   const { data: members = [] } = useMembers();
   const setMembers = useSetProjectMembers(project.id);
   const [selected, setSelected] = useState(project.memberIds);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) setSelected(project.memberIds);
-        onOpenChange(next);
-      }}
-    >
+    <>
+      <MemberChecklist members={members} value={selected} onChange={setSelected} className="max-h-72" />
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose} disabled={setMembers.isPending}>
+          Cancel
+        </Button>
+        <Button
+          disabled={setMembers.isPending}
+          onClick={() =>
+            setMembers.mutate(selected, {
+              onSuccess: () => {
+                toast.success("Team updated");
+                onClose();
+              },
+              onError: (error) => toast.error(errorMessage(error, "Could not update the team.")),
+            })
+          }
+        >
+          {setMembers.isPending && <LoaderCircle className="animate-spin" />} Save
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+function TeamDialog({ project, open, onOpenChange }: { project: ProjectDetail; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Project team</DialogTitle>
-          <DialogDescription>Members only see the projects they're assigned to.</DialogDescription>
+          <DialogDescription>Members only see the projects they're assigned to. Taking someone off the team also unassigns their open tasks here.</DialogDescription>
         </DialogHeader>
-        <MemberChecklist members={members} value={selected} onChange={setSelected} className="max-h-72" />
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={setMembers.isPending}>
-            Cancel
-          </Button>
-          <Button
-            disabled={setMembers.isPending}
-            onClick={() =>
-              setMembers.mutate(selected, {
-                onSuccess: () => {
-                  toast.success("Team updated");
-                  onOpenChange(false);
-                },
-                onError: (error) => toast.error(errorMessage(error, "Could not update the team.")),
-              })
-            }
-          >
-            {setMembers.isPending && <LoaderCircle className="animate-spin" />} Save
-          </Button>
-        </DialogFooter>
+        {/* Mounted only while open, so the ticks always start from the team as it is now. */}
+        {open && <TeamForm project={project} onClose={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   );

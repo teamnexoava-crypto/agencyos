@@ -42,11 +42,12 @@ function Messages({ projectId, clientCanWrite }: { projectId: string; clientCanW
   const post = usePostComment(projectId);
   const remove = useDeleteComment(projectId);
   const [body, setBody] = useState("");
-  const end = useRef<HTMLLIElement>(null);
+  const list = useRef<HTMLUListElement>(null);
   const count = comments?.length ?? 0;
 
+  // Keep the newest message in view by scrolling the thread itself – never the whole page.
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
+    list.current?.scrollTo({ top: list.current.scrollHeight });
   }, [count]);
 
   const send = () => {
@@ -74,7 +75,7 @@ function Messages({ projectId, clientCanWrite }: { projectId: string; clientCanW
           No messages yet.
         </div>
       ) : (
-        <ul className="max-h-96 space-y-3 overflow-y-auto p-5" aria-live="polite">
+        <ul ref={list} className="max-h-96 space-y-3 overflow-y-auto p-5" aria-live="polite">
           {(comments ?? []).map((comment) => {
             const mine = comment.authorType === "member";
             return (
@@ -98,7 +99,6 @@ function Messages({ projectId, clientCanWrite }: { projectId: string; clientCanW
               </li>
             );
           })}
-          <li ref={end} aria-hidden="true" />
         </ul>
       )}
 

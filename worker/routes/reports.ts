@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, sql, sum, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, sql, sum, type SQL } from "drizzle-orm";
 import { PROJECT_STATUSES, type ProjectStatus } from "../../shared/constants";
 import { dateRangeSchema } from "../../shared/schemas/expense";
 import type { ActivityItem, DashboardData, DeadlineItem, ProfitAndLoss } from "../../shared/types";
 import { activityLog, clients, expenseCategories, expenses, invoices, payments, projectSteps, projects, tasks, workspaceMembers } from "../db/schema";
+import { localToday } from "../lib/request";
 import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
@@ -11,12 +12,11 @@ import { projectVisibility } from "../services/projects";
 import { monthlySeries, outstandingBalance } from "../services/reports";
 import type { AppEnv } from "../types";
 
-const todayUtc = () => new Date().toISOString().slice(0, 10);
 const plusDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 /** Work due in the next two weeks, plus anything already overdue – only from projects the caller can see. */
-async function loadDeadlines(t: Tenant, projectIds: string[] | null): Promise<DeadlineItem[]> {
-  const horizon = plusDays(todayUtc(), 14);
+async function loadDeadlines(t: Tenant, projectIds: string[] | null, today: string): Promise<DeadlineItem[]> {
+  const horizon = plusDays(today, 14);
   const inScope = (column: typeof projects.id | typeof projectSteps.projectId | typeof tasks.projectId): SQL | undefined =>
     projectIds === null ? undefined : projectIds.length === 0 ? sql`false` : inArray(column, projectIds);
   const openProject = and(isNull(projects.deletedAt), notInArray(projects.status, ["completed", "cancelled"]));
@@ -73,7 +73,7 @@ export const reportRoutes = new Hono<AppEnv>()
   .get("/dashboard", validate("query", dateRangeSchema), async (c) => {
     const t = tenant(c);
     const range = c.req.valid("query");
-    const today = todayUtc();
+    const today = localToday(c);
 
     const visible = await t.db
       .select({ id: projects.id, status: projects.status })
@@ -93,12 +93,13 @@ export const reportRoutes = new Hono<AppEnv>()
         .select({ total: count() })
         .from(tasks)
         .innerJoin(projects, eq(projects.id, tasks.projectId))
-        .where(t.where(tasks, eq(tasks.assigneeId, t.member.id), eq(tasks.done, false), isNull(projects.deletedAt))),
+        // Only on projects the person can open (a member's own), and not on finished or cancelled ones.
+        .where(t.where(tasks, eq(tasks.assigneeId, t.member.id), eq(tasks.done, false), isNull(projects.deletedAt), notInArray(projects.status, ["completed", "cancelled"]), projectVisibility(t))),
       t.db
         .select({ total: count() })
         .from(clients)
         .where(t.where(clients, isNull(clients.deletedAt))),
-      loadDeadlines(t, scopeIds),
+      loadDeadlines(t, scopeIds, today),
       t.db
         .select()
         .from(activityLog)
@@ -131,7 +132,7 @@ export const reportRoutes = new Hono<AppEnv>()
           .select({ id: invoices.id, number: invoices.number, clientName: clients.name, dueDate: invoices.dueDate, total: invoices.total, amountPaid: invoices.amountPaid })
           .from(invoices)
           .leftJoin(clients, eq(clients.id, invoices.clientId))
-          .where(t.where(invoices, isNull(invoices.deletedAt), inArray(invoices.status, ["sent", "viewed", "partially_paid"]), lt(invoices.dueDate, today)))
+          .where(t.where(invoices, isNull(invoices.deletedAt), inArray(invoices.status, ["sent", "viewed", "partially_paid"]), lt(invoices.dueDate, today), gt(invoices.total, invoices.amountPaid)))
           .orderBy(asc(invoices.dueDate))
           .limit(6),
       ]);

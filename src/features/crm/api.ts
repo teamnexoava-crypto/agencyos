@@ -54,10 +54,20 @@ export function useUpdateLead() {
           list?.map((item) => (item.id === id ? { ...item, ...(input.stage !== undefined && { stage: input.stage }), ...(input.followUpDate !== undefined && { followUpDate: input.followUpDate || null }) } : item)),
         );
       }
-      return { previous };
+      const previousLead = queryClient.getQueryData<LeadDetail>(crmKeys.lead(id));
+      if (previousLead) {
+        queryClient.setQueryData<LeadDetail>(crmKeys.lead(id), {
+          ...previousLead,
+          ...(input.stage !== undefined && { stage: input.stage }),
+          ...(input.followUpDate !== undefined && { followUpDate: input.followUpDate || null }),
+          ...(input.assigneeId !== undefined && { assigneeId: input.assigneeId || null }),
+        });
+      }
+      return { previous, previousLead };
     },
-    onError: (_error, _variables, context) => {
+    onError: (_error, { id }, context) => {
       if (context?.previous) queryClient.setQueryData(crmKeys.leads, context.previous);
+      if (context?.previousLead) queryClient.setQueryData(crmKeys.lead(id), context.previousLead);
     },
     onSuccess: (lead) => applyLead(queryClient, lead),
   });

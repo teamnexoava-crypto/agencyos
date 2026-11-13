@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, gte, isNull, sql, sum } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, sql, sum } from "drizzle-orm";
 import { z } from "zod";
 import { computeInvoiceTotals } from "../../shared/invoice";
 import { idSchema } from "../../shared/schemas/common";
@@ -9,6 +9,7 @@ import type { InvoiceDefaults, InvoiceDetail, InvoiceListItem } from "../../shar
 import { clients, invoiceItems, invoices, payments, projects, workspaces } from "../db/schema";
 import { ApiError, notFound } from "../lib/errors";
 import { newPublicToken } from "../lib/ids";
+import { localToday } from "../lib/request";
 import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
@@ -60,9 +61,17 @@ async function loadDetail(t: Tenant, invoice: InvoiceRow): Promise<InvoiceDetail
 }
 
 /** Checks the ids the browser sent, then turns the form into column values with server-computed totals. */
-async function prepare(t: Tenant, input: InvoiceInput) {
-  await requireClientId(t, input.clientId);
-  if (input.projectId) await requireProject(t, input.projectId);
+async function prepare(t: Tenant, input: InvoiceInput, existing?: InvoiceRow) {
+  // Links that are not being changed are left alone: an invoice must stay editable after its client
+  // or project has been deleted.
+  if (input.clientId !== existing?.clientId) await requireClientId(t, input.clientId);
+  if (input.projectId && input.projectId !== existing?.projectId) {
+    const project = await requireProject(t, input.projectId);
+    // An invoice shows up on its project's client page, so the two must belong together.
+    if (project.clientId && project.clientId !== input.clientId) {
+      throw new ApiError(400, "validation_error", "That project belongs to a different client.", { projectId: "This project belongs to a different client" });
+    }
+  }
   const totals = computeInvoiceTotals(input);
   return {
     totals,
@@ -116,7 +125,10 @@ export const invoiceRoutes = new Hono<AppEnv>()
   .get("/", validate("query", listQuery), async (c) => {
     const t = tenant(c);
     const { clientId, projectId } = c.req.valid("query");
-    const monthStart = `${new Date().toISOString().slice(0, 7)}-01`;
+    const today = localToday(c);
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const [year, month] = today.split("-").map(Number) as [number, number];
+    const nextMonthStart = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
 
     const [rows, collected] = await Promise.all([
       t.db
@@ -132,7 +144,7 @@ export const invoiceRoutes = new Hono<AppEnv>()
       t.db
         .select({ total: sum(payments.amount).mapWith(Number) })
         .from(payments)
-        .where(t.where(payments, gte(payments.date, monthStart))),
+        .where(t.where(payments, gte(payments.date, monthStart), lt(payments.date, nextMonthStart))),
     ]);
 
     const list: InvoiceListItem[] = rows.map(({ invoice, clientName, projectTitle }) => ({
@@ -225,7 +237,7 @@ export const invoiceRoutes = new Hono<AppEnv>()
     if (existing.status === "cancelled") throw new ApiError(409, "invoice_locked", "A cancelled invoice can't be edited.");
     if (existing.amountPaid > 0) throw new ApiError(409, "invoice_locked", "This invoice has payments recorded, so it can't be edited. Remove the payments first.");
 
-    const prepared = await prepare(t, c.req.valid("json"));
+    const prepared = await prepare(t, c.req.valid("json"), existing);
     const invoice = await t.db.transaction(async (tx) => {
       const [updated] = await tx
         .update(invoices)
@@ -247,9 +259,11 @@ export const invoiceRoutes = new Hono<AppEnv>()
     const existing = await requireInvoice(t, c.req.valid("param").id);
     if (existing.status !== "draft") return c.json({ invoice: await loadDetail(t, existing) });
 
+    // Nothing to collect on a zero-total invoice (fully discounted work): sending it closes it.
+    const settled = existing.total === 0;
     const [invoice] = await t.db
       .update(invoices)
-      .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+      .set({ status: settled ? "paid" : "sent", sentAt: new Date(), paidAt: settled ? new Date() : null, updatedAt: new Date() })
       .where(t.where(invoices, eq(invoices.id, existing.id)))
       .returning();
     if (!invoice) throw notFound("Invoice");
@@ -305,12 +319,19 @@ export const invoiceRoutes = new Hono<AppEnv>()
     const existing = await requireInvoice(t, c.req.valid("param").id);
     if (existing.status === "cancelled") throw new ApiError(409, "invoice_locked", "This invoice is cancelled.");
 
-    const balance = existing.total - existing.amountPaid;
-    if (input.amount > balance) {
-      throw new ApiError(400, "validation_error", "Please check the highlighted fields.", { amount: `Only ${money(balance, existing.currency)} is still due on this invoice` });
-    }
-
     const invoice = await t.db.transaction(async (tx) => {
+      // Lock the invoice first: two people (or a double click) recording the same payment must queue
+      // up, and the second one is checked against the balance the first one left.
+      const [locked] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.workspaceId, t.workspaceId), eq(invoices.id, existing.id)))
+        .for("update");
+      if (!locked || locked.status === "cancelled") throw new ApiError(409, "invoice_locked", "This invoice is cancelled.");
+      const balance = locked.total - locked.amountPaid;
+      if (input.amount > balance) {
+        throw new ApiError(400, "validation_error", "Please check the highlighted fields.", { amount: balance > 0 ? `Only ${money(balance, locked.currency)} is still due on this invoice` : "This invoice is already paid in full" });
+      }
       await tx.insert(payments).values({
         workspaceId: t.workspaceId,
         invoiceId: existing.id,
@@ -327,13 +348,13 @@ export const invoiceRoutes = new Hono<AppEnv>()
         .from(payments)
         .where(and(eq(payments.workspaceId, t.workspaceId), eq(payments.invoiceId, existing.id)));
       const amountPaid = paid?.total ?? 0;
-      const status = statusForPayments(existing, amountPaid);
+      const status = statusForPayments(locked, amountPaid);
       const [updated] = await tx
         .update(invoices)
         .set({
           amountPaid,
           status,
-          sentAt: existing.sentAt ?? new Date(), // recording money against a draft means it was sent
+          sentAt: locked.sentAt ?? new Date(), // recording money against a draft means it was sent
           paidAt: status === "paid" ? new Date() : null,
           updatedAt: new Date(),
         })

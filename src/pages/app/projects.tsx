@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { FolderKanban, FolderSearch, Kanban, Plus, Search, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { PROJECT_PRIORITIES, PROJECT_STATUSES, type ProjectStatus } from "@shared/constants";
+import { SegmentedControl } from "@/components/shared/segmented-control";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
@@ -18,7 +19,6 @@ import { ProjectFormDialog } from "@/features/projects/project-form-dialog";
 import { ProjectsTable } from "@/features/projects/projects-table";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { errorMessage } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 type View = "board" | "table";
 const ALL = "all";
@@ -163,28 +163,16 @@ export default function ProjectsPage() {
                 </Button>
               )}
 
-              <div role="group" aria-label="View" className="ml-auto flex rounded-lg border bg-card p-0.5 shadow-soft">
-                {(
-                  [
-                    { value: "board", label: "Board", icon: Kanban },
-                    { value: "table", label: "Table", icon: Table2 },
-                  ] as const
-                ).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setView(option.value)}
-                    aria-pressed={view === option.value}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
-                      view === option.value ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <option.icon className="size-4" />
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label="View"
+                className="ml-auto"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: "board", label: "Board", icon: Kanban },
+                  { value: "table", label: "Table", icon: Table2 },
+                ]}
+              />
             </div>
           </div>
 

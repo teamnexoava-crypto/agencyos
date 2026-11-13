@@ -4,7 +4,7 @@ import { z } from "zod";
 import { idSchema } from "../../shared/schemas/common";
 import { clientSchema, clientUpdateSchema } from "../../shared/schemas/client";
 import type { ClientDTO, ClientDetail } from "../../shared/types";
-import { clients, projects } from "../db/schema";
+import { clients, leads, projects } from "../db/schema";
 import { notFound } from "../lib/errors";
 import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
@@ -137,13 +137,27 @@ export const clientRoutes = new Hono<AppEnv>()
     return c.json({ client: toDTO(row, projectCount?.total ?? 0) });
   })
 
-  /** Soft delete. The client's projects are kept (they simply show no client). */
+  /**
+   * Soft delete. The client's projects are kept and simply have no client any more; a lead that was
+   * converted into this client can be converted again. Invoices and contracts keep pointing at the
+   * (hidden) client, because they are records of who was billed and who signed.
+   */
   .delete("/:id", validate("param", idParam), async (c) => {
     const t = tenant(c);
     const existing = await requireClient(t, c.req.valid("param").id);
-    await t.db
-      .update(clients)
-      .set({ deletedAt: new Date() })
-      .where(t.where(clients, eq(clients.id, existing.id)));
+    await t.db.transaction(async (tx) => {
+      await tx
+        .update(clients)
+        .set({ deletedAt: new Date() })
+        .where(t.where(clients, eq(clients.id, existing.id)));
+      await tx
+        .update(projects)
+        .set({ clientId: null })
+        .where(t.where(projects, eq(projects.clientId, existing.id)));
+      await tx
+        .update(leads)
+        .set({ clientId: null })
+        .where(t.where(leads, eq(leads.clientId, existing.id)));
+    });
     return c.json({ ok: true });
   });

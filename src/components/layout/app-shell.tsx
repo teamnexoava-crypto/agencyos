@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigation } from "react-router";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -21,6 +21,7 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useLocalStorage("aos-sidebar-collapsed", false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const navigation = useNavigation();
 
   // Keyboard shortcuts: ⌘K / Ctrl+K → search, "[" → toggle sidebar.
   useEffect(() => {
@@ -38,7 +39,7 @@ export function AppShell() {
 
   // New page → scroll back to the top.
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [location.pathname]);
 
   const sidebarOffset = isDesktop ? (collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH) : 0;
@@ -51,6 +52,13 @@ export function AppShell() {
       >
         Skip to content
       </a>
+
+      {/* Shown while the next page's code is being fetched (slow connections), so a click never feels ignored. */}
+      {navigation.state === "loading" && (
+        <div role="progressbar" aria-label="Loading page" className="fixed inset-x-0 top-0 z-50 h-0.5 print:hidden">
+          <div className="route-progress h-full bg-primary" />
+        </div>
+      )}
 
       <DesktopSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
 

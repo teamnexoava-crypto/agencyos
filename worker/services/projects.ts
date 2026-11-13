@@ -1,6 +1,6 @@
-import { and, asc, count, eq, exists, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, exists, inArray, isNull, ne, notInArray, sql, type SQL } from "drizzle-orm";
 import type { ProjectSummary, StepDTO, TaskDTO } from "../../shared/types";
-import { clients, projectMembers, projectSteps, projects, tasks } from "../db/schema";
+import { clients, projectMembers, projectSteps, projects, tasks, workspaceMembers } from "../db/schema";
 import { ApiError, notFound } from "../lib/errors";
 import type { Tenant } from "../lib/tenant";
 
@@ -51,7 +51,7 @@ export async function summarizeProjects(t: Tenant, rows: ProjectRow[]): Promise<
 
   const [clientRows, stepStats, taskStats, memberRows] = await Promise.all([
     clientIds.length
-      ? t.db.select({ id: clients.id, name: clients.name }).from(clients).where(t.where(clients, inArray(clients.id, clientIds)))
+      ? t.db.select({ id: clients.id, name: clients.name }).from(clients).where(t.where(clients, inArray(clients.id, clientIds), isNull(clients.deletedAt)))
       : Promise.resolve([]),
     t.db
       .select({
@@ -93,7 +93,8 @@ export async function summarizeProjects(t: Tenant, rows: ProjectRow[]): Promise<
     return {
       id: row.id,
       title: row.title,
-      clientId: row.clientId,
+      // A client that has been deleted counts as "no client", so the edit form never resends a dead id.
+      clientId: row.clientId && clientNames.has(row.clientId) ? row.clientId : null,
       clientName: row.clientId ? (clientNames.get(row.clientId) ?? null) : null,
       status: row.status,
       priority: row.priority,
@@ -152,13 +153,60 @@ export function toTaskDTO(row: TaskRow): TaskDTO {
   };
 }
 
-/** Replaces a project's assignees with exactly `memberIds` (already validated against the workspace). */
+/**
+ * Replaces a project's team with exactly `memberIds` (already validated against the workspace).
+ * A member who leaves the team can no longer open the project, so their open work there is unassigned
+ * rather than left pointing at someone who can't see it. (Owners and admins see every project, so
+ * theirs stays.)
+ */
 export async function setProjectMembers(t: Tenant, projectId: string, memberIds: string[]): Promise<void> {
   const unique = [...new Set(memberIds)];
   await t.db.transaction(async (tx) => {
+    const removed = await tx
+      .select({ id: workspaceMembers.id })
+      .from(projectMembers)
+      .innerJoin(workspaceMembers, eq(workspaceMembers.id, projectMembers.memberId))
+      .where(
+        and(
+          eq(projectMembers.workspaceId, t.workspaceId),
+          eq(projectMembers.projectId, projectId),
+          eq(workspaceMembers.role, "member"),
+          unique.length > 0 ? notInArray(projectMembers.memberId, unique) : undefined,
+        ),
+      );
     await tx.delete(projectMembers).where(and(eq(projectMembers.workspaceId, t.workspaceId), eq(projectMembers.projectId, projectId)));
     if (unique.length > 0) {
       await tx.insert(projectMembers).values(unique.map((memberId) => ({ workspaceId: t.workspaceId, projectId, memberId })));
     }
+    const removedIds = removed.map((row) => row.id);
+    if (removedIds.length > 0) {
+      await tx
+        .update(tasks)
+        .set({ assigneeId: null })
+        .where(and(eq(tasks.workspaceId, t.workspaceId), eq(tasks.projectId, projectId), eq(tasks.done, false), inArray(tasks.assigneeId, removedIds)));
+      await tx
+        .update(projectSteps)
+        .set({ assigneeId: null })
+        .where(and(eq(projectSteps.workspaceId, t.workspaceId), eq(projectSteps.projectId, projectId), ne(projectSteps.status, "completed"), inArray(projectSteps.assigneeId, removedIds)));
+    }
   });
+}
+
+/**
+ * Makes sure whoever is given a task or step on a project can actually open that project.
+ * An owner or admin assigning the work adds the person to the project team; a member may only pick
+ * people who are already on it (they can't widen who sees the project).
+ */
+export async function ensureAssigneeOnProject(t: Tenant, projectId: string, assigneeId: string): Promise<void> {
+  const [assignee] = await t.db
+    .select({ role: workspaceMembers.role, onTeam: projectMembers.id })
+    .from(workspaceMembers)
+    .leftJoin(projectMembers, and(eq(projectMembers.memberId, workspaceMembers.id), eq(projectMembers.projectId, projectId)))
+    .where(t.where(workspaceMembers, eq(workspaceMembers.id, assigneeId), isNull(workspaceMembers.removedAt)))
+    .limit(1);
+  if (!assignee) throw new ApiError(400, "invalid_member", "One of the selected people is not a member of this workspace.");
+  // Owners and admins can open every project already.
+  if (assignee.onTeam || assignee.role !== "member") return;
+  if (!t.canSeeFinance) throw new ApiError(400, "invalid_member", "That person isn't on this project's team. Ask an owner or admin to add them first.", { assigneeId: "Not on this project's team" });
+  await t.db.insert(projectMembers).values({ workspaceId: t.workspaceId, projectId, memberId: assigneeId }).onConflictDoNothing();
 }

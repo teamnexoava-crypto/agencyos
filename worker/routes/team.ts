@@ -1,11 +1,11 @@
 import { Hono } from "hono";
-import { and, asc, count, eq, gt, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, eq, exists, gt, inArray, isNull, ne, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { DEFAULT_WA_INVITE_TEMPLATE, INVITE_TTL_MS } from "../../shared/constants";
 import { idSchema } from "../../shared/schemas/common";
 import { inviteSchema, memberUpdateSchema } from "../../shared/schemas/team";
 import type { AssignedStep, AssignedTask, InviteDTO, MemberDetail, TeamMemberDTO, TeamResponse } from "../../shared/types";
-import { invites, projectMembers, projectSteps, projects, tasks, users, workspaceMembers } from "../db/schema";
+import { invites, leads, projectMembers, projectSteps, projects, tasks, users, workspaceMembers } from "../db/schema";
 import { ApiError, forbidden, notFound } from "../lib/errors";
 import { newPublicToken } from "../lib/ids";
 import { tenant, type Tenant } from "../lib/tenant";
@@ -115,20 +115,30 @@ export const teamRoutes = new Hono<AppEnv>()
     const [member] = await loadMembers(t, memberId);
     if (!member) throw notFound("Member");
 
+    // A member's work only counts on projects they are on (they can't open the others); owners and admins see every project.
+    const onTheirProjects = (column: typeof tasks.projectId | typeof projectSteps.projectId): SQL | undefined =>
+      member.role === "member"
+        ? exists(
+            t.db
+              .select({ one: sql`1` })
+              .from(projectMembers)
+              .where(and(eq(projectMembers.projectId, column), eq(projectMembers.memberId, memberId))),
+          )
+        : undefined;
     const [projectIds, taskRows, stepRows] = await Promise.all([
       t.db.select({ id: projectMembers.projectId }).from(projectMembers).where(t.where(projectMembers, eq(projectMembers.memberId, memberId))),
       t.db
         .select({ task: tasks, projectTitle: projects.title })
         .from(tasks)
         .innerJoin(projects, eq(projects.id, tasks.projectId))
-        .where(t.where(tasks, eq(tasks.assigneeId, memberId), eq(tasks.done, false), isNull(projects.deletedAt)))
+        .where(t.where(tasks, eq(tasks.assigneeId, memberId), eq(tasks.done, false), isNull(projects.deletedAt), onTheirProjects(tasks.projectId)))
         .orderBy(asc(tasks.dueDate), asc(tasks.createdAt))
         .limit(200),
       t.db
         .select({ step: projectSteps, projectTitle: projects.title })
         .from(projectSteps)
         .innerJoin(projects, eq(projects.id, projectSteps.projectId))
-        .where(t.where(projectSteps, eq(projectSteps.assigneeId, memberId), ne(projectSteps.status, "completed"), isNull(projects.deletedAt)))
+        .where(t.where(projectSteps, eq(projectSteps.assigneeId, memberId), ne(projectSteps.status, "completed"), isNull(projects.deletedAt), onTheirProjects(projectSteps.projectId)))
         .orderBy(asc(projectSteps.dueDate), asc(projectSteps.createdAt))
         .limit(200),
     ]);
@@ -201,8 +211,21 @@ export const teamRoutes = new Hono<AppEnv>()
         .update(workspaceMembers)
         .set({ removedAt: new Date() })
         .where(and(eq(workspaceMembers.workspaceId, t.workspaceId), eq(workspaceMembers.id, target.member.id)));
-      // Take them off project teams so re-inviting later starts from a clean slate.
+      // Take them off project teams and hand back their open work and leads, so nothing stays assigned
+      // to someone who is gone – and re-inviting them later starts from a clean slate.
       await tx.delete(projectMembers).where(and(eq(projectMembers.workspaceId, t.workspaceId), eq(projectMembers.memberId, target.member.id)));
+      await tx
+        .update(tasks)
+        .set({ assigneeId: null })
+        .where(and(eq(tasks.workspaceId, t.workspaceId), eq(tasks.assigneeId, target.member.id), eq(tasks.done, false)));
+      await tx
+        .update(projectSteps)
+        .set({ assigneeId: null })
+        .where(and(eq(projectSteps.workspaceId, t.workspaceId), eq(projectSteps.assigneeId, target.member.id), ne(projectSteps.status, "completed")));
+      await tx
+        .update(leads)
+        .set({ assigneeId: null })
+        .where(and(eq(leads.workspaceId, t.workspaceId), eq(leads.assigneeId, target.member.id)));
     });
 
     c.var.defer(

@@ -34,13 +34,15 @@ type Portal = Awaited<ReturnType<typeof findPortal>>;
 export async function buildPortalData(db: Database, { link, project, workspace }: Portal): Promise<PortalData> {
   // Every lookup is pinned to the link's own workspace and project.
   const scope = (table: { workspaceId: PgColumn; projectId: PgColumn }) => and(eq(table.workspaceId, link.workspaceId), eq(table.projectId, project.id));
+  // If the project was moved to another client, documents made for the previous one stay off this page.
+  const sameClient = (column: PgColumn) => (project.clientId ? eq(column, project.clientId) : undefined);
 
   const [clientRows, stepRows, invoiceRows, contractRows, fileRows, commentRows] = await Promise.all([
     project.clientId
       ? db
           .select({ name: clients.name })
           .from(clients)
-          .where(and(eq(clients.workspaceId, link.workspaceId), eq(clients.id, project.clientId)))
+          .where(and(eq(clients.workspaceId, link.workspaceId), eq(clients.id, project.clientId), isNull(clients.deletedAt)))
           .limit(1)
       : Promise.resolve([]),
     db
@@ -62,14 +64,14 @@ export async function buildPortalData(db: Database, { link, project, workspace }
           })
           .from(invoices)
           // Drafts and cancelled invoices are the agency's business only.
-          .where(and(scope(invoices), isNull(invoices.deletedAt), inArray(invoices.status, ["sent", "viewed", "partially_paid", "paid"])))
+          .where(and(scope(invoices), sameClient(invoices.clientId), isNull(invoices.deletedAt), inArray(invoices.status, ["sent", "viewed", "partially_paid", "paid"])))
           .orderBy(desc(invoices.issueDate))
       : Promise.resolve(null),
     link.showContract
       ? db
           .select({ title: contracts.title, status: contracts.status, token: contracts.publicToken })
           .from(contracts)
-          .where(and(scope(contracts), isNull(contracts.deletedAt), inArray(contracts.status, ["sent", "viewed", "client_signed", "completed"])))
+          .where(and(scope(contracts), sameClient(contracts.clientId), isNull(contracts.deletedAt), inArray(contracts.status, ["sent", "viewed", "client_signed", "completed"])))
           .orderBy(desc(contracts.createdAt))
       : Promise.resolve(null),
     link.showFiles

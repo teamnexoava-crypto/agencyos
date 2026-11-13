@@ -115,7 +115,7 @@ export default function InvitePage() {
                 You're signed in as <span className="font-medium">{me.user.email}</span>. This invite only works with {invite.email}.
               </span>
             </div>
-            <Button variant="outline" size="lg" className="mt-4 w-full" onClick={() => logout.mutate()} disabled={logout.isPending}>
+            <Button variant="outline" size="lg" className="mt-4 w-full" onClick={() => logout.mutate(`/invite/${token}`)} disabled={logout.isPending}>
               <LogOut /> Sign out and switch account
             </Button>
           </>

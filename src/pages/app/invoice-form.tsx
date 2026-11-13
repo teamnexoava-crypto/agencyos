@@ -49,8 +49,11 @@ export function NewInvoicePage() {
   const projects = useProjects();
   const project = useProject(projectId, projectId !== "");
 
-  const loading = defaults.isPending || clients.isPending || projects.isPending || (projectId !== "" && project.isPending);
-  const failed = defaults.isError || clients.isError || projects.isError;
+  // The form copies its starting values once, so wait for defaults fetched for THIS visit (not a cached
+  // copy from before Settings were changed). After that, a failed background refresh must not replace
+  // a half-written invoice with an error screen – only a missing first load is an error.
+  const loading = !defaults.isFetchedAfterMount || clients.isPending || projects.isPending || (projectId !== "" && project.isPending);
+  const failed = (defaults.isError && !defaults.isFetchedAfterMount) || (clients.isError && !clients.data) || (projects.isError && !projects.data);
 
   let body;
   if (failed) {
@@ -97,7 +100,7 @@ export function EditInvoicePage() {
   const backTo = `/app/invoices/${invoiceId}`;
 
   let body;
-  if (invoice.isError || clients.isError || projects.isError) {
+  if ((invoice.isError && !invoice.data) || (clients.isError && !clients.data) || (projects.isError && !projects.data)) {
     body = <ErrorState onRetry={() => void Promise.all([invoice.refetch(), clients.refetch(), projects.refetch()])} />;
   } else if (!invoice.data || !clients.data || !projects.data) {
     body = <FormSkeleton />;

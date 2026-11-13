@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, DragOverlay, KeyboardCode, KeyboardSensor, MouseSensor, TouchSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { LEAD_STAGES, type LeadStage } from "@shared/constants";
 import type { LeadDTO, MemberSummary } from "@shared/types";
 import { formatMoneyCompact } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, staggerIndex } from "@/lib/utils";
 import { LeadCardBody } from "./lead-card";
 import { STAGE_META } from "./meta";
 
@@ -16,9 +16,11 @@ interface CardProps {
   currency: string;
   today: string;
   onOpen: (id: string) => void;
+  /** Position in its column, for the staggered entrance. */
+  index: number;
 }
 
-function DraggableCard({ lead, members, currency, today, onOpen }: CardProps) {
+function DraggableCard({ lead, members, currency, today, onOpen, index }: CardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id });
   return (
     <button
@@ -27,9 +29,10 @@ function DraggableCard({ lead, members, currency, today, onOpen }: CardProps) {
       {...attributes}
       {...listeners}
       // dnd-kit announces drag instructions itself; the visible name is the lead.
-      aria-label={`${lead.name}${lead.company ? `, ${lead.company}` : ""}. Open lead.`}
+      aria-label={`${lead.name}${lead.company ? `, ${lead.company}` : ""}. Press Enter to open, Space to move.`}
       onClick={() => onOpen(lead.id)}
-      className={cn(CARD_CLASS, isDragging && "opacity-40")}
+      className={cn(CARD_CLASS, "rise-in", isDragging && "opacity-40")}
+      style={staggerIndex(index)}
     >
       <LeadCardBody lead={lead} assignee={lead.assigneeId ? members.get(lead.assigneeId) : undefined} currency={currency} today={today} />
     </button>
@@ -69,10 +72,13 @@ interface LeadBoardProps {
 export function LeadBoard({ leads, members, currency, today, showValue, onOpen, onMove }: LeadBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(
-    // A small movement threshold keeps a plain click a click.
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor),
+    // Mouse: a small movement threshold keeps a plain click a click. Touch: long-press to pick a card
+    // up, so an ordinary swipe still scrolls the board. (A pointer sensor would claim touches first
+    // and the browser's scrolling would then cancel every drag.)
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    // Keyboard: Space picks up and drops; Enter is left alone so it opens the lead like any button.
+    useSensor(KeyboardSensor, { keyboardCodes: { start: [KeyboardCode.Space], cancel: [KeyboardCode.Esc], end: [KeyboardCode.Space] } }),
   );
   const active = leads.find((lead) => lead.id === activeId);
 
@@ -89,14 +95,15 @@ export function LeadBoard({ leads, members, currency, today, showValue, onOpen, 
           const column = leads.filter((lead) => lead.stage === stage);
           return (
             <Column key={stage} stage={stage} leads={column} showValue={showValue} currency={currency}>
-              {column.map((lead) => (
-                <DraggableCard key={lead.id} lead={lead} members={members} currency={currency} today={today} onOpen={onOpen} />
+              {column.map((lead, index) => (
+                <DraggableCard key={lead.id} index={index} lead={lead} members={members} currency={currency} today={today} onOpen={onOpen} />
               ))}
             </Column>
           );
         })}
       </div>
-      <DragOverlay>
+      {/* No drop animation: by default the ghost flies back to the old column before the card jumps to the new one. */}
+      <DragOverlay dropAnimation={null}>
         {active && (
           <div className={cn(CARD_CLASS, "rotate-2 cursor-grabbing shadow-lift")}>
             <LeadCardBody lead={active} assignee={active.assigneeId ? members.get(active.assigneeId) : undefined} currency={currency} today={today} />

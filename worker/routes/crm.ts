@@ -114,6 +114,20 @@ async function notifyAssignee(t: Tenant, lead: LeadRow): Promise<void> {
  * Google Sheet sync
  * ---------------------------------------------------------------------------------------------- */
 
+/**
+ * A lead's phone as a WhatsApp number with country code, the form clients require ("+91 98765 43210").
+ * Numbers typed without one get the workspace's own country when that is unambiguous (10 digits in an
+ * INR workspace → India); anything that can't be made valid is left out rather than saved broken.
+ */
+function toWhatsapp(phone: string | null, currency: string): string | null {
+  const raw = (phone ?? "").trim();
+  const digits = raw.replace(/\D/g, "").replace(/^0+/, "");
+  if (digits.length < 7 || digits.length > 15) return null;
+  if (raw.startsWith("+")) return `+${digits}`;
+  if (digits.length === 10) return currency === "INR" ? `+91${digits}` : null;
+  return digits.length >= 11 ? `+${digits}` : null;
+}
+
 /** How an e-mail address or phone number is compared: lower case, or the last 10 digits. */
 const emailKey = (email: string | null) => (email ? email.trim().toLowerCase() : "");
 function phoneKey(phone: string | null): string {
@@ -380,7 +394,7 @@ export const crmRoutes = new Hono<AppEnv>()
     const updated = await t.db.transaction(async (tx) => {
       const [client] = await tx
         .insert(clients)
-        .values({ workspaceId: t.workspaceId, name: lead.name, company: lead.company, email: lead.email, whatsapp: lead.phone?.slice(0, 20) ?? null })
+        .values({ workspaceId: t.workspaceId, name: lead.name, company: lead.company, whatsapp: toWhatsapp(lead.phone, t.workspace.currency), email: lead.email && z.email().max(200).safeParse(lead.email).success ? lead.email : null })
         .returning({ id: clients.id });
       if (!client) throw new Error("Insert returned no row");
       const [row] = await tx
@@ -414,7 +428,14 @@ export const crmRoutes = new Hono<AppEnv>()
     const t = tenant(c);
     t.requireRole("owner", "admin");
     const { headers, rows } = await fetchSheet(parseSheetUrl(c.req.valid("json").url), c.env.SHEETS_TEST_ORIGIN);
-    const preview: SheetPreview = { headers: headers.filter((header) => header !== ""), sampleRows: rows.slice(0, 3), rowCount: rows.length, suggestedMapping: suggestMapping(headers) };
+    // Columns without a name can't be mapped, so they are left out of the headers AND of the sample rows.
+    const named = headers.map((header, index) => ({ header, index })).filter((column) => column.header !== "");
+    const preview: SheetPreview = {
+      headers: named.map((column) => column.header),
+      sampleRows: rows.slice(0, 3).map((row) => named.map((column) => row[column.index] ?? "")),
+      rowCount: rows.length,
+      suggestedMapping: suggestMapping(headers),
+    };
     return c.json({ preview });
   })
 

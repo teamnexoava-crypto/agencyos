@@ -66,6 +66,18 @@ function DraftEditor({ contract, onSent }: { contract: ContractDetail; onSent: (
     return () => window.clearTimeout(timer);
   }, [dirty, titleValid, saving, failed, title, content]);
 
+  // Leaving for another page inside the app: save what is pending right away instead of dropping it.
+  const pendingRef = useRef(false);
+  useEffect(() => {
+    pendingRef.current = dirty && titleValid && !saving;
+  });
+  useEffect(
+    () => () => {
+      if (pendingRef.current) void saveRef.current();
+    },
+    [],
+  );
+
   // Don't lose the last few keystrokes if the tab is closed mid-edit.
   useEffect(() => {
     if (!dirty) return;
@@ -228,6 +240,9 @@ export default function ContractDetailPage() {
   const clientSignature = contract.signatures.find((signature) => signature.role === "client");
   const agencySignature = contract.signatures.find((signature) => signature.role === "agency");
   const deletable = isDraft || (status === "voided" && !clientSignature);
+  const canVersion = !isDraft && !awaitingClient && !contract.nextVersionId;
+  // A voided, superseded contract that the client had signed has nothing left to do: no empty menu.
+  const hasMenu = live || Boolean(contract.signedFileId) || canVersion || deletable;
 
   const run = (name: ContractAction, success: string) =>
     action.mutate(name, {
@@ -304,58 +319,60 @@ export default function ContractDetailPage() {
               <span className="sm:hidden">PDF</span>
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="More actions">
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
-              {live && (
-                <>
-                  <DropdownMenuItem onSelect={() => void copyToClipboard(contractUrl(contract.publicToken), "Signing link copied")}>
-                    <Link2 /> Copy client link
-                  </DropdownMenuItem>
+          {hasMenu && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="More actions">
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                {live && (
+                  <>
+                    <DropdownMenuItem onSelect={() => void copyToClipboard(contractUrl(contract.publicToken), "Signing link copied")}>
+                      <Link2 /> Copy client link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <a href={contractUrl(contract.publicToken)} target="_blank" rel="noopener noreferrer">
+                        <Eye /> Open client view
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setConfirm("link")}>
+                      <RefreshCw /> Reset client link
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {contract.signedFileId && (
                   <DropdownMenuItem asChild>
-                    <a href={contractUrl(contract.publicToken)} target="_blank" rel="noopener noreferrer">
-                      <Eye /> Open client view
+                    <a href={`/api/files/${contract.signedFileId}`} download>
+                      <Download /> Download sealed copy
                     </a>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setConfirm("link")}>
-                    <RefreshCw /> Reset client link
+                )}
+                {live && <DropdownMenuSeparator />}
+                {awaitingClient && (
+                  <DropdownMenuItem onSelect={() => setConfirm("unsend")}>
+                    <Pencil /> Edit text
                   </DropdownMenuItem>
-                </>
-              )}
-              {contract.signedFileId && (
-                <DropdownMenuItem asChild>
-                  <a href={`/api/files/${contract.signedFileId}`} download>
-                    <Download /> Download sealed copy
-                  </a>
-                </DropdownMenuItem>
-              )}
-              {live && <DropdownMenuSeparator />}
-              {awaitingClient && (
-                <DropdownMenuItem onSelect={() => setConfirm("unsend")}>
-                  <Pencil /> Edit text
-                </DropdownMenuItem>
-              )}
-              {!isDraft && !awaitingClient && !contract.nextVersionId && (
-                <DropdownMenuItem onSelect={() => setConfirm("version")}>
-                  <CopyPlus /> Create new version
-                </DropdownMenuItem>
-              )}
-              {(awaitingClient || status === "client_signed") && (
-                <DropdownMenuItem variant="destructive" onSelect={() => setConfirm("void")}>
-                  <Ban /> Void contract
-                </DropdownMenuItem>
-              )}
-              {deletable && (
-                <DropdownMenuItem variant="destructive" onSelect={() => setConfirm("delete")}>
-                  <Trash2 /> {isDraft ? "Delete draft" : "Delete contract"}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                )}
+                {canVersion && (
+                  <DropdownMenuItem onSelect={() => setConfirm("version")}>
+                    <CopyPlus /> Create new version
+                  </DropdownMenuItem>
+                )}
+                {(awaitingClient || status === "client_signed") && (
+                  <DropdownMenuItem variant="destructive" onSelect={() => setConfirm("void")}>
+                    <Ban /> Void contract
+                  </DropdownMenuItem>
+                )}
+                {deletable && (
+                  <DropdownMenuItem variant="destructive" onSelect={() => setConfirm("delete")}>
+                    <Trash2 /> {isDraft ? "Delete draft" : "Delete contract"}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

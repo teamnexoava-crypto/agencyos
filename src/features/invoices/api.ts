@@ -48,7 +48,15 @@ function applyInvoice(queryClient: QueryClient, invoice: InvoiceDetail) {
   queryClient.setQueryData(invoiceKeys.detail(invoice.id), invoice);
   void queryClient.invalidateQueries({ queryKey: ["invoices", "list"] });
   void queryClient.invalidateQueries({ queryKey: invoiceKeys.defaults });
+  refreshMoneyViews(queryClient);
+}
+
+/** Dashboard, profit & loss, client totals and each project's budget card all depend on invoices and payments. */
+function refreshMoneyViews(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: ["clients"] });
+  void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  void queryClient.invalidateQueries({ queryKey: ["pnl"] });
+  void queryClient.invalidateQueries({ queryKey: ["projects"] });
 }
 
 export function useSaveInvoice(id?: string) {
@@ -78,6 +86,7 @@ export function useDeleteInvoice() {
     onSuccess: (_data, id) => {
       queryClient.removeQueries({ queryKey: invoiceKeys.detail(id) });
       void queryClient.invalidateQueries({ queryKey: ["invoices", "list"] });
+      refreshMoneyViews(queryClient);
     },
   });
 }

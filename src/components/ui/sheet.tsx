@@ -33,7 +33,7 @@ function SheetContent({ className, children, side = "right", showCloseButton = t
         data-slot="sheet-content"
         className={cn(
           "fixed z-50 flex flex-col bg-popover text-popover-foreground shadow-pop outline-none",
-          "data-[state=open]:animate-in data-[state=open]:duration-300 data-[state=closed]:animate-out data-[state=closed]:duration-200",
+          "data-[state=open]:animate-in data-[state=open]:duration-400 data-[state=open]:ease-out-soft data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=closed]:ease-in",
           side === "left" && "inset-y-0 left-0 h-full w-[85%] max-w-xs border-r data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left",
           side === "right" && "inset-y-0 right-0 h-full w-full max-w-md border-l data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right",
           side === "bottom" && "inset-x-0 bottom-0 max-h-[90dvh] rounded-t-2xl border-t data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom",

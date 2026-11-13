@@ -180,6 +180,16 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
   `docs.google.com` from those two values, so the Worker cannot be pointed at another host. Downloads
   are capped at 1 MB / 2,000 rows. Syncing only ever adds rows: a lead is matched by e-mail or phone
   and never imported twice, edits made in the CRM are kept, and deleted leads do not come back.
+- **Assignments follow access.** Giving someone a task or step on a project they are not on adds
+  them to that project's team (owners and admins only; a member can only pick people already on it).
+  Taking a member off a project, or out of the workspace, unassigns their open work and leads, so
+  nothing stays assigned to a person who can no longer see it.
+- **Dates.** The browser sends its calendar date in `X-Local-Date`; the Worker uses it for "today",
+  "overdue" and "this month" only when it is within a day of the server's own date, so reports match
+  what the person sees without letting the header shift them arbitrarily.
+- **Rate limits.** The sign-in flow has the tight per-IP limit. `/api/auth/me` and `/api/auth/config`
+  are read on every page load and use the generous one, so an office behind one address is never
+  locked out by ordinary browsing.
 - **Foreign ids.** Client, member and project ids sent by the browser are looked up inside the
   caller's workspace before use, so an id from another workspace is rejected rather than linked.
 - **Sessions.** A random 256-bit token lives in an `HttpOnly; Secure; SameSite=Lax` cookie. The database stores

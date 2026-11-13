@@ -21,6 +21,7 @@ import { requireAuth } from "../middleware/context";
 import { logActivity, notify } from "../services/activity";
 import { requireMembers } from "../services/members";
 import {
+  ensureAssigneeOnProject,
   listProjectSummaries,
   requireClientId,
   requireProject,
@@ -246,7 +247,10 @@ export const projectRoutes = new Hono<AppEnv>()
     t.requireRole("owner", "admin");
     const project = await requireProject(t, c.req.valid("param").projectId);
     const input = c.req.valid("json");
-    if (input.assigneeId) await requireMembers(t.db, t.workspaceId, [input.assigneeId]);
+    if (input.assigneeId) {
+      await requireMembers(t.db, t.workspaceId, [input.assigneeId]);
+      await ensureAssigneeOnProject(t, project.id, input.assigneeId);
+    }
 
     const [last] = await t.db
       .select({ position: max(projectSteps.position) })
@@ -305,7 +309,10 @@ export const projectRoutes = new Hono<AppEnv>()
     // Members may move a step's status forward/back on their own projects; everything else is for managers.
     const onlyStatus = Object.keys(input).every((key) => key === "status");
     if (!onlyStatus) t.requireRole("owner", "admin");
-    if (input.assigneeId) await requireMembers(t.db, t.workspaceId, [input.assigneeId]);
+    if (input.assigneeId && input.assigneeId !== existing.assigneeId) {
+      await requireMembers(t.db, t.workspaceId, [input.assigneeId]);
+      await ensureAssigneeOnProject(t, project.id, input.assigneeId);
+    }
 
     const statusChanged = input.status !== undefined && input.status !== existing.status;
     const [step] = await t.db
@@ -357,6 +364,7 @@ export const projectRoutes = new Hono<AppEnv>()
     const project = await requireProject(t, c.req.valid("param").projectId);
     const input = c.req.valid("json");
     const assignees = input.assigneeId ? await requireMembers(t.db, t.workspaceId, [input.assigneeId]) : [];
+    if (input.assigneeId) await ensureAssigneeOnProject(t, project.id, input.assigneeId);
 
     const [last] = await t.db
       .select({ position: max(tasks.position) })
@@ -406,7 +414,10 @@ export const projectRoutes = new Hono<AppEnv>()
       .limit(1);
     if (!existing) throw notFound("Task");
 
-    const assignees = input.assigneeId ? await requireMembers(t.db, t.workspaceId, [input.assigneeId]) : [];
+    // Only a changed assignee is checked: saving an untouched task must not fail because its old assignee has since left.
+    const newAssignee = input.assigneeId && input.assigneeId !== existing.assigneeId ? input.assigneeId : "";
+    const assignees = newAssignee ? await requireMembers(t.db, t.workspaceId, [newAssignee]) : [];
+    if (newAssignee) await ensureAssigneeOnProject(t, project.id, newAssignee);
     const doneChanged = input.done !== undefined && input.done !== existing.done;
 
     const [task] = await t.db

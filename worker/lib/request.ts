@@ -36,3 +36,15 @@ export function safeRedirectPath(value: string | undefined | null, fallback = "/
   if (value.startsWith("/api/")) return fallback;
   return value;
 }
+
+const utcDay = (offsetDays = 0) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * "Today" where the person is. The browser sends its calendar date in `X-Local-Date`; it is used only
+ * when it is yesterday, today or tomorrow by the server's own clock (every real time zone falls in
+ * that window), so the header can't be used to shift reports to an arbitrary date.
+ */
+export function localToday(c: Context<AppEnv>): string {
+  const sent = c.req.header("X-Local-Date") ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(sent) && sent >= utcDay(-1) && sent <= utcDay(1) ? sent : utcDay();
+}

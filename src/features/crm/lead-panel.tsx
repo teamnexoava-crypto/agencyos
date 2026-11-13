@@ -18,7 +18,7 @@ import { useMembers } from "@/features/members/api";
 import { MemberSelect } from "@/features/members/member-select";
 import { ApiError, errorMessage } from "@/lib/api";
 import { celebrate } from "@/lib/confetti";
-import { formatDate, formatMoney, todayIso } from "@/lib/format";
+import { formatMoney, todayIso } from "@/lib/format";
 import { whatsappUrl } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import { useAddLeadNote, useConvertLead, useDeleteLead, useDeleteLeadNote, useLead, useUpdateLead } from "./api";
@@ -40,6 +40,40 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Date field that keeps what is being typed to itself and saves once, when the field is left. (A
+ * date input fires a change for every completed part while typing – saving each one would store
+ * half-typed dates like the year 0002 and reset the field under the cursor.)
+ */
+function FollowUpInput({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const [synced, setSynced] = useState(value);
+  // The saved date changed from outside (the save finished, or someone else edited it): show that.
+  if (value !== synced) {
+    setSynced(value);
+    setDraft(value);
+  }
+  const commit = () => {
+    // Anything before 2000 is a half-typed year, not a real follow-up.
+    if (draft !== value && (draft === "" || draft >= "2000-01-01")) onCommit(draft);
+    else if (draft !== value) setDraft(value);
+  };
+  return (
+    <Input
+      type="date"
+      className="h-9"
+      aria-label="Follow up on"
+      min="2000-01-01"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") commit();
+      }}
+    />
   );
 }
 
@@ -248,7 +282,7 @@ function LeadBody({ lead, members, onClose }: { lead: LeadDetail; members: Membe
             </Select>
           </Field>
           <Field label="Follow up on">
-            <Input type="date" className="h-9" aria-label="Follow up on" value={lead.followUpDate ?? ""} onChange={(event) => patch({ followUpDate: event.target.value })} />
+            <FollowUpInput value={lead.followUpDate ?? ""} onCommit={(followUpDate) => patch({ followUpDate })} />
           </Field>
           <Field label="Assigned to">
             {canManage ? (
@@ -269,7 +303,7 @@ function LeadBody({ lead, members, onClose }: { lead: LeadDetail; members: Membe
             </Field>
           )}
           <Field label="Last contacted">{lead.lastContactedAt ? formatInstant(lead.lastContactedAt) : <span className="text-muted-foreground">Not yet</span>}</Field>
-          <Field label="Added">{formatDate(new Date(lead.createdAt).toISOString().slice(0, 10))}</Field>
+          <Field label="Added">{new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(lead.createdAt))}</Field>
         </dl>
 
         {extra.length > 0 && (

@@ -3,10 +3,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { CalendarDays, ListChecks, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { MemberSummary, ProjectDetail, TaskDTO } from "@shared/types";
+import { SegmentedControl } from "@/components/shared/segmented-control";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useSession } from "@/features/auth/api";
 import { useMembers } from "@/features/members/api";
 import { MemberAvatar } from "@/features/members/member-avatar";
 import { MemberSelect } from "@/features/members/member-select";
@@ -62,7 +64,11 @@ interface TasksTabProps {
 
 /** Checklist of to-dos for the project. Everyone on the project can add, assign and complete tasks. */
 export function TasksTab({ project, members }: TasksTabProps) {
-  const { data: memberList = [] } = useMembers();
+  const { canManage } = useSession();
+  const { data: allMembers = [] } = useMembers();
+  // Owners and admins may hand a task to anyone (that person joins the project team). A member can
+  // only pick people already on the project – plus owners and admins, who see every project.
+  const memberList = canManage ? allMembers : allMembers.filter((member) => member.role !== "member" || project.memberIds.includes(member.id));
   const updateTask = useUpdateTask(project.id);
   const deleteTask = useDeleteTask(project.id);
   const [filter, setFilter] = useState<Filter>("all");
@@ -87,22 +93,17 @@ export function TasksTab({ project, members }: TasksTabProps) {
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{open}</span> open · {project.tasksDone} done
             </p>
-            <div role="group" aria-label="Filter tasks" className="flex rounded-lg border bg-card p-0.5 shadow-soft">
-              {(["all", "open", "done"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFilter(value)}
-                  aria-pressed={filter === value}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-[13px] font-medium capitalize transition-colors",
-                    filter === value ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {value}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              label="Filter tasks"
+              size="sm"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "open", label: "Open" },
+                { value: "done", label: "Done" },
+              ]}
+            />
           </div>
 
           {visible.length === 0 ? (

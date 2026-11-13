@@ -10,7 +10,7 @@ import { clients, contractTemplates, contracts, projects, signatures } from "../
 import { sha256Hex } from "../lib/crypto";
 import { ApiError, notFound } from "../lib/errors";
 import { newId, newPublicToken } from "../lib/ids";
-import { clientIp, userAgent } from "../lib/request";
+import { clientIp, localToday, userAgent } from "../lib/request";
 import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
@@ -210,7 +210,7 @@ export const contractRoutes = new Hono<AppEnv>()
           start_date: project?.startDate ? longDate(project.startDate) : "",
           due_date: project?.dueDate ? longDate(project.dueDate) : "",
           agency_name: t.workspace.name,
-          today: longDate(new Date().toISOString().slice(0, 10)),
+          today: longDate(localToday(c)),
         })
       : "";
 
@@ -237,7 +237,15 @@ export const contractRoutes = new Hono<AppEnv>()
 
   .get("/:id", validate("param", idParam), async (c) => {
     const t = tenant(c);
-    const contract = await requireContract(t, c.req.valid("param").id);
+    let contract = await requireContract(t, c.req.valid("param").id);
+    // If writing the sealed copy failed at signing time (a storage hiccup), make it now.
+    if (contract.status === "completed" && contract.signedPdfFileId === null) {
+      try {
+        contract = { ...contract, signedPdfFileId: await sealContract(t.db, c.env.BUCKET, contract, t.workspace, t.member.id) };
+      } catch (error) {
+        console.error("Failed to write the sealed contract copy", error);
+      }
+    }
     return c.json({ contract: await loadDetail(t, c.env.BUCKET, contract) });
   })
 

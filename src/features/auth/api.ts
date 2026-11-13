@@ -47,14 +47,15 @@ export function useAuthConfig() {
   });
 }
 
+/** Signs out. Pass a path (e.g. an invite link) to come back to after signing in with another account. */
 export function useLogout() {
   return useMutation({
-    mutationFn: () => api<{ ok: true }>("/api/auth/logout", { method: "POST" }),
-    onSuccess: () => {
+    mutationFn: (_next?: string) => api<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+    onSuccess: (_data, next) => {
       setCsrfToken("");
       // A full page load (rather than a client-side redirect) guarantees that every cached query and
       // all in-memory state from this account is gone before anyone else signs in on this device.
-      window.location.assign("/login");
+      window.location.assign(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
     },
   });
 }

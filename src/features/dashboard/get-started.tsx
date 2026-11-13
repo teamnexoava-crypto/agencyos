@@ -13,8 +13,8 @@ interface SetupStep {
 
 const SETUP_STEPS: SetupStep[] = [
   { title: "Add your first client", description: "Keep contacts, GST details and WhatsApp numbers in one place.", to: "/app/clients", icon: Users, managersOnly: true },
-  { title: "Create a project", description: "Plan milestones, assign tasks and track progress on a kanban board.", to: "/app/projects", icon: FolderKanban },
-  { title: "Invite your team", description: "Share an invite link and decide who sees what.", to: "/app/team", icon: UsersRound },
+  { title: "Create a project", description: "Plan milestones, assign tasks and track progress on a kanban board.", to: "/app/projects", icon: FolderKanban, managersOnly: true },
+  { title: "Invite your team", description: "Share an invite link and decide who sees what.", to: "/app/team", icon: UsersRound, managersOnly: true },
   { title: "Send an invoice", description: "GST-ready invoices with a public pay link you can share on WhatsApp.", to: "/app/invoices", icon: ReceiptText, managersOnly: true },
   { title: "Get a contract signed", description: "Templates, e-signatures and a tamper-evident audit trail.", to: "/app/contracts", icon: FileSignature, managersOnly: true },
 ];

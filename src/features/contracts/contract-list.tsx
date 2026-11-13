@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router";
 import type { ContractListItem } from "@shared/types";
-import { cn } from "@/lib/utils";
+import { cn, staggerIndex } from "@/lib/utils";
 import { ContractStatusBadge } from "./status-badge";
 
 const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
@@ -16,11 +16,11 @@ interface ContractRowsProps {
 export function ContractRows({ contracts, hide = [], className }: ContractRowsProps) {
   return (
     <ul className={cn("divide-y overflow-hidden rounded-2xl border bg-card shadow-soft", className)}>
-      {contracts.map((contract) => {
+      {contracts.map((contract, index) => {
         const subtitle = [!hide.includes("client") && contract.clientName, !hide.includes("project") && contract.projectTitle].filter(Boolean).join(" · ");
         const when = contract.completedAt ? `Signed ${shortDate(contract.completedAt)}` : contract.sentAt ? `Sent ${shortDate(contract.sentAt)}` : `Edited ${shortDate(contract.updatedAt)}`;
         return (
-          <li key={contract.id}>
+          <li key={contract.id} className="rise-in" style={staggerIndex(index)}>
             <Link to={`/app/contracts/${contract.id}`} className="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-accent/40">
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1">

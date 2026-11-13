@@ -10,6 +10,7 @@ import { errorMessage } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useDeleteExpense } from "./api";
 import { ExpenseDialog } from "./expense-dialog";
+import { staggerIndex } from "@/lib/utils";
 
 interface ExpenseListProps {
   expenses: ExpenseDTO[];
@@ -28,8 +29,8 @@ export function ExpenseList({ expenses, projects, lockedProjectId }: ExpenseList
   return (
     <>
       <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-soft">
-        {expenses.map((expense) => (
-          <li key={expense.id} className="flex items-center gap-3 px-4 py-3">
+        {expenses.map((expense, index) => (
+          <li key={expense.id} className="rise-in flex items-center gap-3 px-4 py-3" style={staggerIndex(index)}>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{expense.description}</p>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

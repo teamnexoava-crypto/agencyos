@@ -30,13 +30,14 @@ export const settingsInvoicingSchema = z.object({
   defaultTaxMode: z.enum(TAX_MODES),
   /** Basis points – 1800 = 18%. */
   defaultTaxRate: z.number({ error: "Enter a rate" }).int().min(0, "Can't be negative").max(10_000, "Can't be more than 100%"),
-  invoiceNotes: optionalText(1000),
+  // Same limits as on an invoice: "remember these for next time" there must always be saveable here.
+  invoiceNotes: optionalText(2000),
   invoiceTerms: optionalText(2000),
-  bankDetails: optionalText(600),
+  bankDetails: optionalText(1000),
   upiId: z
     .string()
     .trim()
-    .max(80)
+    .max(100)
     .refine((value) => value === "" || /^[\w.-]{2,}@[a-zA-Z][\w.-]{1,}$/.test(value), "Enter a valid UPI ID, e.g. studio@okhdfcbank"),
 });
 export type SettingsInvoicingInput = z.infer<typeof settingsInvoicingSchema>;

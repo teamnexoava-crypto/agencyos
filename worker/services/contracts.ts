@@ -236,6 +236,8 @@ export async function sealContract(db: Database, bucket: R2Bucket, contract: Con
       size: bytes.byteLength,
       uploadedBy,
     })
+    // A retry after a half-finished attempt reuses the file row that already points at this object.
+    .onConflictDoUpdate({ target: files.r2Key, set: { size: bytes.byteLength, deletedAt: null } })
     .returning({ id: files.id });
   if (!file) throw new Error("Insert returned no row");
   await db

@@ -28,6 +28,8 @@ export function useUploadLogo() {
       queryClient.setQueryData<MeResponse | null>(queryKeys.me, (me) =>
         me?.workspace ? { ...me, workspace: { ...me.workspace, logoUrl } } : me,
       );
+      // The Settings page reads the logo from its own query.
+      void queryClient.invalidateQueries({ queryKey: ["workspace", "settings"] });
     },
   });
 }
@@ -40,6 +42,7 @@ export function useRemoveLogo() {
       queryClient.setQueryData<MeResponse | null>(queryKeys.me, (me) =>
         me?.workspace ? { ...me, workspace: { ...me.workspace, logoUrl: null } } : me,
       );
+      void queryClient.invalidateQueries({ queryKey: ["workspace", "settings"] });
     },
   });
 }

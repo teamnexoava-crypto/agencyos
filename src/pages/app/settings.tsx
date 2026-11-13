@@ -592,19 +592,19 @@ export default function SettingsPage() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <TabsContent value="profile">
+          <TabsContent value="profile" forceMount className="data-[state=inactive]:hidden">
             <div className="grid gap-6">
               <ProfileForm settings={settings} />
               {role === "owner" && <DangerZone name={settings.name} />}
             </div>
           </TabsContent>
-          <TabsContent value="invoicing">
+          <TabsContent value="invoicing" forceMount className="data-[state=inactive]:hidden">
             <InvoicingForm settings={settings} />
           </TabsContent>
-          <TabsContent value="messages">
+          <TabsContent value="messages" forceMount className="data-[state=inactive]:hidden">
             <MessagesForm settings={settings} />
           </TabsContent>
-          <TabsContent value="team">
+          <TabsContent value="team" forceMount className="data-[state=inactive]:hidden">
             <SettingsCard title="Team and roles" description="Who can see and do what in this workspace.">
               <dl className="grid gap-3 text-sm">
                 {[

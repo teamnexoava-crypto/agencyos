@@ -41,7 +41,7 @@ export function NotificationsPopover() {
         <Button variant="ghost" size="icon" aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"} className="relative text-muted-foreground hover:text-foreground">
           <Bell className="size-[18px]" />
           {unread > 0 && (
-            <span aria-hidden="true" className="tabular absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white ring-2 ring-background">
+            <span key={unread} aria-hidden="true" className="pop-in tabular absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white ring-2 ring-background">
               {unread > 9 ? "9+" : unread}
             </span>
           )}

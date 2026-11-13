@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { LEAD_STAGES, type LeadStage } from "@shared/constants";
 import type { LeadDTO } from "@shared/types";
+import { SegmentedControl } from "@/components/shared/segmented-control";
 import { CountUp } from "@/components/shared/count-up";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -26,7 +27,7 @@ import { errorMessage } from "@/lib/api";
 import { celebrate } from "@/lib/confetti";
 import { downloadCsv } from "@/lib/csv";
 import { formatMoney, formatMoneyCompact, todayIso } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, staggerIndex } from "@/lib/utils";
 
 const ALL = "__all__";
 const VIEW_KEY = "aos-crm-view";
@@ -35,6 +36,12 @@ const AUTO_SYNC_AFTER_MS = 10 * 60 * 1000;
 
 type View = "board" | "list";
 const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+
+/** YYYY-MM-DD in the person's own time zone (an early-morning lead must not be exported under yesterday's date). */
+function localDay(ms: number): string {
+  const date = new Date(ms);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 function readView(): View {
   try {
@@ -153,7 +160,7 @@ export default function CrmPage() {
         lead.assigneeId ? (members.get(lead.assigneeId)?.name ?? "") : "",
         lead.followUpDate,
         ...(canManage ? [lead.value === null ? null : lead.value / 100] : []),
-        new Date(lead.createdAt).toISOString().slice(0, 10),
+        localDay(lead.createdAt),
       ]),
     );
 
@@ -235,24 +242,15 @@ export default function CrmPage() {
           </dl>
 
           <div className="mt-6 mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div role="group" aria-label="View" className="flex w-fit rounded-lg border bg-card p-0.5 shadow-soft">
-              {(
-                [
-                  ["board", "Board", Columns3],
-                  ["list", "List", List],
-                ] as const
-              ).map(([value, label, Icon]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => chooseView(value)}
-                  aria-pressed={view === value}
-                  className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors", view === value ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground")}
-                >
-                  <Icon className="size-3.5" /> {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              label="View"
+              value={view}
+              onChange={chooseView}
+              options={[
+                { value: "board", label: "Board", icon: Columns3 },
+                { value: "list", label: "List", icon: List },
+              ]}
+            />
             <div className="relative lg:w-64">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, phone, email…" aria-label="Search leads" className="h-9 pl-9" />
@@ -342,11 +340,11 @@ export default function CrmPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {visible.map((lead) => {
+                  {visible.map((lead, index) => {
                     const assignee = lead.assigneeId ? members.get(lead.assigneeId) : undefined;
                     const followUp = lead.followUpDate && OPEN_STAGES.includes(lead.stage) ? followUpLabel(lead.followUpDate, today) : null;
                     return (
-                      <tr key={lead.id} className="transition-colors hover:bg-accent/40">
+                      <tr key={lead.id} className="rise-in transition-colors hover:bg-accent/40" style={staggerIndex(index)}>
                         <th scope="row" className="max-w-64 px-4 py-3 font-normal">
                           <button type="button" onClick={() => openLead(lead.id)} className="block w-full rounded-sm text-left">
                             <span className="block truncate font-medium hover:text-primary">{lead.name}</span>

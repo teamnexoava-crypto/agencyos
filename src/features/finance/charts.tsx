@@ -1,3 +1,4 @@
+import { useReducedMotion } from "motion/react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PROJECT_STATUSES, type ProjectStatus } from "@shared/constants";
 import type { MonthlyPoint } from "@shared/types";
@@ -113,8 +114,18 @@ function MonthlyTable({ rows, currency, columns }: { rows: ReturnType<typeof use
   );
 }
 
+/** Shows every n-th month label so they are evenly spaced and never collide (about six across the chart). */
+const labelInterval = (points: number) => Math.max(0, Math.ceil(points / 6) - 1);
+
+/** Marks draw themselves in once when a chart appears – unless the person prefers reduced motion. */
+function useChartMotion() {
+  const reduced = useReducedMotion();
+  return { isAnimationActive: !reduced, animationDuration: 700, animationEasing: "ease-out" as const };
+}
+
 /** Monthly money in vs money out: two series compared on one axis → grouped columns. */
 export function RevenueExpensesChart({ data, currency }: { data: MonthlyPoint[]; currency: string }) {
+  const motion = useChartMotion();
   const rows = useChartRows(data);
   const ticks = niceTicks(data.flatMap((point) => [point.revenue, point.expenses]));
   return (
@@ -123,11 +134,11 @@ export function RevenueExpensesChart({ data, currency }: { data: MonthlyPoint[];
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} barGap={2} barCategoryGap="24%" margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK} tickMargin={8} minTickGap={12} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK} tickMargin={8} interval={labelInterval(rows.length)} />
             <YAxis ticks={ticks} domain={[ticks[0] ?? 0, ticks.at(-1) ?? 0]} tickFormatter={(value: number) => formatMoneyCompact(value, currency)} tickLine={false} axisLine={false} tick={TICK} width={56} />
             <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.6 }} content={({ active, payload, label }) => <MoneyTooltip active={active} payload={payload} label={label} currency={currency} series={REVENUE_EXPENSE_SERIES} />} />
-            {REVENUE_EXPENSE_SERIES.map((series) => (
-              <Bar key={series.key} dataKey={series.key} fill={series.color} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+            {REVENUE_EXPENSE_SERIES.map((series, index) => (
+              <Bar key={series.key} dataKey={series.key} fill={series.color} radius={[4, 4, 0, 0]} maxBarSize={24} {...motion} animationBegin={index * 90} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -139,6 +150,7 @@ export function RevenueExpensesChart({ data, currency }: { data: MonthlyPoint[];
 
 /** Profit over time: a single series, so a 2px line with a light wash and a zero baseline. */
 export function ProfitTrendChart({ data, currency }: { data: MonthlyPoint[]; currency: string }) {
+  const motion = useChartMotion();
   const rows = useChartRows(data);
   const ticks = niceTicks(data.map((point) => point.profit));
   return (
@@ -147,7 +159,7 @@ export function ProfitTrendChart({ data, currency }: { data: MonthlyPoint[]; cur
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK} tickMargin={8} minTickGap={12} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK} tickMargin={8} interval={labelInterval(rows.length)} />
             <YAxis ticks={ticks} domain={[ticks[0] ?? 0, ticks.at(-1) ?? 0]} tickFormatter={(value: number) => formatMoneyCompact(value, currency)} tickLine={false} axisLine={false} tick={TICK} width={56} />
             <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.5} />
             <Tooltip cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.4 }} content={({ active, payload, label }) => <MoneyTooltip active={active} payload={payload} label={label} currency={currency} series={PROFIT_SERIES} />} />
@@ -164,7 +176,7 @@ export function ProfitTrendChart({ data, currency }: { data: MonthlyPoint[]; cur
               // Markers carry a 2px ring in the surface colour so they stay legible on the line.
               dot={rows.length <= 12 ? { r: 4, fill: "var(--chart-3)", stroke: "var(--card)", strokeWidth: 2 } : false}
               activeDot={{ r: 5, fill: "var(--chart-3)", stroke: "var(--card)", strokeWidth: 2 }}
-              isAnimationActive={false}
+              {...motion}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -179,6 +191,7 @@ const RING_ORDER: ProjectStatus[] = ["lead", "on_hold", "completed", "in_progres
 
 /** Project status split. The legend beside the ring carries every name and count, so colour is never the only cue. */
 export function ProjectStatusDonut({ counts }: { counts: Record<ProjectStatus, number> }) {
+  const motion = useChartMotion();
   const total = PROJECT_STATUSES.reduce((sum, status) => sum + counts[status], 0);
   const slices = RING_ORDER.filter((status) => counts[status] > 0).map((status) => ({ status, name: STATUS_META[status].label, value: counts[status], color: STATUS_META[status].color }));
 
@@ -187,7 +200,7 @@ export function ProjectStatusDonut({ counts }: { counts: Record<ProjectStatus, n
       <div className="relative size-40 shrink-0" aria-hidden="true">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={slices} dataKey="value" nameKey="name" innerRadius={52} outerRadius={76} startAngle={90} endAngle={-270} stroke="var(--card)" strokeWidth={2} isAnimationActive={false}>
+            <Pie data={slices} dataKey="value" nameKey="name" innerRadius={52} outerRadius={76} startAngle={90} endAngle={-270} stroke="var(--card)" strokeWidth={2} {...motion}>
               {slices.map((slice) => (
                 <Cell key={slice.status} fill={slice.color} />
               ))}

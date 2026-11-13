@@ -67,8 +67,9 @@ async function requireExpense(t: Tenant, id: string) {
 }
 
 /** Ids from the browser are checked against this workspace before they are linked to an expense. */
-async function checkLinks(t: Tenant, input: { categoryId: string; projectId: string }) {
-  if (input.projectId) await requireProject(t, input.projectId);
+async function checkLinks(t: Tenant, input: { categoryId: string; projectId: string }, existing?: { projectId: string | null }) {
+  // An unchanged project is not re-checked, so an expense stays editable after its project is deleted.
+  if (input.projectId && input.projectId !== existing?.projectId) await requireProject(t, input.projectId);
   if (input.categoryId) {
     const [category] = await t.db
       .select({ id: expenseCategories.id })
@@ -160,7 +161,7 @@ export const expenseRoutes = new Hono<AppEnv>()
     const t = tenant(c);
     const existing = await requireExpense(t, c.req.valid("param").id);
     const input = c.req.valid("json");
-    await checkLinks(t, input);
+    await checkLinks(t, input, existing);
     await t.db
       .update(expenses)
       .set({

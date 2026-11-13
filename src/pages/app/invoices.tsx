@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { FileSearch, Plus, ReceiptText, Search } from "lucide-react";
 import { Link } from "react-router";
 import { invoiceDisplayStatus } from "@shared/invoice";
+import { SegmentedControl } from "@/components/shared/segmented-control";
 import { CountUp } from "@/components/shared/count-up";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -112,24 +113,21 @@ export default function InvoicesPage() {
           </dl>
 
           <div className="mt-6 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div role="group" aria-label="Filter invoices" className="flex w-fit max-w-full overflow-x-auto rounded-lg border bg-card p-0.5 shadow-soft">
-              {FILTERS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setFilter(option.value)}
-                  aria-pressed={filter === option.value}
-                  className={cn(
-                    "shrink-0 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors",
-                    filter === option.value ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {option.label}
-                  {option.value === "draft" && summary.drafts > 0 && <span className="tabular ml-1.5 text-muted-foreground">{summary.drafts}</span>}
-                  {option.value === "overdue" && summary.overdueCount > 0 && <span className="tabular ml-1.5 text-destructive">{summary.overdueCount}</span>}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              label="Filter invoices"
+              value={filter}
+              onChange={setFilter}
+              options={FILTERS.map((option) => ({
+                value: option.value,
+                label: option.label,
+                badge:
+                  option.value === "draft" && summary.drafts > 0 ? (
+                    <span className="tabular text-muted-foreground">{summary.drafts}</span>
+                  ) : option.value === "overdue" && summary.overdueCount > 0 ? (
+                    <span className="tabular text-destructive">{summary.overdueCount}</span>
+                  ) : undefined,
+              }))}
+            />
             <div className="relative sm:w-64">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search invoices…" aria-label="Search invoices" className="h-9 pl-9" />

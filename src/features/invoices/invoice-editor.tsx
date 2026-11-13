@@ -8,6 +8,7 @@ import { DISCOUNT_TYPES, TAX_MODES } from "@shared/constants";
 import { computeInvoiceTotals, lineAmount } from "@shared/invoice";
 import { invoiceSchema, type InvoiceInput } from "@shared/schemas/invoice";
 import type { ClientDTO, InvoiceDocument as InvoiceDocumentData, ProjectSummary } from "@shared/types";
+import { SegmentedControl } from "@/components/shared/segmented-control";
 import { MoneyInput } from "@/components/shared/money-input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -157,27 +158,17 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
     <Form {...form}>
       <form onSubmit={(event) => void onSubmit(event)} noValidate>
         {/* Mobile: switch between the form and the preview */}
-        <div role="group" aria-label="Editor view" className="mb-4 flex rounded-lg border bg-card p-0.5 shadow-soft lg:hidden">
-          {(
-            [
-              { value: "form", label: "Edit", icon: PencilLine },
-              { value: "preview", label: "Preview", icon: Eye },
-            ] as const
-          ).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setMobileView(option.value)}
-              aria-pressed={mobileView === option.value}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                mobileView === option.value ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-              )}
-            >
-              <option.icon className="size-4" /> {option.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Editor view"
+          fullWidth
+          className="mb-4 lg:hidden"
+          value={mobileView}
+          onChange={setMobileView}
+          options={[
+            { value: "form", label: "Edit", icon: PencilLine },
+            { value: "preview", label: "Preview", icon: Eye },
+          ]}
+        />
 
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <div className={cn("grid gap-5", mobileView === "preview" && "hidden lg:grid")}>

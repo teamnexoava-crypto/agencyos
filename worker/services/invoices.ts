@@ -86,7 +86,8 @@ export async function buildInvoiceDocument(db: Database, invoice: InvoiceRow, wo
 
 /** Where an invoice's status lands for a given amount paid. */
 export function statusForPayments(invoice: Pick<InvoiceRow, "total" | "viewedAt" | "sentAt">, amountPaid: number): InvoiceStatus {
-  if (amountPaid > 0 && amountPaid >= invoice.total) return "paid";
+  // A zero-total invoice has nothing to collect: it is settled as soon as it has been sent.
+  if (amountPaid >= invoice.total && (amountPaid > 0 || invoice.sentAt !== null)) return "paid";
   if (amountPaid > 0) return "partially_paid";
   if (invoice.viewedAt) return "viewed";
   return invoice.sentAt ? "sent" : "draft";

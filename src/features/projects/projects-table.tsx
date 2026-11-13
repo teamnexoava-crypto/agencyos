@@ -5,7 +5,7 @@ import type { MemberSummary, ProjectSummary } from "@shared/types";
 import { Progress } from "@/components/ui/progress";
 import { AvatarStack } from "@/features/members/member-avatar";
 import { dueLabel } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, staggerIndex } from "@/lib/utils";
 import { DUE_TONE_CLASS, PRIORITY_META, STATUS_META } from "./meta";
 import { PriorityBadge, StatusBadge } from "./badges";
 import { ProjectCard } from "./project-card";
@@ -81,12 +81,12 @@ export function ProjectsTable({ projects, members }: ProjectsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {sorted.map((project) => {
+            {sorted.map((project, index) => {
               const closed = project.status === "completed" || project.status === "cancelled";
               const due = project.dueDate ? dueLabel(project.dueDate, closed) : null;
               const team = project.memberIds.map((id) => members.get(id)).filter((member): member is MemberSummary => member !== undefined);
               return (
-                <tr key={project.id} className="group relative transition-colors hover:bg-accent/40">
+                <tr key={project.id} className="rise-in group relative transition-colors hover:bg-accent/40" style={staggerIndex(index)}>
                   <td className="max-w-xs px-4 py-3">
                     {/* The link stretches over the whole row, so the row is one big click target. */}
                     <Link to={`/app/projects/${project.id}`} className="font-medium after:absolute after:inset-0 hover:text-primary">

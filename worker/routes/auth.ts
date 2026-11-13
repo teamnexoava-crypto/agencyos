@@ -42,10 +42,9 @@ const devLoginEnabled = (c: Context<AppEnv>) => import.meta.env.DEV && isLocalho
 const loginError = (c: Context<AppEnv>, code: string) => c.redirect(`/login?error=${encodeURIComponent(code)}`, 302);
 
 export const authRoutes = new Hono<AppEnv>()
-  // Brute-force / abuse throttle for everything under /api/auth (per IP).
-  .use(rateLimit("AUTH_LIMITER"))
-
-  .get("/config", (c) => {
+  // These two are read on every page load (and on public pages), so they get the generous limit:
+  // a whole office behind one IP address must never be locked out of the app by ordinary browsing.
+  .get("/config", rateLimit("PUBLIC_LIMITER"), (c) => {
     const body: AuthConfigResponse = { googleConfigured: isGoogleConfigured(c.env), devLogin: devLoginEnabled(c) };
     return c.json(body);
   })
@@ -54,7 +53,7 @@ export const authRoutes = new Hono<AppEnv>()
    * Current user + active workspace + CSRF token, or JSON `null` when signed out. (Deliberately 200
    * rather than 401: the SPA calls this on every public page to decide what to show.)
    */
-  .get("/me", async (c) => {
+  .get("/me", rateLimit("PUBLIC_LIMITER"), async (c) => {
     const auth = c.var.auth;
     if (!auth) return c.json(null);
     const body: MeResponse = {
@@ -65,6 +64,10 @@ export const authRoutes = new Hono<AppEnv>()
     };
     return c.json(body);
   })
+
+  // Brute-force / abuse throttle for the sign-in flow itself (per IP). Registered here so it covers
+  // only the routes below.
+  .use(rateLimit("AUTH_LIMITER"))
 
   /** Step 1: redirect to Google's consent screen with state + PKCE. */
   .get("/google", (c) => {

@@ -3,7 +3,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   closestCorners,
   useDroppable,
@@ -157,9 +157,11 @@ export function KanbanBoard({ projects, allProjects, members, canEdit, onMove, o
   const byId = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
   const sensors = useSensors(
-    // A small distance / delay keeps plain clicks and touch-scrolling from starting a drag.
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    // Mouse: a small movement threshold keeps a plain click a click. Touch: long-press to pick a card
+    // up, so an ordinary swipe still scrolls the board. (A pointer sensor would claim touches first
+    // and the browser's scrolling would then cancel every drag.)
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

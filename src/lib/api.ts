@@ -41,7 +41,10 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const headers: Record<string, string> = { Accept: "application/json" };
+  // The person's own calendar date, so "today", "overdue" and "this month" match what they see on screen.
+  const now = new Date();
+  const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const headers: Record<string, string> = { Accept: "application/json", "X-Local-Date": localDate };
   if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
 
   let body: BodyInit | undefined;

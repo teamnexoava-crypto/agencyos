@@ -65,7 +65,7 @@ export function Panel({ title, action, children, className, index = 0 }: { title
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: 0.1 + index * 0.04, ease: "easeOut" }}
-      className={cn("flex flex-col rounded-2xl border bg-card p-5 shadow-soft", className)}
+      className={cn("flex min-w-0 flex-col rounded-2xl border bg-card p-5 shadow-soft", className)}
     >
       <header className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-sm font-semibold">{title}</h2>
