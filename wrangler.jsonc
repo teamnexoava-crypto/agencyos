@@ -10,6 +10,14 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
+  // The app's own domain. Cloudflare creates the DNS records and certificates for these on deploy.
+  "routes": [
+    { "pattern": "growupliftos.com", "custom_domain": true },
+    { "pattern": "www.growupliftos.com", "custom_domain": true }
+  ],
+  // Keep the original workers.dev address working too (declaring routes would otherwise switch it
+  // off): links already shared with clients point at it.
+  "workers_dev": true,
   "assets": {
     "binding": "ASSETS",
     // Every non-asset, non-API path falls back to index.html so React Router can handle it.
