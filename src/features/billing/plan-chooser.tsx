@@ -150,16 +150,16 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
 
   return (
     <div>
-      {config?.payments === "test" && (
-        <p role="note" className="mx-auto mb-6 w-fit rounded-full border border-amber-500/50 bg-amber-500/10 px-3 py-1 text-[13px] font-medium text-amber-800 dark:text-amber-300">
-          Test mode – payments here use Razorpay's test keys, so no real money is taken.
-        </p>
-      )}
       {pending && <PendingSetup setup={pending} />}
       {heading ? (
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-          <h2 id="plans-heading" className="text-lg font-semibold tracking-tight">
+          <h2 id="plans-heading" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
             {heading}
+            {config?.payments === "test" && (
+              <span role="note" title="Payments here use Razorpay's test keys, so no real money is taken." className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-xs font-medium tracking-normal text-amber-800 dark:text-amber-300">
+                Test mode – no real money
+              </span>
+            )}
           </h2>
           <CycleSwitch value={cycle} onChange={setCycle} />
         </div>
