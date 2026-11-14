@@ -22,7 +22,9 @@ export function BillingBanner() {
   const ending = billing.status === "active" && billing.autoPay !== "on" && !retrying && billing.daysLeft !== null && billing.daysLeft <= RENEWAL_REMINDER_DAYS;
   // On the Free plan the owner (the only person who gets in) is quietly reminded there is more.
   const free = billing.status === "free";
-  if ((!trial && !ending && !retrying && !free) || pathname === "/app/billing") return null;
+  const onBilling = pathname === "/app/billing";
+  // On the billing page itself only the trial countdown is worth repeating; the rest is on the page.
+  if ((!trial && !ending && !retrying && !free) || (onBilling && !trial)) return null;
 
   const left = billing.daysLeft ?? 0;
   const urgent = retrying || (!free && left <= 2);
@@ -33,7 +35,7 @@ export function BillingBanner() {
     <div role="status" className={cn("flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-4 py-2 text-center text-[13px] print:hidden", urgent ? "bg-amber-500/15 text-amber-900 dark:text-amber-200" : "bg-primary/10 text-foreground")}>
       <Clock className="size-3.5 shrink-0" aria-hidden="true" />
       <span>{text}</span>
-      {canManage ? (
+      {onBilling ? null : canManage ? (
         <Link to="/app/billing" className="font-semibold underline underline-offset-2 hover:no-underline">
           {free ? "Upgrade to unlock more" : trial ? "See plans" : retrying ? "See what to do" : "Renew now"}
         </Link>

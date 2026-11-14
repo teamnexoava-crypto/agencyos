@@ -152,8 +152,9 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
     <div>
       {pending && <PendingSetup setup={pending} />}
       {heading ? (
-        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-          <h2 id="plans-heading" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+        // Three columns, so the switch sits in the middle of the plans whatever is beside it.
+        <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+          <h2 id="plans-heading" className="flex items-center justify-center gap-2.5 text-lg font-semibold tracking-tight sm:justify-start">
             {heading}
             {config?.payments === "test" && (
               <span role="note" title="Payments here use Razorpay's test keys, so no real money is taken." className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-xs font-medium tracking-normal text-amber-800 dark:text-amber-300">
@@ -161,7 +162,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
               </span>
             )}
           </h2>
-          <CycleSwitch value={cycle} onChange={setCycle} />
+          <CycleSwitch value={cycle} onChange={setCycle} className="mx-auto" />
         </div>
       ) : (
         <CycleSwitch value={cycle} onChange={setCycle} className="mx-auto" />

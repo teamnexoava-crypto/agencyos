@@ -79,6 +79,11 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
     },
   }[billing.status];
 
+  // Shown only when there is something to manage or to know: a paid plan with its date, or an
+  // auto-pay mandate (next charge, a failed payment, turning it off). A plain trial or the Free plan
+  // needs no box – the plans below already say which one is active.
+  if (billing.status !== "active" && !mandate) return null;
+
   return (
     <section className={cn("flex max-w-full items-center gap-3 rounded-xl border bg-card py-2 pr-1.5 pl-3 shadow-soft sm:max-w-md", view.warn && "border-amber-500/50")} aria-label="Current plan">
       <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", view.warn ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" : "bg-primary/10 text-primary")}>
