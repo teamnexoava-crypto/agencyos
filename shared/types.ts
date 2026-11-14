@@ -139,6 +139,8 @@ export interface BillingOverview {
 
 export interface AuthConfigResponse {
   googleConfigured: boolean;
+  /** Whether plans can be paid for yet, and if so with test keys (no real money) or live ones. */
+  payments: "off" | "test" | "live";
   /** True only under `npm run dev` on localhost. */
   devLogin: boolean;
 }

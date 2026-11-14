@@ -6,6 +6,7 @@ import type { AuthConfigResponse, MeResponse } from "../../shared/types";
 import { users } from "../db/schema";
 import { timingSafeEqual } from "../lib/crypto";
 import { forbidden, notFound } from "../lib/errors";
+import { paymentsMode } from "../lib/razorpay";
 import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured } from "../lib/google";
 import { appOrigin, isHttps, isLocalhost, safeRedirectPath } from "../lib/request";
 import { createSession, csrfTokenFor, destroySession, purgeExpiredSessions } from "../lib/session";
@@ -46,7 +47,7 @@ export const authRoutes = new Hono<AppEnv>()
   // These two are read on every page load (and on public pages), so they get the generous limit:
   // a whole office behind one IP address must never be locked out of the app by ordinary browsing.
   .get("/config", rateLimit("PUBLIC_LIMITER"), (c) => {
-    const body: AuthConfigResponse = { googleConfigured: isGoogleConfigured(c.env), devLogin: devLoginEnabled(c) };
+    const body: AuthConfigResponse = { googleConfigured: isGoogleConfigured(c.env), devLogin: devLoginEnabled(c), payments: paymentsMode(c.env) };
     return c.json(body);
   })
 

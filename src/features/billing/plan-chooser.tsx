@@ -6,6 +6,7 @@ import { PLANS, formatPlanPrice, type BillingCycle, type Plan, type PlanId } fro
 import type { BillingDTO, PendingSetupDTO } from "@shared/types";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { useAuthConfig } from "@/features/auth/api";
 import { errorMessage } from "@/lib/api";
 import { queryKeys } from "@/lib/query-client";
 import { useBillingOverview, useCheckout, useSubscribe } from "./api";
@@ -53,6 +54,7 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
   const checkout = useCheckout();
   const subscribe = useSubscribe();
   const queryClient = useQueryClient();
+  const { data: config } = useAuthConfig();
 
   // The overview is checked against Razorpay each time it loads, so it can be ahead of the session.
   const current = overview?.billing ?? billing;
@@ -141,6 +143,11 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
 
   return (
     <div>
+      {config?.payments === "test" && (
+        <p role="note" className="mx-auto mb-6 w-fit rounded-full border border-amber-500/50 bg-amber-500/10 px-3 py-1 text-[13px] font-medium text-amber-800 dark:text-amber-300">
+          Test mode – payments here use Razorpay's test keys, so no real money is taken.
+        </p>
+      )}
       {pending && <PendingSetup setup={pending} />}
       <CycleSwitch value={cycle} onChange={setCycle} className="mx-auto" />
       <PlanCards

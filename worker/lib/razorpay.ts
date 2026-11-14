@@ -5,6 +5,12 @@ import { ApiError } from "./errors";
 /** Payments are switched on only once both API keys are present. */
 export const isBillingConfigured = (env: Env): boolean => Boolean(env.RAZORPAY_KEY_ID?.trim() && env.RAZORPAY_KEY_SECRET?.trim());
 
+/** Whether payments are off, or on with Razorpay's test keys (no real money) or live keys. Not a secret. */
+export function paymentsMode(env: Env): "off" | "test" | "live" {
+  if (!isBillingConfigured(env)) return "off";
+  return env.RAZORPAY_KEY_ID?.trim().startsWith("rzp_test_") ? "test" : "live";
+}
+
 /**
  * A failed call to Razorpay. To the person it is always the same "try again" message; `providerStatus`
  * is for our own code, which sometimes needs to tell "Razorpay said no" (4xx) from "couldn't ask" (0).
