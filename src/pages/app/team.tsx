@@ -7,6 +7,7 @@ import type { TeamMemberDTO } from "@shared/types";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { UpgradeNotice } from "@/features/billing/upgrade-notice";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ export default function TeamPage() {
   return (
     <>
       <PageHeader title="Team" description={canManage ? "Invite people and control what they can see." : `Everyone at ${workspace.name}.`} actions={inviteButton} />
+      <UpgradeNotice feature="team" banner />
 
       {isError ? (
         <ErrorState onRetry={() => void refetch()} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { CalendarClock, Columns3, Download, FileSearch, FileSpreadsheet, List, Plus, Search, UserRoundSearch } from "lucide-react";
-import { useSearchParams } from "react-router";
+import { CalendarClock, Columns3, Download, FileSearch, FileSpreadsheet, List, Lock, Plus, Search, UserRoundSearch } from "lucide-react";
+import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { LEAD_STAGES, type LeadStage } from "@shared/constants";
 import type { LeadDTO } from "@shared/types";
@@ -20,6 +20,7 @@ import { LeadBoard } from "@/features/crm/lead-board";
 import { LeadFormDialog } from "@/features/crm/lead-form-dialog";
 import { LeadPanel } from "@/features/crm/lead-panel";
 import { OPEN_STAGES, STAGE_META, followUpLabel, syncMessage } from "@/features/crm/meta";
+import { useIsLocked } from "@/features/billing/locked";
 import { SheetsDialog } from "@/features/crm/sheets-dialog";
 import { useMemberMap } from "@/features/members/api";
 import { MemberAvatar } from "@/features/members/member-avatar";
@@ -169,7 +170,14 @@ export default function CrmPage() {
       <Plus /> Add lead
     </Button>
   );
-  const sheetsButton = canManage && (
+  const sheetsLocked = useIsLocked("sheets");
+  const sheetsButton = canManage && sheetsLocked ? (
+    <Button asChild variant="outline" title="Google Sheet sync is on Growth and Premium">
+      <Link to="/app/billing">
+        <Lock /> Google Sheets
+      </Link>
+    </Button>
+  ) : canManage && (
     <Button variant="outline" onClick={() => setSheetsOpen(true)}>
       <FileSpreadsheet /> Google Sheets
       {sources && sources.length > 0 && <span className="tabular rounded-full bg-muted px-1.5 text-xs text-muted-foreground">{sources.length}</span>}

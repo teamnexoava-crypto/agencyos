@@ -13,7 +13,7 @@ import { cleanFileName, sniffReceipt } from "../lib/uploads";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
-import { assertStorageAvailable } from "../services/billing";
+import { assertFeature, assertStorageAvailable } from "../services/billing";
 import { requireProject } from "../services/projects";
 import type { AppEnv } from "../types";
 
@@ -117,6 +117,7 @@ export const expenseRoutes = new Hono<AppEnv>()
 
   .post("/categories", validate("json", expenseCategorySchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "finance");
     const { name } = c.req.valid("json");
     const existing = await t.db
       .select()
@@ -135,6 +136,7 @@ export const expenseRoutes = new Hono<AppEnv>()
 
   .post("/", validate("json", expenseSchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "finance");
     const input = c.req.valid("json");
     await checkLinks(t, input);
     const [row] = await t.db
@@ -160,6 +162,7 @@ export const expenseRoutes = new Hono<AppEnv>()
 
   .patch("/:id", validate("param", idParam), validate("json", expenseSchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "finance");
     const existing = await requireExpense(t, c.req.valid("param").id);
     const input = c.req.valid("json");
     await checkLinks(t, input, existing);
@@ -214,6 +217,7 @@ export const expenseRoutes = new Hono<AppEnv>()
       const kind = sniffReceipt(bytes);
       if (!kind) throw new ApiError(415, "unsupported_type", "Upload an image (PNG, JPEG, WebP) or a PDF.");
 
+      assertFeature(t, c.env, "finance");
       await assertStorageAvailable(t, c.env, bytes.byteLength);
       const key = `ws/${t.workspaceId}/receipts/${newId()}.${kind.ext}`;
       await c.env.BUCKET.put(key, bytes, { httpMetadata: { contentType: kind.mime } });

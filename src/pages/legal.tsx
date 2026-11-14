@@ -186,8 +186,10 @@ export function TermsPage() {
       <section id="plans">
         <h2>Free trial, plans and payments</h2>
         <p>
-          Every new workspace can use GrowUpliftOS free for {TRIAL_DAYS} days. To keep using it after that, the workspace needs a paid plan,
-          charged in Indian rupees through Razorpay.
+          Every new workspace gets the Premium plan free for {TRIAL_DAYS} days. After that it moves to the Free plan by itself and can
+          stay there for as long as you like. The Free plan is for one person and has limits; team members, contracts, the client
+          portal, finance and Google Sheet sync are part of the paid plans (Growth and Premium), which are charged in Indian rupees
+          through Razorpay.
         </p>
         <ul>
           <li>
@@ -202,9 +204,10 @@ export function TermsPage() {
           </li>
         </ul>
         <p>
-          If a payment fails, Razorpay retries it for a few days and the workspace stays usable meanwhile. When a trial or plan ends
-          without payment, the workspace is locked until a plan is bought: your data is kept, links you already shared with clients
-          keep working, and you can still delete the workspace. Prices and plan limits are shown on the pricing page and may change
+          If a payment fails, Razorpay retries it for a few days and the plan stays as it is meanwhile. When a trial or a paid plan
+          ends, the workspace moves to the Free plan: nothing is deleted, but what the Free plan does not include is switched off
+          until you upgrade – team members cannot sign in to the workspace, client portal links are paused, and new contracts and
+          expenses cannot be added. Invoice and contract links you already shared keep working. Prices and plan limits are shown on the pricing page and may change
           for future periods; the amount of an auto-pay mandate you have approved never changes without a new approval from you.
         </p>
       </section>

@@ -122,18 +122,25 @@ wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required sec
 
 ## Trial, plans and payments
 
-Every new workspace gets a 7-day trial (`TRIAL_DAYS`); after that it needs a paid plan or it is locked.
-Prices, limits and plan names live in one file, `shared/plans.ts`, which the landing page, the Billing
-screen and the server-side limits all read.
+There are three tiers – **Free**, **Growth** and **Premium** – defined in one file, `shared/plans.ts`
+(prices, limits, features, and the wording on the cards). The landing page, the Billing screen and the
+server-side checks all read from it.
 
+- **Every new workspace starts with 7 days of Premium** (`TRIAL_DAYS`, `TRIAL_PLAN`), no card needed.
+- **Then it is on Free, by itself.** Nothing is locked away or deleted. Free is for one person and has
+  limits (active projects, clients, invoices a month, leads, storage) and no team members, contracts,
+  client portal, finance or Google Sheet sync. The same happens when a paid plan runs out.
 - **State is computed, not scheduled.** `billingOf()` (`worker/services/billing.ts`) works out
-  `open / exempt / trial / active / expired` from three columns on the workspace (`trial_ends_at`,
-  `plan`, `paid_until`) on every request. There is no job that has to expire anyone.
-- **The lock lives in `tenant()`.** An expired workspace gets `402 subscription_required` from every
-  workspace route except billing and "delete workspace" (the routes that pass `allowLocked`). Public
-  client links (invoice, contract, portal) keep working so an agency's clients are never affected.
-- **Limits** (people, connected sheets, contracts per month, storage) are checked where the thing is
-  created; the trial has the Team plan's limits.
+  `open / exempt / trial / active / free`, the tier, its limits and features from a few columns on the
+  workspace on every request. There is no job that has to downgrade anyone.
+- **Limits and features are enforced on the server**, where the thing is created or used
+  (`assertProjectAvailable`, `assertFeature(t, env, "contracts")`, …). Existing data stays readable:
+  a contract made during the trial can still be opened on Free, just not sent. The UI mirrors this
+  with upgrade notices and lock icons, but never decides it.
+- **One person on Free** is enforced in `tenant()`: anyone but the owner gets `402 plan_seat` and a
+  "team is paused" screen until the owner upgrades.
+- **Public links:** invoice and contract links already shared keep working on every tier; client
+  portal links answer "not found" while the workspace is on Free and work again after an upgrade.
 - **Monthly plans are paid by auto-pay; a year (or a single month) is one payment.** Auto-pay is a
   Razorpay subscription: the payer approves a mandate once (UPI AutoPay or card) on Razorpay's hosted
   page, opened in a new tab, and Razorpay collects each month. One-off payments use a Razorpay Payment

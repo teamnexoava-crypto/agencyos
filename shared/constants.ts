@@ -5,6 +5,12 @@
 
 /** The product's name, wherever it is built into a message or stored with a record. */
 export const APP_NAME = "GrowUpliftOS";
+/**
+ * The YouTube id of the walkthrough video on the home page – the part after "v=" or "youtu.be/"
+ * (11 characters). Leave empty to hide the video section.
+ */
+export const DEMO_VIDEO_ID = "";
+
 /** Notes written by the app itself carry its name as the author; older ones carry the previous name. */
 export const SYSTEM_AUTHOR_NAMES: readonly string[] = [APP_NAME, "AgencyOS"];
 

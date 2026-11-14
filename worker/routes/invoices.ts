@@ -16,6 +16,7 @@ import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
 import { buildInvoiceDocument, invoiceMessageTemplate, notifyManagers, statusForPayments, toPaymentDTO, type InvoiceRow } from "../services/invoices";
 import { requireClientId, requireProject } from "../services/projects";
+import { assertInvoiceAvailable } from "../services/billing";
 import type { AppEnv } from "../types";
 
 const idParam = z.object({ id: idSchema });
@@ -182,6 +183,7 @@ export const invoiceRoutes = new Hono<AppEnv>()
 
   .post("/", validate("json", invoiceSchema), async (c) => {
     const t = tenant(c);
+    await assertInvoiceAvailable(t, c.env);
     const prepared = await prepare(t, c.req.valid("json"));
 
     const invoice = await t.db.transaction(async (tx) => {

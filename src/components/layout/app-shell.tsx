@@ -3,9 +3,10 @@ import { motion } from "motion/react";
 import { useLocation, useNavigation } from "react-router";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useSession } from "@/features/auth/api";
 import { useBilling } from "@/features/billing/api";
 import { BillingBanner } from "@/features/billing/billing-banner";
-import { Paywall } from "@/features/billing/paywall";
+import { SeatLock } from "@/features/billing/paywall";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { PageTransition } from "./page-transition";
 import { QuickNav } from "./quick-nav";
@@ -26,6 +27,7 @@ export function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false);
   const navigation = useNavigation();
   const billing = useBilling();
+  const { isOwner } = useSession();
 
   // Keyboard shortcuts: ⌘K / Ctrl+K → search, "[" → toggle sidebar.
   useEffect(() => {
@@ -48,8 +50,8 @@ export function AppShell() {
 
   const sidebarOffset = isDesktop ? (collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH) : 0;
 
-  // Trial or plan over: nothing in the app works until a plan is chosen, so show only that.
-  if (billing.status === "expired") return <Paywall />;
+  // The Free plan is for one person: the rest of the team waits until the owner upgrades.
+  if (billing.status === "free" && !isOwner) return <SeatLock />;
 
   return (
     <div className="min-h-dvh bg-background print:min-h-0 print:bg-white">

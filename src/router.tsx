@@ -1,8 +1,11 @@
 import type { ComponentType, ReactNode } from "react";
 import { createBrowserRouter, Navigate, Outlet, useRouteError } from "react-router";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader } from "@/components/shared/page-header";
 import { useSession } from "@/features/auth/api";
 import { RedirectIfAuthenticated, RequireAuth } from "@/features/auth/guards";
+import { useIsLocked, type LockedFeature } from "@/features/billing/locked";
+import { UpgradeNotice } from "@/features/billing/upgrade-notice";
 import LandingPage from "@/pages/landing";
 import NotFoundPage from "@/pages/not-found";
 
@@ -19,6 +22,18 @@ function RouteError() {
 function ManagersOnly({ children }: { children: ReactNode }) {
   const { canManage } = useSession();
   return canManage ? children : <Navigate to="/app" replace />;
+}
+
+/** A whole section the workspace's plan may not include: shows what it is and how to get it instead. */
+function RequireFeature({ feature, title, description }: { feature: LockedFeature; title: string; description: string }) {
+  const locked = useIsLocked(feature);
+  if (!locked) return <Outlet />;
+  return (
+    <>
+      <PageHeader title={title} description={description} />
+      <UpgradeNotice feature={feature} />
+    </>
+  );
 }
 
 /**
@@ -101,7 +116,10 @@ export const router = createBrowserRouter([
                   { path: "invoices/new", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).NewInvoicePage }) },
                   { path: "invoices/:invoiceId", lazy: page(() => import("@/pages/app/invoice-detail")) },
                   { path: "invoices/:invoiceId/edit", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).EditInvoicePage }) },
-                  { path: "finance", lazy: page(() => import("@/pages/app/finance")) },
+                  {
+                    element: <RequireFeature feature="finance" title="Finance" description="Expenses, and profit and loss." />,
+                    children: [{ path: "finance", lazy: page(() => import("@/pages/app/finance")) }],
+                  },
                   { path: "contracts", lazy: page(() => import("@/pages/app/contracts")) },
                   { path: "contracts/:contractId", lazy: page(() => import("@/pages/app/contract-detail")) },
                   { path: "settings", lazy: page(() => import("@/pages/app/settings")) },

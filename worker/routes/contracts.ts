@@ -15,7 +15,7 @@ import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
-import { assertContractAvailable } from "../services/billing";
+import { assertContractAvailable, assertFeature } from "../services/billing";
 import { buildContractDocument, contractMessageTemplate, parseSignatureImage, sealContract, signatureKey, type ContractRow } from "../services/contracts";
 import { notifyManagers } from "../services/invoices";
 import { requireClientId, requireProject } from "../services/projects";
@@ -147,6 +147,7 @@ export const contractRoutes = new Hono<AppEnv>()
 
   .post("/templates", validate("json", contractTemplateSchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "contracts");
     const input = c.req.valid("json");
     const [row] = await t.db
       .insert(contractTemplates)
@@ -158,6 +159,7 @@ export const contractRoutes = new Hono<AppEnv>()
 
   .put("/templates/:id", validate("param", idParam), validate("json", contractTemplateSchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "contracts");
     const existing = await requireTemplate(t, c.req.valid("param").id);
     const input = c.req.valid("json");
     const [row] = await t.db
@@ -262,6 +264,7 @@ export const contractRoutes = new Hono<AppEnv>()
 
   .post("/:id/send", validate("param", idParam), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "contracts");
     const contract = await requireContract(t, c.req.valid("param").id);
     if (contract.status !== "draft") return c.json({ contract: await loadDetail(t, c.env.BUCKET, contract) }); // already sent: nothing to do
     if (contractText(contract.content).length === 0) throw new ApiError(400, "empty_contract", "Write the agreement text before sending it.");
@@ -371,6 +374,7 @@ export const contractRoutes = new Hono<AppEnv>()
    */
   .post("/:id/version", validate("param", idParam), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "contracts");
     const contract = await requireContract(t, c.req.valid("param").id);
     if (contract.status === "draft") throw conflict("This contract is still a draft – you can edit it directly.");
     const [existing] = await t.db

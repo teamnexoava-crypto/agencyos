@@ -1,9 +1,12 @@
 import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { APP_NAME } from "../../shared/constants";
 import {
+  ALL_FEATURES,
   AUTOPAY_GRACE_DAYS,
+  FEATURE_NAMES,
   NO_LIMITS,
   PLANS,
+  TIERS,
   TRIAL_DAYS,
   TRIAL_PLAN,
   addMonths,
@@ -13,12 +16,15 @@ import {
   paidTimeFor,
   type BillingCycle,
   type BillingPaymentStatus,
+  type PlanFeature,
   type PlanId,
   type SubscriptionStatus,
+  type TierId,
 } from "../../shared/plans";
 import type { AutoPayDTO, BillingDTO, BillingPaymentDTO, BillingUsage, PendingSetupDTO } from "../../shared/types";
 import type { Database } from "../db";
-import { appFlags, billingPayments, billingProviderPlans, billingSubscriptions, contracts, files, invites, leadSources, workspaceMembers, workspaces } from "../db/schema";
+import type { PgColumn } from "drizzle-orm/pg-core";
+import { appFlags, billingPayments, billingProviderPlans, billingSubscriptions, clients, contracts, files, invites, invoices, leadSources, leads, projects, workspaceMembers, workspaces } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import {
   RazorpayError,
@@ -45,20 +51,23 @@ const fromUnix = (seconds: number | null | undefined) => (seconds ? new Date(sec
 export function billingOf(env: Env, ws: WorkspaceRow, now = new Date()): BillingDTO {
   const autoPay = autoPayStateOf(ws.subscriptionId ? ws.subscriptionStatus : null);
   const base = { plan: ws.plan, trialEndsAt: ws.trialEndsAt.getTime(), paidUntil: ws.paidUntil?.getTime() ?? null };
-  if (!isBillingConfigured(env)) return { ...base, enabled: false, status: "open", daysLeft: null, autoPay: null, limits: NO_LIMITS };
-  if (ws.billingExempt) return { ...base, enabled: true, status: "exempt", daysLeft: null, autoPay: null, limits: NO_LIMITS };
+  const unlimited = { tier: TRIAL_PLAN, limits: NO_LIMITS, features: ALL_FEATURES } as const;
+  if (!isBillingConfigured(env)) return { ...base, enabled: false, status: "open", daysLeft: null, autoPay: null, ...unlimited };
+  if (ws.billingExempt) return { ...base, enabled: true, status: "exempt", daysLeft: null, autoPay: null, ...unlimited };
+  const on = (tier: TierId) => ({ tier, limits: TIERS[tier].limits, features: TIERS[tier].features });
   // An auto-pay charge is taken on the day the covered time ends and may land a little later (and a
-  // failed one is retried), so the workspace stays usable for a few days past that date while it does.
+  // failed one is retried), so the workspace keeps what it has for a few days past that date.
   const grace = autoPay === "on" || autoPay === "retrying" ? GRACE_MS : 0;
   if (ws.plan && ws.paidUntil && ws.paidUntil.getTime() + grace > now.getTime()) {
-    return { ...base, enabled: true, status: "active", daysLeft: daysUntil(ws.paidUntil, now), autoPay, limits: PLANS[ws.plan].limits };
+    return { ...base, enabled: true, status: "active", daysLeft: daysUntil(ws.paidUntil, now), autoPay, ...on(ws.plan) };
   }
   // A mandate approved during the trial takes its first payment the day the trial ends; until that
   // payment arrives nothing has been paid, so the workspace is simply still on its trial.
   if (!ws.plan && ws.trialEndsAt.getTime() + grace > now.getTime()) {
-    return { ...base, enabled: true, status: "trial", daysLeft: daysUntil(ws.trialEndsAt, now), autoPay, limits: PLANS[TRIAL_PLAN].limits };
+    return { ...base, enabled: true, status: "trial", daysLeft: daysUntil(ws.trialEndsAt, now), autoPay, ...on(TRIAL_PLAN) };
   }
-  return { ...base, enabled: true, status: "expired", daysLeft: null, autoPay, limits: PLANS[ws.plan ?? TRIAL_PLAN].limits };
+  // The trial is over, or the paid plan has run out: the Free tier. Nothing is locked away or lost.
+  return { ...base, enabled: true, status: "free", daysLeft: null, autoPay, ...on("free") };
 }
 
 /**
@@ -75,41 +84,60 @@ export function isSetupFresh(basis: string | null, ws: WorkspaceRow): boolean {
   return plan === (ws.plan ?? "") && paidUntil === String(ws.paidUntil?.getTime() ?? "") && (ws.subscriptionId === null || ws.subscriptionId === mandate);
 }
 
-/** Thrown by `tenant()` for every request except billing itself once the trial or plan has run out. */
-export const subscriptionRequired = (ws: WorkspaceRow) =>
-  new ApiError(402, "subscription_required", ws.plan ? `Your plan has ended. Renew it to keep using ${APP_NAME}.` : `Your free trial has ended. Choose a plan to keep using ${APP_NAME}.`);
+/**
+ * The Free tier is for one person. Once a workspace is on it, anyone other than the owner is asked to
+ * wait until the owner upgrades – `tenant()` throws this for them.
+ */
+export const seatRequired = (ws: WorkspaceRow) => new ApiError(402, "plan_seat", `${ws.name} is on the Free plan, which is for one person. Ask the owner to upgrade so the team can get back in.`);
 
 /* ------------------------------------------------------------------------------------------------
- * Plan limits
+ * Plan limits and features
  * ---------------------------------------------------------------------------------------------- */
 
-const limitReached = (message: string) => new ApiError(403, "plan_limit", `${message} Upgrade in Billing to add more.`);
-const planLabel = (t: Tenant, env: Env) => {
-  const billing = billingOf(env, t.workspace);
-  return billing.status === "trial" ? "The free trial" : `The ${PLANS[billing.plan ?? TRIAL_PLAN].name} plan`;
-};
+const upgradeTo = (tier: TierId) => (tier === "free" ? "Upgrade in Billing to get more." : "Upgrade to Premium in Billing for no limits.");
+const tierLabel = (billing: BillingDTO) => (billing.status === "trial" ? "The free trial" : `The ${TIERS[billing.tier].name} plan`);
+const limitReached = (billing: BillingDTO, what: string) => new ApiError(403, "plan_limit", `${tierLabel(billing)} includes ${what}. ${upgradeTo(billing.tier)}`);
 
 const startOfMonthUtc = (now = new Date()) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+const ACTIVE_PROJECT = notInArray(projects.status, ["completed", "cancelled"]);
+
+/** Whole features that the workspace's tier switches off (contracts, the client portal, finance). */
+export function assertFeature(t: Tenant, env: Env, feature: PlanFeature): void {
+  if (!billingOf(env, t.workspace).features[feature]) {
+    const plural = feature !== "portal";
+    throw new ApiError(403, "plan_feature", `${FEATURE_NAMES[feature]} ${plural ? "are" : "is"} part of the Growth and Premium plans. Upgrade in Billing to use ${plural ? "them" : "it"}.`);
+  }
+}
+
+/** The same question for a workspace reached without a session (public links). */
+export const hasFeature = (env: Env, ws: WorkspaceRow, feature: PlanFeature): boolean => billingOf(env, ws).features[feature];
 
 export async function usageOf(db: Database, workspaceId: string, now = new Date()): Promise<BillingUsage> {
-  const [members, openInvites, sheets, contractsThisMonth, storage] = await Promise.all([
-    db.$count(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaceId), isNull(workspaceMembers.removedAt))),
-    db.$count(invites, and(eq(invites.workspaceId, workspaceId), isNull(invites.acceptedAt), isNull(invites.revokedAt), gt(invites.expiresAt, now))),
-    db.$count(leadSources, and(eq(leadSources.workspaceId, workspaceId), isNull(leadSources.deletedAt))),
-    // Deleted contracts still count, so the monthly allowance can't be reset by deleting and recreating.
-    db.$count(contracts, and(eq(contracts.workspaceId, workspaceId), gte(contracts.createdAt, startOfMonthUtc(now)))),
+  const mine = <T extends { workspaceId: PgColumn }>(table: T) => eq(table.workspaceId, workspaceId);
+  const [members, openInvites, activeProjects, clientCount, invoicesThisMonth, leadCount, sheets, contractsThisMonth, storage] = await Promise.all([
+    db.$count(workspaceMembers, and(mine(workspaceMembers), isNull(workspaceMembers.removedAt))),
+    db.$count(invites, and(mine(invites), isNull(invites.acceptedAt), isNull(invites.revokedAt), gt(invites.expiresAt, now))),
+    db.$count(projects, and(mine(projects), isNull(projects.deletedAt), ACTIVE_PROJECT)),
+    db.$count(clients, and(mine(clients), isNull(clients.deletedAt))),
+    // Deleted invoices and contracts still count, so a monthly allowance can't be reset by deleting and recreating.
+    db.$count(invoices, and(mine(invoices), gte(invoices.createdAt, startOfMonthUtc(now)))),
+    db.$count(leads, and(mine(leads), isNull(leads.deletedAt))),
+    db.$count(leadSources, and(mine(leadSources), isNull(leadSources.deletedAt))),
+    db.$count(contracts, and(mine(contracts), gte(contracts.createdAt, startOfMonthUtc(now)))),
     db
       .select({ bytes: sql<string>`coalesce(sum(${files.size}), 0)` })
       .from(files)
-      .where(and(eq(files.workspaceId, workspaceId), isNull(files.deletedAt))),
+      .where(and(mine(files), isNull(files.deletedAt))),
   ]);
-  return { members: members + openInvites, sheets, contractsThisMonth, storageBytes: Number(storage[0]?.bytes ?? 0) };
+  return { members: members + openInvites, activeProjects, clients: clientCount, invoicesThisMonth, leads: leadCount, sheets, contractsThisMonth, storageBytes: Number(storage[0]?.bytes ?? 0) };
 }
 
 /** A seat is needed for every member and for every invitation that is still open. */
 export async function assertSeatAvailable(t: Tenant, env: Env, replacingInviteFor?: string): Promise<void> {
-  const limit = billingOf(env, t.workspace).limits.members;
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.members;
   if (limit === null) return;
+  if (limit <= 1) throw new ApiError(403, "plan_feature", "Team members are part of the Growth and Premium plans. Upgrade in Billing to invite your team.");
   const now = new Date();
   const [members, openInvites] = await Promise.all([
     t.db.$count(workspaceMembers, t.where(workspaceMembers, isNull(workspaceMembers.removedAt))),
@@ -118,9 +146,7 @@ export async function assertSeatAvailable(t: Tenant, env: Env, replacingInviteFo
       t.where(invites, isNull(invites.acceptedAt), isNull(invites.revokedAt), gt(invites.expiresAt, now), replacingInviteFor ? ne(invites.email, replacingInviteFor) : undefined),
     ),
   ]);
-  if (members + openInvites >= limit) {
-    throw limitReached(`${planLabel(t, env)} includes ${limit} ${limit === 1 ? "person" : "people"}, counting invitations that are still open.`);
-  }
+  if (members + openInvites >= limit) throw limitReached(billing, `${limit} people, counting invitations that are still open`);
 }
 
 /** Checked again when an invitation is accepted, in case the plan changed after it was sent. */
@@ -130,31 +156,69 @@ export async function hasSeatFor(db: Database, env: Env, ws: WorkspaceRow): Prom
   return (await db.$count(workspaceMembers, and(eq(workspaceMembers.workspaceId, ws.id), isNull(workspaceMembers.removedAt)))) < limit;
 }
 
-export async function assertSheetAvailable(t: Tenant, env: Env): Promise<void> {
-  const limit = billingOf(env, t.workspace).limits.sheets;
+export async function assertProjectAvailable(t: Tenant, env: Env): Promise<void> {
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.activeProjects;
   if (limit === null) return;
-  if ((await t.db.$count(leadSources, t.where(leadSources, isNull(leadSources.deletedAt)))) >= limit) {
-    throw limitReached(`${planLabel(t, env)} includes ${limit} connected Google Sheet${limit === 1 ? "" : "s"}.`);
+  if ((await t.db.$count(projects, t.where(projects, isNull(projects.deletedAt), ACTIVE_PROJECT))) >= limit) {
+    throw limitReached(billing, `${limit} active projects – complete or delete one to start another`);
+  }
+}
+
+export async function assertClientAvailable(t: Tenant, env: Env): Promise<void> {
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.clients;
+  if (limit === null) return;
+  if ((await t.db.$count(clients, t.where(clients, isNull(clients.deletedAt)))) >= limit) throw limitReached(billing, `${limit} clients`);
+}
+
+export async function assertInvoiceAvailable(t: Tenant, env: Env): Promise<void> {
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.invoicesPerMonth;
+  if (limit === null) return;
+  if ((await t.db.$count(invoices, t.where(invoices, gte(invoices.createdAt, startOfMonthUtc())))) >= limit) {
+    throw limitReached(billing, `${limit} invoices a month, and this month's are used up`);
+  }
+}
+
+export async function assertLeadAvailable(t: Tenant, env: Env): Promise<void> {
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.leads;
+  if (limit === null) return;
+  if ((await t.db.$count(leads, t.where(leads, isNull(leads.deletedAt)))) >= limit) throw limitReached(billing, `${limit} leads`);
+}
+
+/** `connecting` = a new sheet is being added; otherwise the question is only whether sheet sync is on at all. */
+export async function assertSheetAvailable(t: Tenant, env: Env, connecting = true): Promise<void> {
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.sheets;
+  if (limit === null) return;
+  if (limit === 0) throw new ApiError(403, "plan_feature", "Google Sheet sync is part of the Growth and Premium plans. Upgrade in Billing to use it.");
+  if (connecting && (await t.db.$count(leadSources, t.where(leadSources, isNull(leadSources.deletedAt)))) >= limit) {
+    throw limitReached(billing, `${limit} connected Google Sheet${limit === 1 ? "" : "s"}`);
   }
 }
 
 export async function assertContractAvailable(t: Tenant, env: Env): Promise<void> {
-  const limit = billingOf(env, t.workspace).limits.contractsPerMonth;
+  assertFeature(t, env, "contracts");
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.contractsPerMonth;
   if (limit === null) return;
   if ((await t.db.$count(contracts, t.where(contracts, gte(contracts.createdAt, startOfMonthUtc())))) >= limit) {
-    throw limitReached(`${planLabel(t, env)} includes ${limit} contracts a month, and this month's are used up.`);
+    throw limitReached(billing, `${limit} contracts a month, and this month's are used up`);
   }
 }
 
 export async function assertStorageAvailable(t: Tenant, env: Env, addingBytes: number): Promise<void> {
-  const limit = billingOf(env, t.workspace).limits.storageBytes;
+  const billing = billingOf(env, t.workspace);
+  const limit = billing.limits.storageBytes;
   if (limit === null) return;
   const [row] = await t.db
     .select({ bytes: sql<string>`coalesce(sum(${files.size}), 0)` })
     .from(files)
     .where(t.where(files, isNull(files.deletedAt)));
   if (Number(row?.bytes ?? 0) + addingBytes > limit) {
-    throw limitReached(`${planLabel(t, env)} includes ${Math.round(limit / 1024 ** 3)} GB of file storage, and it is full.`);
+    throw limitReached(billing, `${limit >= 1024 ** 3 ? `${Math.round(limit / 1024 ** 3)} GB` : `${Math.round(limit / 1024 ** 2)} MB`} of file storage, and it is full`);
   }
 }
 
@@ -599,7 +663,8 @@ export async function refreshBillingIfDue(db: Database, env: Env, ws: WorkspaceR
   const now = Date.now();
   if (current.subscriptionSyncedAt && now - current.subscriptionSyncedAt.getTime() < LAZY_CHECK_EVERY_MS) return current;
 
-  if (billingOf(env, current).status === "expired") {
+  // On the Free tier there may be a payment or an approval we never heard about: look before settling for it.
+  if (billingOf(env, current).status === "free") {
     try {
       await reconcileBilling(db, env, current.id, { timeoutMs: 4_000 });
       return await reload();

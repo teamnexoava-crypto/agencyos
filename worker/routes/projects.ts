@@ -32,6 +32,7 @@ import {
   type ProjectRow,
 } from "../services/projects";
 import { projectFinance } from "../services/reports";
+import { assertProjectAvailable } from "../services/billing";
 import type { AppEnv } from "../types";
 
 const projectParam = z.object({ projectId: idSchema });
@@ -109,6 +110,7 @@ export const projectRoutes = new Hono<AppEnv>()
 
   .post("/", validate("json", projectSchema), async (c) => {
     const t = tenant(c);
+    await assertProjectAvailable(t, c.env);
     t.requireRole("owner", "admin");
     const input = c.req.valid("json");
 

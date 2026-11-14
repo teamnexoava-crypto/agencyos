@@ -1,90 +1,141 @@
 /**
- * Subscription plans: what each one costs and allows. The landing page, the in-app billing screen
- * and the server-side limits all read from here, so a price or limit is changed in exactly one place.
+ * Plans: what each one costs, allows and unlocks. The landing page, the in-app billing screen and the
+ * server-side limits all read from here, so a price, limit or feature is changed in exactly one place.
+ *
+ * How it works for a workspace:
+ *  - it starts with a free trial of the top plan (`TRIAL_PLAN`) for `TRIAL_DAYS` days;
+ *  - after that – and whenever a paid plan runs out – it is on the Free tier, with no lock and no
+ *    data lost: some things are limited and some features are switched off until it upgrades;
+ *  - Growth and Premium are paid (monthly by auto-pay, or a single payment for a month or a year).
  */
 
-/** Every new workspace can use the product for this many days before a plan is needed. */
+/** Every new workspace gets the top plan free for this many days. */
 export const TRIAL_DAYS = 7;
 
-export const PLAN_IDS = ["solo", "team", "agency"] as const;
+/** The plans that are paid for. */
+export const PLAN_IDS = ["growth", "premium"] as const;
 export type PlanId = (typeof PLAN_IDS)[number];
+
+/** Everything a workspace can be on, including the Free tier. */
+export const TIER_IDS = ["free", ...PLAN_IDS] as const;
+export type TierId = (typeof TIER_IDS)[number];
 
 export const BILLING_CYCLES = ["monthly", "yearly"] as const;
 export type BillingCycle = (typeof BILLING_CYCLES)[number];
 
-/** `null` means "no limit". */
+/** How much of each thing a tier allows. `null` means "no limit". */
 export interface PlanLimits {
   /** People in the workspace, counting the owner and invitations that are still open. */
   members: number | null;
-  /** Google Sheets connected to the CRM. */
-  sheets: number | null;
+  /** Projects that are not completed or cancelled. */
+  activeProjects: number | null;
+  clients: number | null;
+  /** Invoices created in a calendar month. */
+  invoicesPerMonth: number | null;
   /** Contracts created in a calendar month. */
   contractsPerMonth: number | null;
+  /** Leads in the CRM. */
+  leads: number | null;
+  /** Google Sheets connected to the CRM (0 = the feature is off). */
+  sheets: number | null;
   /** Total size of uploaded files, in bytes. */
   storageBytes: number | null;
 }
 
-export interface Plan {
-  id: PlanId;
+/** Whole features a tier switches on or off. */
+export interface PlanFeatures {
+  /** Contracts with e-signatures. */
+  contracts: boolean;
+  /** The client portal link on each project. */
+  portal: boolean;
+  /** Expenses and the profit & loss report. */
+  finance: boolean;
+}
+export type PlanFeature = keyof PlanFeatures;
+
+export const FEATURE_NAMES: Record<PlanFeature, string> = {
+  contracts: "Contracts with e-signatures",
+  portal: "The client portal",
+  finance: "Expenses and profit & loss",
+};
+
+export interface Tier {
+  id: TierId;
   name: string;
   tagline: string;
-  /** Price in paise. A year costs ten months. */
-  price: Record<BillingCycle, number>;
+  /** Price in paise; `null` for the Free tier. A year costs ten months. */
+  price: Record<BillingCycle, number> | null;
   limits: PlanLimits;
+  features: PlanFeatures;
   popular?: boolean;
-  /** Shown above the highlights, e.g. "Everything in Solo, plus". */
+  /** Shown above the highlights, e.g. "Everything in Free, plus". */
   includes?: string;
   highlights: string[];
+  /** What this tier does not have (shown struck through on the Free card). */
+  missing?: string[];
 }
 
+/** A tier that is paid for. */
+export type Plan = Tier & { id: PlanId; price: Record<BillingCycle, number> };
+
+const MB = 1024 ** 2;
 const GB = 1024 ** 3;
 
-export const PLANS: Record<PlanId, Plan> = {
-  solo: {
-    id: "solo",
-    name: "Solo",
-    tagline: "For freelancers and consultants.",
-    price: { monthly: 499_00, yearly: 4_990_00 },
-    limits: { members: 1, sheets: 1, contractsPerMonth: 10, storageBytes: 2 * GB },
-    highlights: ["1 user", "Unlimited projects, clients and invoices", "10 contracts with e-sign a month", "Client portal for every project", "CRM with 1 Google Sheet sync", "2 GB file storage"],
+export const TIERS: { free: Tier; growth: Plan; premium: Plan } = {
+  free: {
+    id: "free",
+    name: "Free",
+    tagline: "For trying things out and very small work.",
+    price: null,
+    limits: { members: 1, activeProjects: 3, clients: 10, invoicesPerMonth: 5, contractsPerMonth: 0, leads: 25, sheets: 0, storageBytes: 200 * MB },
+    features: { contracts: false, portal: false, finance: false },
+    highlights: ["1 user", "3 active projects with tasks and milestones", "10 clients", "5 invoices a month, with payment tracking", "CRM for 25 leads", "200 MB file storage"],
+    missing: ["Team members", "Contracts with e-sign", "Client portal", "Expenses and profit & loss", "Google Sheet sync"],
   },
-  team: {
-    id: "team",
-    name: "Team",
-    tagline: "For small agencies that work together.",
+  growth: {
+    id: "growth",
+    name: "Growth",
+    tagline: "For freelancers and small agencies getting busy.",
     price: { monthly: 999_00, yearly: 9_990_00 },
-    limits: { members: 5, sheets: 5, contractsPerMonth: null, storageBytes: 10 * GB },
+    limits: { members: 5, activeProjects: null, clients: null, invoicesPerMonth: null, contractsPerMonth: 15, leads: null, sheets: 2, storageBytes: 10 * GB },
+    features: { contracts: true, portal: true, finance: true },
     popular: true,
-    includes: "Everything in Solo, plus",
-    highlights: ["Up to 5 team members", "Unlimited contracts with e-sign", "5 Google Sheet syncs", "10 GB file storage", "Priority support"],
+    includes: "Everything in Free, plus",
+    highlights: ["Up to 5 team members", "Unlimited projects, clients and invoices", "15 contracts with e-sign a month", "Client portal for every project", "Expenses and profit & loss", "Unlimited leads, 2 Google Sheet syncs", "10 GB file storage"],
   },
-  agency: {
-    id: "agency",
-    name: "Agency",
-    tagline: "For bigger teams with many clients.",
+  premium: {
+    id: "premium",
+    name: "Premium",
+    tagline: "For agencies that want no limits.",
     price: { monthly: 1_999_00, yearly: 19_990_00 },
-    limits: { members: 15, sheets: null, contractsPerMonth: null, storageBytes: 50 * GB },
-    includes: "Everything in Team, plus",
-    highlights: ["Up to 15 team members", "Unlimited Google Sheet syncs", "50 GB file storage", "Priority and WhatsApp support"],
+    limits: { members: null, activeProjects: null, clients: null, invoicesPerMonth: null, contractsPerMonth: null, leads: null, sheets: null, storageBytes: 100 * GB },
+    features: { contracts: true, portal: true, finance: true },
+    includes: "Everything in Growth, with no limits",
+    highlights: ["Unlimited team members", "Unlimited contracts with e-sign", "Unlimited Google Sheet syncs", "100 GB file storage", "Priority support on WhatsApp"],
   },
 };
 
+export const TIER_LIST: Tier[] = TIER_IDS.map((id) => TIERS[id]);
+
+/** The paid plans, by id. */
+export const PLANS: Record<PlanId, Plan> = { growth: TIERS.growth, premium: TIERS.premium };
 export const PLAN_LIST: Plan[] = PLAN_IDS.map((id) => PLANS[id]);
 
-/** What a workspace gets while it is still on its free trial. */
-export const TRIAL_PLAN: PlanId = "team";
+/** What a workspace gets during its free trial: everything. */
+export const TRIAL_PLAN: PlanId = "premium";
 
-export const NO_LIMITS: PlanLimits = { members: null, sheets: null, contractsPerMonth: null, storageBytes: null };
+export const NO_LIMITS: PlanLimits = { members: null, activeProjects: null, clients: null, invoicesPerMonth: null, contractsPerMonth: null, leads: null, sheets: null, storageBytes: null };
+export const ALL_FEATURES: PlanFeatures = { contracts: true, portal: true, finance: true };
 
 /**
  * Where a workspace stands:
- *  - `open`     payments are not switched on yet, so nothing is limited or locked
- *  - `exempt`   a workspace that is never charged
- *  - `trial`    inside the free trial
- *  - `active`   on a paid plan
- *  - `expired`  the trial or the paid period has ended: the app is locked until a plan is bought
+ *  - `open`    payments are not switched on yet, so nothing is limited
+ *  - `exempt`  a workspace that is never charged or limited
+ *  - `trial`   inside the free trial of the top plan
+ *  - `active`  on a paid plan
+ *  - `free`    on the Free tier (the trial is over, or a paid plan has run out)
  */
-export const BILLING_STATUSES = ["open", "exempt", "trial", "active", "expired"] as const;
+export const BILLING_STATUSES = ["open", "exempt", "trial", "active", "free"] as const;
 export type BillingStatus = (typeof BILLING_STATUSES)[number];
 
 export const BILLING_PAYMENT_STATUSES = ["created", "paid", "failed", "expired"] as const;

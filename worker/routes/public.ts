@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -17,7 +18,19 @@ import { rateLimit } from "../middleware/rate-limit";
 import { buildContractDocument, parseSignatureImage, signatureKey, type ContractRow } from "../services/contracts";
 import { buildInvoiceDocument, notifyManagers } from "../services/invoices";
 import { buildPortalData, findPortal, recordPortalView, toCommentDTO } from "../services/portal";
+import { hasFeature } from "../services/billing";
 import type { AppEnv, WorkspaceRow } from "../types";
+
+/**
+ * Resolves a client portal link. The portal is a paid feature: while the workspace is on the Free
+ * tier its links answer as if they did not exist, and work again the moment it upgrades.
+ */
+async function openPortal(c: Context<AppEnv>, token: string) {
+  const portal = await findPortal(c.var.db, token);
+  if (!hasFeature(c.env, portal.workspace, "portal")) throw notFound("Page");
+  return portal;
+}
+
 
 const tokenParam = z.object({ token: z.string().regex(/^[\w-]{21,64}$/) });
 
@@ -234,7 +247,7 @@ export const publicRoutes = new Hono<AppEnv>()
 
   .get("/portal/:token", validate("param", tokenParam), async (c) => {
     const db = c.var.db;
-    const portal = await findPortal(db, c.req.valid("param").token);
+    const portal = await openPortal(c, c.req.valid("param").token);
     const viewerIsTeam = c.var.auth?.workspace?.id === portal.link.workspaceId;
     // The page re-fetches quietly while it stays open (`?refresh=1`); only the first load is a visit.
     if (!viewerIsTeam && c.req.query("refresh") !== "1") c.var.defer(recordPortalView(db, portal.link));
@@ -246,7 +259,7 @@ export const publicRoutes = new Hono<AppEnv>()
   .get("/portal/:token/files/:fileId", validate("param", tokenParam.extend({ fileId: idSchema })), async (c) => {
     const db = c.var.db;
     const { token, fileId } = c.req.valid("param");
-    const { link, project } = await findPortal(db, token);
+    const { link, project } = await openPortal(c, token);
     if (!link.showFiles) throw notFound("File");
     const [file] = await db
       .select()
@@ -281,7 +294,7 @@ export const publicRoutes = new Hono<AppEnv>()
   /** A message from the client. Tighter limit than page views: this writes to the database and notifies people. */
   .post("/portal/:token/comments", rateLimit("AUTH_LIMITER"), validate("param", tokenParam), validate("json", portalCommentSchema), async (c) => {
     const db = c.var.db;
-    const { link, project } = await findPortal(db, c.req.valid("param").token);
+    const { link, project } = await openPortal(c, c.req.valid("param").token);
     if (!link.allowComments) throw new ApiError(403, "comments_off", "Messages are switched off for this project.");
     const input = c.req.valid("json");
     const [row] = await db

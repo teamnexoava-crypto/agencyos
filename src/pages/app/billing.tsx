@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BadgeCheck, Clock, Gift, LoaderCircle, Sparkles, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Clock, Gift, LoaderCircle, Sparkles, Sprout, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { AUTOPAY_GRACE_DAYS, PLANS, TRIAL_DAYS, formatPlanPrice } from "@shared/plans";
 import type { AutoPayDTO, BillingDTO, BillingOverview, BillingPaymentDTO } from "@shared/types";
@@ -30,7 +30,8 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
   const paidUntil = billing.paidUntil ? formatDay(billing.paidUntil) : formatDay(billing.trialEndsAt);
   const price = autoPay ? formatPlanPrice(autoPay.amount) : "The payment";
   const lockDay = formatDay((billing.paidUntil ?? billing.trialEndsAt) + AUTOPAY_GRACE_DAYS * 86_400_000);
-  const retrying = `We couldn't collect ${autoPay ? price : "the payment"}. Razorpay is trying again – look for its message, or a request in your UPI app, and approve it. If it keeps failing the workspace is locked on ${lockDay}; you can also pay for a month below.`;
+  const retrying = `We couldn't collect ${autoPay ? price : "the payment"}. Razorpay is trying again – look for its message, or a request in your UPI app, and approve it. If it keeps failing you move to the Free plan on ${lockDay}; you can also pay for a month below.`;
+  const freeLoses = "team members, contracts, the client portal, finance and Google Sheet sync";
 
   const trial = (): { text: string; tag: string | null; warn?: boolean } => {
     const until = formatDay(billing.trialEndsAt);
@@ -39,7 +40,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
     }
     if (mandate === "retrying") return { text: `Your free trial has ended. ${retrying}`, tag: "Payment failed", warn: true };
     return {
-      text: `Your trial runs until ${until}, with everything in the Team plan. Choose a plan any time – billing only starts when the trial ends, so you lose nothing by choosing early.`,
+      text: `Everything in Premium is unlocked until ${until}. After that you move to the Free plan by yourself – nothing is deleted, but ${freeLoses} switch off until you upgrade. Choose a plan any time: billing only starts when the trial ends.`,
       tag: daysLeft(billing.daysLeft),
     };
   };
@@ -52,15 +53,20 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
     if (mandate === "stopped") {
       return { text: `Auto-pay has stopped – the payment kept failing, or the mandate was paused. Your plan runs until ${paidUntil}. Turn auto-pay on again below, or pay for a month.`, tag: daysLeft(billing.daysLeft), warn: true };
     }
-    return { text: `Paid until ${paidUntil}. Auto-pay is off, so nothing is taken by itself – turn it on below, or pay again before that date.`, tag: daysLeft(billing.daysLeft) };
+    return { text: `Paid until ${paidUntil}. Auto-pay is off, so nothing is taken by itself – turn it on below, or pay again before that date. Otherwise you move to the Free plan then.`, tag: daysLeft(billing.daysLeft) };
   };
 
   const view: { icon: LucideIcon; title: string; text: string; tag: string | null; warn?: boolean } = {
     open: { icon: Sparkles, title: "Everything is unlocked", text: `Online payments are being set up. Once they open, every workspace gets a ${TRIAL_DAYS}-day free trial and you can choose a plan here.`, tag: null },
     exempt: { icon: Gift, title: "This workspace is free", text: "It has full access with no limits and never needs a plan.", tag: null },
-    trial: { icon: Clock, title: "Free trial", ...trial() },
+    trial: { icon: Clock, title: "Premium free trial", ...trial() },
     active: { icon: BadgeCheck, title: `${planName} plan`, ...active() },
-    expired: { icon: Clock, title: "No active plan", text: "Choose a plan below to unlock the workspace.", tag: null },
+    free: {
+      icon: Sprout,
+      title: "Free plan",
+      text: `You have the basics, free for as long as you like. Upgrade to bring back ${freeLoses}, and to lift the limits below.`,
+      tag: null,
+    },
   }[billing.status];
 
   return (
@@ -84,7 +90,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
         open={confirmOff}
         onOpenChange={setConfirmOff}
         title="Turn off auto-pay?"
-        description={`No more payments will be taken. ${billing.status === "trial" ? "Your free trial" : `Your ${planName} plan`} runs until ${paidUntil}; after that the workspace is locked until you pay again.`}
+        description={`No more payments will be taken. ${billing.status === "trial" ? "Your free trial" : `Your ${planName} plan`} runs until ${paidUntil}; after that you move to the Free plan.`}
         confirmLabel="Turn off auto-pay"
         onConfirm={() => {
           setConfirmOff(false);
@@ -96,14 +102,15 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
 }
 
 function Meter({ label, used, limit, format = String }: { label: string; used: number; limit: number | null; format?: (value: number) => string }) {
-  const full = limit !== null && used >= limit;
+  const full = limit !== null && limit > 0 && used >= limit;
   return (
     <div className="rounded-xl border bg-card p-4 shadow-soft">
       <p className="text-[13px] text-muted-foreground">{label}</p>
       <p className={cn("tabular mt-1 text-lg font-semibold tracking-tight", full && "text-amber-700 dark:text-amber-400")}>
-        {format(used)} <span className="text-sm font-normal text-muted-foreground">{limit === null ? "· no limit" : `of ${format(limit)}`}</span>
+        {limit === 0 ? <span className="text-sm font-normal text-muted-foreground">Not in your plan</span> : format(used)}{" "}
+        {limit !== 0 && <span className="text-sm font-normal text-muted-foreground">{limit === null ? "· no limit" : `of ${format(limit)}`}</span>}
       </p>
-      {limit !== null && <Progress value={(used / limit) * 100} label={`${label} used`} full="limit" className="mt-3" />}
+      {limit !== null && limit > 0 && <Progress value={(used / limit) * 100} label={`${label} used`} full="limit" className="mt-3" />}
     </div>
   );
 }
@@ -116,6 +123,10 @@ function Usage({ overview }: { overview: BillingOverview }) {
         What you're using
       </h2>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Meter label="Active projects" used={usage.activeProjects} limit={billing.limits.activeProjects} />
+        <Meter label="Clients" used={usage.clients} limit={billing.limits.clients} />
+        <Meter label="Invoices this month" used={usage.invoicesThisMonth} limit={billing.limits.invoicesPerMonth} />
+        <Meter label="Leads" used={usage.leads} limit={billing.limits.leads} />
         <Meter label="People (with open invites)" used={usage.members} limit={billing.limits.members} />
         <Meter label="Google Sheets connected" used={usage.sheets} limit={billing.limits.sheets} />
         <Meter label="Contracts this month" used={usage.contractsThisMonth} limit={billing.limits.contractsPerMonth} />
@@ -183,7 +194,7 @@ export default function BillingPage() {
   usePaymentResult();
   // The overview is fresher after a payment; the session copy covers the first paint.
   const billing = overview?.billing ?? sessionBilling;
-  const limited = billing.status === "trial" || billing.status === "active";
+  const limited = billing.status === "trial" || billing.status === "active" || billing.status === "free";
 
   return (
     <>
@@ -194,7 +205,7 @@ export default function BillingPage() {
         {/* The plans come straight after the summary: choosing one is what this page is mostly for. */}
         {billing.status !== "exempt" && (
           <section aria-labelledby="plans-heading">
-            <PlanChooser billing={sessionBilling} heading={billing.status === "active" || billing.autoPay ? "Plans" : "Choose a plan"} />
+            <PlanChooser billing={sessionBilling} heading="Plans" />
           </section>
         )}
 

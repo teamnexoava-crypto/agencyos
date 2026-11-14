@@ -13,7 +13,7 @@ import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { rateLimit } from "../middleware/rate-limit";
 import { logActivity, notify } from "../services/activity";
-import { assertSheetAvailable } from "../services/billing";
+import { assertClientAvailable, assertLeadAvailable, assertSheetAvailable } from "../services/billing";
 import { requireMembers } from "../services/members";
 import type { AppEnv } from "../types";
 
@@ -263,6 +263,7 @@ export const crmRoutes = new Hono<AppEnv>()
 
   .post("/leads", validate("json", leadSchema), async (c) => {
     const t = tenant(c);
+    await assertLeadAvailable(t, c.env);
     const input = c.req.valid("json");
     // A member's own lead is theirs; only managers hand leads to other people.
     const assigneeId = t.canSeeFinance ? emptyToNull(input.assigneeId) : t.member.id;
@@ -388,6 +389,7 @@ export const crmRoutes = new Hono<AppEnv>()
   /** Turns a lead into a client (and marks it won), so projects, contracts and invoices can follow. */
   .post("/leads/:id/convert", validate("param", idParam), async (c) => {
     const t = tenant(c);
+    await assertClientAvailable(t, c.env);
     t.requireRole("owner", "admin");
     const lead = await requireLead(t, c.req.valid("param").id);
     if (lead.clientId) throw conflict("This lead is already a client.");
@@ -427,6 +429,7 @@ export const crmRoutes = new Hono<AppEnv>()
   /** Looks at a sheet before connecting it: column names, a few rows and a suggested mapping. */
   .post("/sources/preview", rateLimit("AUTH_LIMITER"), validate("json", sheetPreviewSchema), async (c) => {
     const t = tenant(c);
+    await assertSheetAvailable(t, c.env, false);
     t.requireRole("owner", "admin");
     const { headers, rows } = await fetchSheet(parseSheetUrl(c.req.valid("json").url), c.env.SHEETS_TEST_ORIGIN);
     // Columns without a name can't be mapped, so they are left out of the headers AND of the sample rows.
@@ -494,6 +497,7 @@ export const crmRoutes = new Hono<AppEnv>()
 
   .post("/sources/:id/sync", rateLimit("AUTH_LIMITER"), validate("param", idParam), async (c) => {
     const t = tenant(c);
+    await assertSheetAvailable(t, c.env, false);
     t.requireRole("owner", "admin");
     const source = await requireSource(t, c.req.valid("param").id);
     return c.json(await runSync(t, source, c.env.SHEETS_TEST_ORIGIN));

@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { UpgradeNotice } from "@/features/billing/upgrade-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -203,6 +204,7 @@ export default function ContractsPage() {
           </Button>
         }
       />
+      <UpgradeNotice feature="contracts" banner />
       <Tabs value={tab} onValueChange={(value) => setSearchParams(value === "templates" ? { tab: "templates" } : {}, { replace: true })}>
         <TabsList aria-label="Contract sections">
           <TabsTrigger value="contracts">

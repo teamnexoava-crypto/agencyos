@@ -10,6 +10,7 @@ import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { projectVisibility } from "../services/projects";
 import { monthlySeries, outstandingBalance } from "../services/reports";
+import { assertFeature } from "../services/billing";
 import type { AppEnv } from "../types";
 
 const plusDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -165,6 +166,7 @@ export const reportRoutes = new Hono<AppEnv>()
   /** Profit & loss for a date range: by month, project, client and expense category. Owner/admin only. */
   .get("/pnl", validate("query", dateRangeSchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "finance");
     t.requireRole("owner", "admin");
     const range = c.req.valid("query");
     const paidInRange = t.where(payments, gte(payments.date, range.from), lte(payments.date, range.to));

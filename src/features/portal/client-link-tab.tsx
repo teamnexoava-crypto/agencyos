@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsLocked } from "@/features/billing/locked";
+import { UpgradeNotice } from "@/features/billing/upgrade-notice";
 import { useClient } from "@/features/clients/api";
 import { errorMessage } from "@/lib/api";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -136,7 +138,9 @@ export function ClientLinkTab({ project }: { project: ProjectDetail }) {
   const save = useSaveShareLink(project.id);
   const regenerate = useRegenerateShareLink(project.id);
   const [confirmReset, setConfirmReset] = useState(false);
+  const locked = useIsLocked("portal");
 
+  if (locked) return <UpgradeNotice feature="portal" />;
   if (isError) return <ErrorState onRetry={() => void refetch()} />;
   if (isPending) return <Skeleton className="h-64 rounded-2xl" role="status" aria-label="Loading client link" />;
 

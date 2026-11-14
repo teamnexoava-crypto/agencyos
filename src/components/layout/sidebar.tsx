@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from "motion/react";
-import { PanelLeft } from "lucide-react";
+import { Lock, PanelLeft } from "lucide-react";
 import { NavLink } from "react-router";
 import { WorkspaceLogo } from "@/components/shared/workspace-logo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from "@/features/auth/api";
+import { useBilling } from "@/features/billing/api";
 import { cn } from "@/lib/utils";
 import { BILLING_ITEM, SETTINGS_ITEM, canAccess, navForRole, type NavItem } from "./nav";
 
@@ -19,6 +20,8 @@ interface SidebarNavProps {
 
 function SidebarLink({ item, collapsed, instance, onNavigate }: SidebarNavProps & { item: NavItem }) {
   const Icon = item.icon;
+  const { features } = useBilling();
+  const locked = item.feature !== undefined && !features[item.feature];
   const link = (
     <NavLink
       to={item.to}
@@ -47,6 +50,7 @@ function SidebarLink({ item, collapsed, instance, onNavigate }: SidebarNavProps 
           )}
           <Icon className={cn("relative size-[18px] shrink-0", isActive && "text-primary")} />
           {!collapsed && <span className="relative truncate">{item.label}</span>}
+          {!collapsed && locked && <Lock className="relative ml-auto size-3.5 shrink-0 text-muted-foreground" aria-label="Not in your plan" />}
         </>
       )}
     </NavLink>

@@ -13,7 +13,7 @@ import { cleanFileName, sniffProjectFile } from "../lib/uploads";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
-import { assertStorageAvailable } from "../services/billing";
+import { assertFeature, assertStorageAvailable } from "../services/billing";
 import { toCommentDTO } from "../services/portal";
 import { requireProject } from "../services/projects";
 import type { AppEnv } from "../types";
@@ -180,6 +180,7 @@ export const projectPortalRoutes = new Hono<AppEnv>()
   /** Creates the link the first time, then updates what it shows. Switching it off makes the URL 404 without losing it. */
   .put("/:projectId/share", validate("param", projectParam), validate("json", shareLinkSchema), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "portal");
     t.requireRole("owner", "admin");
     const project = await requireProject(t, c.req.valid("param").projectId);
     const input = c.req.valid("json");
@@ -195,6 +196,7 @@ export const projectPortalRoutes = new Hono<AppEnv>()
   /** New URL; the old one stops working at once. */
   .post("/:projectId/share/regenerate", validate("param", projectParam), async (c) => {
     const t = tenant(c);
+    assertFeature(t, c.env, "portal");
     t.requireRole("owner", "admin");
     const project = await requireProject(t, c.req.valid("param").projectId);
     const [row] = await t.db

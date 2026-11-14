@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
-import { PLANS, formatPlanPrice, type BillingCycle, type Plan, type PlanId } from "@shared/plans";
+import { PLANS, formatPlanPrice, type BillingCycle, type Plan, type PlanId, type Tier } from "@shared/plans";
 import type { BillingDTO, PendingSetupDTO } from "@shared/types";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -70,8 +70,9 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
   const hasMandate = current.autoPay === "on" || current.autoPay === "retrying";
   const canPay = current.enabled && current.status !== "exempt";
   const autoPay = cycle === "monthly" && !monthByMonth;
-  // The plan the workspace is on (or, during the trial, the one auto-pay is set up for).
-  const activePlan = mandatePlan ?? onPlan;
+  // What the workspace is on: its paid plan (or, during the trial, the one auto-pay is set up for), or Free.
+  const activeTier = mandatePlan ?? onPlan ?? (current.status === "free" ? "free" : null);
+  const isPaid = (tier: Tier): tier is Plan => tier.price !== null;
   // Stays busy after a one-off checkout succeeds: the browser is on its way to the payment page.
   const busy = checkout.isPending || checkout.isSuccess || subscribe.isPending;
 
@@ -144,7 +145,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
 
   const label = (plan: Plan) => {
     if (!autoPay) return `Pay ${formatPlanPrice(plan.price[cycle])} for 1 ${cycle === "yearly" ? "year" : "month"}`;
-    return onPlan || mandatePlan ? `Switch to ${plan.name}` : `Choose ${plan.name}`;
+    return onPlan || mandatePlan ? `Switch to ${plan.name}` : `Upgrade to ${plan.name}`;
   };
 
   return (
@@ -168,28 +169,41 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
       <PlanCards
         cycle={cycle}
         className={heading ? "mt-7" : "mt-8"}
-        badge={(plan) => (plan.id === activePlan ? "Your plan" : null)}
-        action={(plan) =>
-          // In the auto-pay view the current plan is simply "Active"; with one-off payments the same
-          // button extends it by a month or a year.
-          autoPay && plan.id === activePlan ? (
-            <div className="grid gap-1.5">
+        badge={(tier) => (tier.id === activeTier ? "Your plan" : null)}
+        action={(tier) => {
+          if (!isPaid(tier)) {
+            // Free is where a workspace lands by itself; there is nothing to buy.
+            return tier.id === activeTier ? (
               <Button variant="secondary" disabled className="w-full disabled:opacity-100">
                 <Check className="text-emerald-600 dark:text-emerald-400" /> Active
               </Button>
-              {!mandatePlan && canPay && (
-                <button type="button" disabled={busy} className="text-[13px] font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50" onClick={() => choose(plan)}>
-                  Turn on auto-pay
-                </button>
-              )}
-            </div>
-          ) : (
-            <Button variant={plan.popular ? "default" : "outline"} disabled={!canPay || busy} onClick={() => choose(plan)}>
-              {busy && chosen === plan.id && <LoaderCircle className="animate-spin" />}
-              {label(plan)}
+            ) : (
+              <p className="flex h-9 items-center justify-center text-center text-[13px] text-muted-foreground">{current.status === "trial" ? "Yours after the trial, if you don't upgrade" : "Yours if your plan ends"}</p>
+            );
+          }
+          // In the auto-pay view the current plan is simply "Active"; with one-off payments the same
+          // button extends it by a month or a year.
+          if (autoPay && tier.id === activeTier) {
+            return (
+              <div className="grid gap-1.5">
+                <Button variant="secondary" disabled className="w-full disabled:opacity-100">
+                  <Check className="text-emerald-600 dark:text-emerald-400" /> Active
+                </Button>
+                {!mandatePlan && canPay && (
+                  <button type="button" disabled={busy} className="text-[13px] font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50" onClick={() => choose(tier)}>
+                    Turn on auto-pay
+                  </button>
+                )}
+              </div>
+            );
+          }
+          return (
+            <Button variant={tier.popular ? "default" : "outline"} disabled={!canPay || busy} onClick={() => choose(tier)}>
+              {busy && chosen === tier.id && <LoaderCircle className="animate-spin" />}
+              {label(tier)}
             </Button>
-          )
-        }
+          );
+        }}
       />
       <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] text-balance text-muted-foreground">
         {!canPay ? (

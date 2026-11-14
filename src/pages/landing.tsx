@@ -21,8 +21,10 @@ import { BrandLogo, GoogleIcon } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/features/auth/api";
+import { DemoVideo } from "@/features/landing/demo-video";
 import { Pricing } from "@/features/landing/pricing";
 import { cn } from "@/lib/utils";
+import { DEMO_VIDEO_ID } from "@shared/constants";
 import { TRIAL_DAYS } from "@shared/plans";
 
 const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
@@ -306,8 +308,8 @@ const STEPS = [
 
 const FAQS = [
   {
-    q: "Is there a free trial?",
-    a: `Yes. Every new workspace gets ${TRIAL_DAYS} days with everything unlocked, and no card is needed to start. After that you choose a plan to keep working; your data stays safe either way.`,
+    q: "Is it really free?",
+    a: `Yes. When you sign in you get ${TRIAL_DAYS} days of Premium with everything unlocked, and no card is needed. After that you move to the Free plan by yourself and can stay on it for as long as you like: projects, clients, invoices and a small CRM for one person. Team members, contracts, the client portal, finance and Google Sheet sync are on the paid plans. Nothing you made is ever deleted.`,
   },
   {
     q: "How do I pay?",
@@ -387,13 +389,23 @@ export default function LandingPage() {
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <GetStarted signedIn={signedIn} />
-              <span className="text-[13px] text-muted-foreground">{TRIAL_DAYS}-day free trial · No card needed</span>
+              <span className="text-[13px] text-muted-foreground">Free plan forever · {TRIAL_DAYS} days of Premium to start · No card</span>
             </motion.div>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }} className="mt-14 sm:mt-20">
             <DashboardMock />
           </motion.div>
         </section>
+
+        {/* Walkthrough video (shown once a video id is set) */}
+        {DEMO_VIDEO_ID && (
+          <section id="video" className="mx-auto max-w-6xl scroll-mt-20 px-5 pb-20 sm:px-8 sm:pb-28">
+            <SectionHeading eyebrow="Watch first" title="Why I built this, and who it's for" text="A few minutes on the problem, and a walk through the whole thing with a real client from first enquiry to final payment." />
+            <Reveal className="mt-10">
+              <DemoVideo />
+            </Reveal>
+          </section>
+        )}
 
         {/* Features */}
         <section id="features" className="scroll-mt-20 border-t bg-muted/30 py-20 sm:py-28">
@@ -459,7 +471,7 @@ export default function LandingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
-          <SectionHeading eyebrow="Pricing" title="Simple pricing that grows with you" text={`Try everything free for ${TRIAL_DAYS} days. Then one flat price per workspace – no per-user surprises.`} />
+          <SectionHeading eyebrow="Pricing" title="Start free. Upgrade when you're ready." text={`Every new account gets ${TRIAL_DAYS} days of Premium. Then stay on Free, or pick one flat price per workspace – no per-user surprises.`} />
           <Pricing signedIn={signedIn} />
         </section>
 

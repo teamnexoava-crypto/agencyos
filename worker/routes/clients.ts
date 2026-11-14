@@ -12,6 +12,7 @@ import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
 import { clientBillingTotals } from "../services/invoices";
 import { listProjectSummaries } from "../services/projects";
+import { assertClientAvailable } from "../services/billing";
 import type { AppEnv } from "../types";
 
 type ClientRow = typeof clients.$inferSelect;
@@ -76,6 +77,7 @@ export const clientRoutes = new Hono<AppEnv>()
 
   .post("/", validate("json", clientSchema), async (c) => {
     const t = tenant(c);
+    await assertClientAvailable(t, c.env);
     const input = c.req.valid("json");
     const [row] = await t.db
       .insert(clients)

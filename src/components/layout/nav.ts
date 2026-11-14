@@ -1,5 +1,6 @@
 import { CreditCard, FileSignature, FolderKanban, LayoutDashboard, ReceiptText, Settings, UserRoundSearch, Users, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import type { Role } from "@shared/constants";
+import type { PlanFeature } from "@shared/plans";
 
 export interface NavItem {
   label: string;
@@ -9,6 +10,8 @@ export interface NavItem {
   end?: boolean;
   /** Restrict to these roles; omitted = everyone. */
   roles?: readonly Role[];
+  /** Shown with a lock when the workspace's plan does not include this feature. */
+  feature?: PlanFeature;
   keywords?: string;
 }
 
@@ -37,8 +40,8 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Money",
     items: [
       { label: "Invoices", to: "/app/invoices", icon: ReceiptText, roles: MANAGERS, keywords: "billing payments gst" },
-      { label: "Finance", to: "/app/finance", icon: Wallet, roles: MANAGERS, keywords: "expenses profit loss p&l reports" },
-      { label: "Contracts", to: "/app/contracts", icon: FileSignature, roles: MANAGERS, keywords: "agreements e-sign signature" },
+      { label: "Finance", to: "/app/finance", icon: Wallet, roles: MANAGERS, feature: "finance", keywords: "expenses profit loss p&l reports" },
+      { label: "Contracts", to: "/app/contracts", icon: FileSignature, roles: MANAGERS, feature: "contracts", keywords: "agreements e-sign signature" },
     ],
   },
 ];

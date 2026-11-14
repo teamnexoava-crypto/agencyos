@@ -17,7 +17,7 @@ import type {
   StepStatus,
   TaxMode,
 } from "./constants";
-import type { AutoPayState, BillingCycle, BillingPaymentStatus, BillingStatus, PlanId, PlanLimits } from "./plans";
+import type { AutoPayState, BillingCycle, BillingPaymentStatus, BillingStatus, PlanFeatures, PlanId, PlanLimits, TierId } from "./plans";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -84,7 +84,10 @@ export interface BillingDTO {
   daysLeft: number | null;
   /** Monthly auto-pay, if one is set up: charging normally, retrying a failed charge, or stopped. */
   autoPay: AutoPayState | null;
+  /** What the workspace gets right now: the top plan during the trial, its paid plan, or Free. */
+  tier: TierId;
   limits: PlanLimits;
+  features: PlanFeatures;
 }
 
 /** The auto-pay mandate that currently pays for the workspace. */
@@ -124,6 +127,10 @@ export interface BillingPaymentDTO {
 
 export interface BillingUsage {
   members: number;
+  activeProjects: number;
+  clients: number;
+  invoicesThisMonth: number;
+  leads: number;
   sheets: number;
   contractsThisMonth: number;
   storageBytes: number;
