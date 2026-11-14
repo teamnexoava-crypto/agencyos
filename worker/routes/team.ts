@@ -12,6 +12,7 @@ import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
+import { assertSeatAvailable } from "../services/billing";
 import { listProjectSummaries, toStepDTO, toTaskDTO } from "../services/projects";
 import type { AppEnv } from "../types";
 
@@ -249,6 +250,8 @@ export const teamRoutes = new Hono<AppEnv>()
       .where(t.where(workspaceMembers, eq(users.email, input.email), isNull(workspaceMembers.removedAt)))
       .limit(1);
     if (existing) throw new ApiError(409, "already_member", "That person is already in this workspace.", { email: "Already a member of this workspace" });
+
+    await assertSeatAvailable(t, c.env, input.email);
 
     // One live invite per address: sending again replaces the earlier link.
     await t.db

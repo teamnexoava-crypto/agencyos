@@ -275,7 +275,8 @@ export const workspaceRoutes = new Hono<AppEnv>()
    * it with ON DELETE CASCADE).
    */
   .delete("/", validate("json", deleteWorkspaceSchema), async (c) => {
-    const t = tenant(c);
+    // Still allowed after a trial or plan has ended: people must always be able to remove their data.
+    const t = tenant(c, { allowLocked: true });
     t.requireRole("owner");
     if (c.req.valid("json").confirmName.trim() !== t.workspace.name) {
       throw new ApiError(400, "validation_error", "The name doesn't match.", { confirmName: "Type the workspace name exactly" });

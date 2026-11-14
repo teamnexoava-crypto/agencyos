@@ -14,8 +14,8 @@
  *    database owner (which bypasses RLS), while Supabase's auto-generated Data API (anon /
  *    authenticated roles) is denied everything. Never add a table without `.enableRLS()`.
  */
-import { relations } from "drizzle-orm";
-import { bigint, boolean, date, doublePrecision, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import { bigint, boolean, date, doublePrecision, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   ACTIVITY_TYPES,
   COMMENT_AUTHOR_TYPES,
@@ -37,6 +37,7 @@ import {
   STEP_STATUSES,
   TAX_MODES,
 } from "../../shared/constants";
+import { BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PLAN_IDS, TRIAL_DAYS } from "../../shared/plans";
 import { newId } from "../lib/ids";
 
 /* ------------------------------------------------------------------------------------------------
@@ -122,9 +123,50 @@ export const workspaces = pgTable("workspaces", {
   waInviteTemplate: text(),
 
   onboardedAt: timestamp({ withTimezone: true, mode: "date" }),
+
+  // Subscription (see shared/plans.ts and worker/services/billing.ts)
+  /** The free trial runs until this moment. */
+  trialEndsAt: timestamp({ withTimezone: true, mode: "date" })
+    .notNull()
+    .default(sql.raw(`now() + interval '${TRIAL_DAYS} days'`)),
+  /** The plan last paid for; NULL until the first payment. */
+  plan: text({ enum: PLAN_IDS }),
+  /** The paid plan is valid until this moment. */
+  paidUntil: timestamp({ withTimezone: true, mode: "date" }),
+  /** Never charged and never locked (e.g. the product owner's own workspace). */
+  billingExempt: boolean().notNull().default(false),
+
   ...timestamps(),
   deletedAt: deletedAt(),
 }).enableRLS();
+
+/** One attempt to pay for a plan. A row is created when checkout starts and settled when Razorpay confirms it. */
+export const billingPayments = pgTable(
+  "billing_payments",
+  {
+    id: id(),
+    workspaceId: workspaceRef(),
+    plan: text({ enum: PLAN_IDS }).notNull(),
+    cycle: text({ enum: BILLING_CYCLES }).notNull(),
+    /** Amount charged, in paise. */
+    amount: bigint({ mode: "number" }).notNull(),
+    currency: text().notNull().default("INR"),
+    status: text({ enum: BILLING_PAYMENT_STATUSES }).notNull().default("created"),
+    /** Razorpay payment link id (plink_…) and the page the payer is sent to. */
+    providerLinkId: text(),
+    providerLinkUrl: text(),
+    /** Razorpay payment id (pay_…), once paid. */
+    providerPaymentId: text(),
+    /** The stretch of time this payment bought, filled in when it is settled. */
+    periodStart: timestamp({ withTimezone: true, mode: "date" }),
+    periodEnd: timestamp({ withTimezone: true, mode: "date" }),
+    paidAt: timestamp({ withTimezone: true, mode: "date" }),
+    createdBy: text().references((): AnyPgColumn => workspaceMembers.id, { onDelete: "set null" }),
+    createdByName: text().notNull(),
+    ...timestamps(),
+  },
+  (t) => [index("billing_payments_ws_idx").on(t.workspaceId, t.createdAt), uniqueIndex("billing_payments_link_uq").on(t.providerLinkId)],
+).enableRLS();
 
 export const sessions = pgTable(
   "sessions",

@@ -1,4 +1,4 @@
-import { FileSignature, FolderKanban, LayoutDashboard, ReceiptText, Settings, UserRoundSearch, Users, UsersRound, Wallet, type LucideIcon } from "lucide-react";
+import { CreditCard, FileSignature, FolderKanban, LayoutDashboard, ReceiptText, Settings, UserRoundSearch, Users, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import type { Role } from "@shared/constants";
 
 export interface NavItem {
@@ -51,6 +51,14 @@ export const SETTINGS_ITEM: NavItem = {
   keywords: "workspace branding tax templates",
 };
 
+export const BILLING_ITEM: NavItem = {
+  label: "Billing",
+  to: "/app/billing",
+  icon: CreditCard,
+  roles: MANAGERS,
+  keywords: "plan subscription trial payment upgrade renew",
+};
+
 export function navForRole(role: Role): NavSection[] {
   return NAV_SECTIONS.map((section) => ({
     ...section,
@@ -64,5 +72,5 @@ export function canAccess(item: NavItem, role: Role): boolean {
 
 export function allNavItems(role: Role): NavItem[] {
   const items = navForRole(role).flatMap((section) => section.items);
-  return canAccess(SETTINGS_ITEM, role) ? [...items, SETTINGS_ITEM] : items;
+  return canAccess(SETTINGS_ITEM, role) ? [...items, BILLING_ITEM, SETTINGS_ITEM] : items;
 }

@@ -9,6 +9,7 @@ import { requireUser } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { rateLimit } from "../middleware/rate-limit";
 import { notify } from "../services/activity";
+import { hasSeatFor } from "../services/billing";
 import { logoUrlFromKey } from "../services/workspaces";
 import type { AppEnv } from "../types";
 
@@ -84,6 +85,12 @@ export const inviteRoutes = new Hono<AppEnv>()
     }
     if (invite.email.toLowerCase() !== auth.user.email.toLowerCase()) {
       throw new ApiError(403, "email_mismatch", `This invite was sent to ${invite.email}, but you're signed in as ${auth.user.email}.`);
+    }
+
+    // The plan may have changed since the invitation was sent, so the seat is checked again here.
+    const alreadyIn = await db.$count(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, auth.user.id), isNull(workspaceMembers.removedAt)));
+    if (alreadyIn === 0 && !(await hasSeatFor(db, c.env, workspace))) {
+      throw new ApiError(403, "plan_limit", `${workspace.name} has no free seats on its plan. Ask the person who invited you to upgrade.`);
     }
 
     const memberId = await db.transaction(async (tx) => {

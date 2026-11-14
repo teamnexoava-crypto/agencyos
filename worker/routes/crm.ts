@@ -13,6 +13,7 @@ import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { rateLimit } from "../middleware/rate-limit";
 import { logActivity, notify } from "../services/activity";
+import { assertSheetAvailable } from "../services/billing";
 import { requireMembers } from "../services/members";
 import type { AppEnv } from "../types";
 
@@ -451,6 +452,7 @@ export const crmRoutes = new Hono<AppEnv>()
       .where(t.where(leadSources, eq(leadSources.sheetId, ref.sheetId), eq(leadSources.gid, ref.gid)))
       .limit(1);
     if (existing && existing.deletedAt === null) throw new ApiError(409, "conflict", "This sheet is already connected.", { url: "This sheet is already connected" });
+    await assertSheetAvailable(t, c.env);
     if ((await t.db.$count(leadSources, t.where(leadSources, isNull(leadSources.deletedAt)))) >= 20) throw conflict("You can connect up to 20 sheets. Disconnect one first.");
 
     const [source] = existing

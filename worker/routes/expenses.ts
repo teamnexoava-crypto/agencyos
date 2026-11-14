@@ -13,6 +13,7 @@ import { cleanFileName, sniffReceipt } from "../lib/uploads";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
+import { assertStorageAvailable } from "../services/billing";
 import { requireProject } from "../services/projects";
 import type { AppEnv } from "../types";
 
@@ -213,6 +214,7 @@ export const expenseRoutes = new Hono<AppEnv>()
       const kind = sniffReceipt(bytes);
       if (!kind) throw new ApiError(415, "unsupported_type", "Upload an image (PNG, JPEG, WebP) or a PDF.");
 
+      await assertStorageAvailable(t, c.env, bytes.byteLength);
       const key = `ws/${t.workspaceId}/receipts/${newId()}.${kind.ext}`;
       await c.env.BUCKET.put(key, bytes, { httpMetadata: { contentType: kind.mime } });
       const [stored] = await t.db

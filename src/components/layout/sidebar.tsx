@@ -5,7 +5,7 @@ import { WorkspaceLogo } from "@/components/shared/workspace-logo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from "@/features/auth/api";
 import { cn } from "@/lib/utils";
-import { SETTINGS_ITEM, canAccess, navForRole, type NavItem } from "./nav";
+import { BILLING_ITEM, SETTINGS_ITEM, canAccess, navForRole, type NavItem } from "./nav";
 
 export const SIDEBAR_WIDTH = 256;
 export const SIDEBAR_COLLAPSED_WIDTH = 72;
@@ -96,6 +96,7 @@ export function SidebarNav({ collapsed, instance, onNavigate }: SidebarNavProps)
 
       {canAccess(SETTINGS_ITEM, role) && (
         <div className="shrink-0 border-t border-sidebar-border px-3 py-3">
+          <SidebarLink item={BILLING_ITEM} collapsed={collapsed} instance={instance} onNavigate={onNavigate} />
           <SidebarLink item={SETTINGS_ITEM} collapsed={collapsed} instance={instance} onNavigate={onNavigate} />
         </div>
       )}

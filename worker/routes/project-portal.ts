@@ -13,6 +13,7 @@ import { cleanFileName, sniffProjectFile } from "../lib/uploads";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
+import { assertStorageAvailable } from "../services/billing";
 import { toCommentDTO } from "../services/portal";
 import { requireProject } from "../services/projects";
 import type { AppEnv } from "../types";
@@ -111,6 +112,7 @@ export const projectPortalRoutes = new Hono<AppEnv>()
       const kind = sniffProjectFile(bytes, file.name);
       if (!kind) throw new ApiError(415, "unsupported_type", "That file type isn't supported. Upload images, PDFs, Office documents, ZIP archives, text files, videos or design files.");
 
+      await assertStorageAvailable(t, c.env, bytes.byteLength);
       const key = `ws/${t.workspaceId}/projects/${project.id}/${newId()}.${kind.ext}`;
       await c.env.BUCKET.put(key, bytes, { httpMetadata: { contentType: kind.mime } });
       const [row] = await t.db

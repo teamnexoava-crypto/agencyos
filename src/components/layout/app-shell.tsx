@@ -3,6 +3,9 @@ import { motion } from "motion/react";
 import { useLocation, useNavigation } from "react-router";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useBilling } from "@/features/billing/api";
+import { BillingBanner } from "@/features/billing/billing-banner";
+import { Paywall } from "@/features/billing/paywall";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { PageTransition } from "./page-transition";
 import { QuickNav } from "./quick-nav";
@@ -22,6 +25,7 @@ export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const navigation = useNavigation();
+  const billing = useBilling();
 
   // Keyboard shortcuts: ⌘K / Ctrl+K → search, "[" → toggle sidebar.
   useEffect(() => {
@@ -43,6 +47,9 @@ export function AppShell() {
   }, [location.pathname]);
 
   const sidebarOffset = isDesktop ? (collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH) : 0;
+
+  // Trial or plan over: nothing in the app works until a plan is chosen, so show only that.
+  if (billing.status === "expired") return <Paywall />;
 
   return (
     <div className="min-h-dvh bg-background print:min-h-0 print:bg-white">
@@ -76,6 +83,7 @@ export function AppShell() {
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className="flex min-h-dvh min-w-0 flex-col print:min-h-0 print:!pl-0"
       >
+        <BillingBanner />
         <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} onOpenSearch={() => setSearchOpen(true)} />
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-10 print:max-w-none print:p-0">
           <PageTransition />

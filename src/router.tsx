@@ -105,6 +105,7 @@ export const router = createBrowserRouter([
                   { path: "contracts", lazy: page(() => import("@/pages/app/contracts")) },
                   { path: "contracts/:contractId", lazy: page(() => import("@/pages/app/contract-detail")) },
                   { path: "settings", lazy: page(() => import("@/pages/app/settings")) },
+                  { path: "billing", lazy: page(() => import("@/pages/app/billing")) },
                 ],
               },
               { path: "*", element: <NotFoundPage /> },

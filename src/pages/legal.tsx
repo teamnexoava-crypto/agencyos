@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { TRIAL_DAYS } from "@shared/plans";
 import { BrandLogo } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -101,6 +102,7 @@ export function PrivacyPage() {
           <li>Cloudflare – application hosting, file storage and network security.</li>
           <li>Supabase – the database (hosted in Mumbai, India).</li>
           <li>Google – sign-in.</li>
+          <li>Razorpay – payments for your plan. We never see or store your card, UPI or bank details.</li>
         </ul>
         <p>
           Anything you choose to share through a public link (an invoice, a contract or a project page) is visible to whoever has that
@@ -178,6 +180,29 @@ export function TermsPage() {
         <p>
           GrowUpliftOS provides tools to create documents and collect signatures; it does not provide legal, tax or accounting advice. You
           are responsible for making sure your documents and tax calculations meet the requirements that apply to you.
+        </p>
+      </section>
+
+      <section id="plans">
+        <h2>Free trial, plans and payments</h2>
+        <p>
+          Every new workspace can use GrowUpliftOS free for {TRIAL_DAYS} days. To keep using it after that, the workspace needs a paid plan.
+          Plans are paid in advance for one month or one year, in Indian rupees, through Razorpay. There is no automatic renewal or
+          auto-debit: a plan simply runs until the date shown on your Billing page, and you choose whether to extend it.
+        </p>
+        <p>
+          When a trial or plan ends, the workspace is locked until a plan is bought. Your data is kept, links you already shared with
+          clients keep working, and you can still delete the workspace. Prices and plan limits are shown on the pricing page and may
+          change for future periods; a period you have already paid for is not affected.
+        </p>
+      </section>
+
+      <section id="refunds">
+        <h2>Cancellations and refunds</h2>
+        <p>
+          You can stop at any time by not renewing; nothing further is charged. Because the free trial lets you try everything first,
+          payments for a period that has started are not refunded. If you were charged twice or charged by mistake, write to us within
+          7 days and we will refund the extra amount to the original payment method, normally within 5–7 working days.
         </p>
       </section>
 

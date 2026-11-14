@@ -120,6 +120,40 @@ public/_headers         Security headers + caching for the SPA and static assets
 wrangler.jsonc          Worker config: Hyperdrive, R2, KV bindings, required secrets
 ```
 
+## Trial, plans and payments
+
+Every new workspace gets a 7-day trial (`TRIAL_DAYS`); after that it needs a paid plan or it is locked.
+Prices, limits and plan names live in one file, `shared/plans.ts`, which the landing page, the Billing
+screen and the server-side limits all read.
+
+- **State is computed, not scheduled.** `billingOf()` (`worker/services/billing.ts`) works out
+  `open / exempt / trial / active / expired` from three columns on the workspace (`trial_ends_at`,
+  `plan`, `paid_until`) on every request. There is no job that has to expire anyone.
+- **The lock lives in `tenant()`.** An expired workspace gets `402 subscription_required` from every
+  workspace route except billing and "delete workspace" (the routes that pass `allowLocked`). Public
+  client links (invoice, contract, portal) keep working so an agency's clients are never affected.
+- **Limits** (people, connected sheets, contracts per month, storage) are checked where the thing is
+  created; the trial has the Team plan's limits.
+- **Payments are prepaid, with no auto-debit.** Checkout creates a Razorpay Payment Link for the
+  server-side price and redirects to Razorpay's hosted page, so no payment script runs in the app and
+  the content security policy is unchanged. Renewing adds to the paid time; switching plans converts
+  unused time at the old price into days at the new one (`nextPaidPeriod`).
+- **Nothing from the browser is trusted.** The return address and the webhook only say "look at this
+  payment link"; `settlePayment()` then reads the link from Razorpay with our keys and activates the
+  plan only if it is paid in full, in INR, for our reference. It is idempotent (row lock), so the
+  redirect, the webhook and the Billing page's own re-check can all arrive for the same payment.
+- `billing_exempt = true` on a workspace means it is never charged or locked.
+
+**Switching payments on** (until then the status is `open`: nothing is limited, locked or chargeable):
+
+1. Razorpay Dashboard → Account & Settings → API keys → generate a key. Add `RAZORPAY_KEY_ID` and
+   `RAZORPAY_KEY_SECRET` as secrets on the Worker (dashboard → Settings → Variables and Secrets).
+2. Razorpay Dashboard → Developers → Webhooks → add `https://<your-domain>/api/webhooks/razorpay`,
+   choose a secret, tick the `payment_link.paid` event, and save the same secret on the Worker as
+   `RAZORPAY_WEBHOOK_SECRET`. (Without the webhook, payments are still confirmed when the payer
+   returns or opens Billing; the webhook covers a closed tab.)
+3. Use test keys first: pay with Razorpay's test UPI/card and check that Billing shows the plan.
+
 ## How it is secured
 
 - **Tenancy.** Every business table has `workspace_id`. Handlers never read a workspace id from the

@@ -3,6 +3,7 @@ import { and, eq, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { FINANCE_ROLES, type Role } from "../../shared/constants";
 import type { AppEnv, AuthContext, WorkspaceContext } from "../types";
+import { billingOf, subscriptionRequired } from "../services/billing";
 import { forbidden, unauthorized } from "./errors";
 
 /** Returns the authenticated caller or throws 401. */
@@ -22,12 +23,17 @@ export function requireUser(c: Context<AppEnv>): AuthContext {
  *   const t = tenant(c);
  *   const rows = await t.db.select().from(clients).where(t.where(clients, isNull(clients.deletedAt)));
  *   await t.db.insert(clients).values({ ...input, workspaceId: t.workspaceId });
+ *
+ * It is also where an ended trial or plan is enforced, so no route can forget that either.
  */
-export function tenant(c: Context<AppEnv>) {
+export function tenant(c: Context<AppEnv>, options: { allowLocked?: boolean } = {}) {
   const auth = requireUser(c);
   if (!auth.workspace || !auth.member) {
     throw forbidden("You are not a member of any workspace.", "no_workspace");
   }
+  // Once the trial or the paid plan has run out, the only things that still work are paying for a
+  // plan and deleting the workspace (the routes that pass `allowLocked`).
+  if (!options.allowLocked && billingOf(c.env, auth.workspace).status === "expired") throw subscriptionRequired(auth.workspace);
   const ctx: WorkspaceContext = { ...auth, workspace: auth.workspace, member: auth.member, role: auth.member.role };
   const workspaceId = ctx.workspace.id;
 

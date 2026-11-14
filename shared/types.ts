@@ -17,6 +17,7 @@ import type {
   StepStatus,
   TaxMode,
 } from "./constants";
+import type { BillingCycle, BillingPaymentStatus, BillingStatus, PlanId, PlanLimits } from "./plans";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -64,8 +65,51 @@ export interface MeResponse {
   /** `null` when the user has been removed from every workspace. */
   workspace: WorkspaceDTO | null;
   membership: MembershipDTO | null;
+  /** Trial / plan state of the workspace; `null` when there is no workspace. */
+  billing: BillingDTO | null;
   /** Must be echoed in the `X-CSRF-Token` header on every state-changing request. */
   csrfToken: string;
+}
+
+/** Where a workspace stands with its trial and plan. */
+export interface BillingDTO {
+  /** False until online payments are switched on: nothing is limited or locked. */
+  enabled: boolean;
+  status: BillingStatus;
+  /** The plan last paid for; `null` before the first payment. */
+  plan: PlanId | null;
+  trialEndsAt: number;
+  paidUntil: number | null;
+  /** Whole days left in the trial or the paid period; `null` when neither is running. */
+  daysLeft: number | null;
+  limits: PlanLimits;
+}
+
+export interface BillingPaymentDTO {
+  id: string;
+  plan: PlanId;
+  cycle: BillingCycle;
+  /** Paise. */
+  amount: number;
+  status: BillingPaymentStatus;
+  createdAt: number;
+  paidAt: number | null;
+  periodStart: number | null;
+  periodEnd: number | null;
+  paidBy: string;
+}
+
+export interface BillingUsage {
+  members: number;
+  sheets: number;
+  contractsThisMonth: number;
+  storageBytes: number;
+}
+
+export interface BillingOverview {
+  billing: BillingDTO;
+  usage: BillingUsage;
+  payments: BillingPaymentDTO[];
 }
 
 export interface AuthConfigResponse {

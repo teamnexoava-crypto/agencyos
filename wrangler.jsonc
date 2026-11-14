@@ -58,6 +58,8 @@
     // Public, unauthenticated routes (logos now; invoice / contract / portal links later), per IP.
     { "name": "PUBLIC_LIMITER", "namespace_id": "1002", "simple": { "limit": 300, "period": 60 } }
   ],
+  // Payments: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are secrets too. Until the
+  // first two are set, the trial and plans are not enforced and nobody can be charged (see README).
   // Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET) are NOT listed here: they are set
   // on the deployed Worker (dashboard → Settings → Variables and Secrets, or `wrangler secret put`)
   // and in .dev.vars locally. Their types are declared in worker/env.d.ts. Until they are set the app

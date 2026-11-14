@@ -7,6 +7,7 @@ import { requestContext } from "./middleware/context";
 import { csrfProtection } from "./middleware/csrf";
 import { assetRoutes } from "./routes/assets";
 import { authRoutes } from "./routes/auth";
+import { billingRoutes, webhookRoutes } from "./routes/billing";
 import { clientRoutes } from "./routes/clients";
 import { contractRoutes } from "./routes/contracts";
 import { crmRoutes } from "./routes/crm";
@@ -51,11 +52,15 @@ app.use(async (c, next) => {
   if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
 });
 app.use(requestContext);
+// Server-to-server calls carry no Origin header or session, so they sit ahead of the CSRF check and
+// prove themselves with a signature instead.
+app.route("/webhooks", webhookRoutes);
 app.use(csrfProtection);
 
 app.get("/health", (c) => c.json({ ok: true }));
 app.route("/auth", authRoutes);
 app.route("/workspace", workspaceRoutes);
+app.route("/billing", billingRoutes);
 app.route("/members", memberRoutes);
 app.route("/team", teamRoutes);
 app.route("/invites", inviteRoutes);

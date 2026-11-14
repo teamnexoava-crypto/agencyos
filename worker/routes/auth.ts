@@ -10,6 +10,7 @@ import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured 
 import { appOrigin, isHttps, isLocalhost, safeRedirectPath } from "../lib/request";
 import { createSession, csrfTokenFor, destroySession, purgeExpiredSessions } from "../lib/session";
 import { rateLimit } from "../middleware/rate-limit";
+import { billingOf } from "../services/billing";
 import { ensureWorkspace, findWorkspaceId, upsertGoogleUser } from "../services/users";
 import { toMembershipDTO, toSessionUser, toWorkspaceDTO } from "../services/workspaces";
 import type { AppEnv } from "../types";
@@ -60,6 +61,7 @@ export const authRoutes = new Hono<AppEnv>()
       user: toSessionUser(auth.user),
       workspace: auth.workspace ? toWorkspaceDTO(auth.workspace) : null,
       membership: auth.member ? toMembershipDTO(auth.member) : null,
+      billing: auth.workspace ? billingOf(c.env, auth.workspace) : null,
       csrfToken: await csrfTokenFor(c.env, auth.sessionId),
     };
     return c.json(body);

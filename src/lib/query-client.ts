@@ -1,7 +1,17 @@
-import { QueryClient } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiError } from "./api";
 
-export const queryClient = new QueryClient({
+/**
+ * The server answers 402 when a trial or plan has just run out. Re-reading the session makes the app
+ * switch to the "choose a plan" screen instead of showing an error on whatever was open.
+ */
+const onSubscriptionEnded = (error: unknown) => {
+  if (error instanceof ApiError && error.status === 402) void queryClient.invalidateQueries({ queryKey: ["me"] });
+};
+
+export const queryClient: QueryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: onSubscriptionEnded }),
+  mutationCache: new MutationCache({ onError: onSubscriptionEnded }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

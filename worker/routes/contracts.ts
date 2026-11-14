@@ -15,6 +15,7 @@ import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { requireAuth } from "../middleware/context";
 import { logActivity } from "../services/activity";
+import { assertContractAvailable } from "../services/billing";
 import { buildContractDocument, contractMessageTemplate, parseSignatureImage, sealContract, signatureKey, type ContractRow } from "../services/contracts";
 import { notifyManagers } from "../services/invoices";
 import { requireClientId, requireProject } from "../services/projects";
@@ -186,6 +187,7 @@ export const contractRoutes = new Hono<AppEnv>()
   .post("/", validate("json", contractCreateSchema), async (c) => {
     const t = tenant(c);
     const input = c.req.valid("json");
+    await assertContractAvailable(t, c.env);
 
     const project = input.projectId ? await requireProject(t, input.projectId) : null;
     const clientId = input.clientId || project?.clientId || "";

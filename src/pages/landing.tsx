@@ -21,7 +21,9 @@ import { BrandLogo, GoogleIcon } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/features/auth/api";
+import { Pricing } from "@/features/landing/pricing";
 import { cn } from "@/lib/utils";
+import { TRIAL_DAYS } from "@shared/plans";
 
 const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp: Variants = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } } };
@@ -303,7 +305,11 @@ const STEPS = [
 ];
 
 const FAQS = [
-  { q: "Is GrowUpliftOS free?", a: "Yes – it's free to use while we're in early access. If paid plans are introduced later, you'll hear about it well before anything changes for you." },
+  {
+    q: "Is there a free trial?",
+    a: `Yes. Every new workspace gets ${TRIAL_DAYS} days with everything unlocked, and no card is needed to start. After that you choose a plan to keep working; your data stays safe either way.`,
+  },
+  { q: "How do I pay?", a: "By UPI, card or netbanking on Razorpay's secure page. There is no auto-debit: you pay for a month or a year and renew when you choose." },
   { q: "Do my clients need to create an account?", a: "No. Clients open a private link to view an invoice, sign a contract or follow their project. Nothing to install, nothing to remember." },
   { q: "Does it handle GST invoices?", a: "Yes. Add your GSTIN and choose CGST + SGST or IGST – the split is calculated for you and printed on the invoice. Invoices in other currencies work too." },
   { q: "Are the e-signatures valid?", a: "Each signature is recorded with the signer's name, the time, their IP address and device, and a fingerprint of the exact text they agreed to. Electronic signatures are widely accepted for ordinary business agreements; for special documents (like property deeds), check what your local law requires." },
@@ -378,7 +384,7 @@ export default function LandingPage() {
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <GetStarted signedIn={signedIn} />
-              <span className="text-[13px] text-muted-foreground">Free to start · No password needed</span>
+              <span className="text-[13px] text-muted-foreground">{TRIAL_DAYS}-day free trial · No card needed</span>
             </motion.div>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }} className="mt-14 sm:mt-20">
@@ -450,41 +456,8 @@ export default function LandingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
-          <SectionHeading eyebrow="Pricing" title="Free while we're in early access" text="Use everything today at no cost. Paid plans will be announced before anything changes." />
-          <div className="mx-auto mt-12 grid max-w-3xl gap-4 md:grid-cols-2">
-            <Reveal>
-              <div className="flex h-full flex-col rounded-2xl border-2 border-primary bg-card p-6 shadow-lift">
-                <p className="flex items-center justify-between">
-                  <span className="font-semibold">Early access</span>
-                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">Available now</span>
-                </p>
-                <p className="mt-4 flex items-baseline gap-1.5">
-                  <span className="tabular text-4xl font-semibold tracking-tight">₹0</span>
-                  <span className="text-sm text-muted-foreground">per month</span>
-                </p>
-                <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-                  {["Projects, clients and team", "Invoices, payments and expenses", "Contracts with e-signatures", "Client portal for every project", "Dashboard and profit & loss"].map((item) => (
-                    <li key={item} className="flex items-center gap-2.5">
-                      <Check className="size-4 shrink-0 text-primary" /> {item}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-6 [&>*]:w-full">
-                  <GetStarted signedIn={signedIn} size="default" />
-                </div>
-              </div>
-            </Reveal>
-            <Reveal delay={0.08}>
-              <div className="flex h-full flex-col rounded-2xl border bg-card p-6 shadow-soft">
-                <p className="flex items-center justify-between">
-                  <span className="font-semibold">Pro</span>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">Coming later</span>
-                </p>
-                <p className="mt-4 text-4xl font-semibold tracking-tight text-muted-foreground">—</p>
-                <p className="mt-6 flex-1 text-sm text-muted-foreground">For growing agencies that need more. Pricing and details will be shared here when it's ready – early-access users will be the first to know.</p>
-              </div>
-            </Reveal>
-          </div>
+          <SectionHeading eyebrow="Pricing" title="Simple pricing that grows with you" text={`Try everything free for ${TRIAL_DAYS} days. Then one flat price per workspace – no per-user surprises.`} />
+          <Pricing signedIn={signedIn} />
         </section>
 
         {/* FAQ */}
