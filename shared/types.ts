@@ -17,7 +17,7 @@ import type {
   StepStatus,
   TaxMode,
 } from "./constants";
-import type { BillingCycle, BillingPaymentStatus, BillingStatus, PlanId, PlanLimits } from "./plans";
+import type { AutoPayState, BillingCycle, BillingPaymentStatus, BillingStatus, PlanId, PlanLimits } from "./plans";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -82,7 +82,28 @@ export interface BillingDTO {
   paidUntil: number | null;
   /** Whole days left in the trial or the paid period; `null` when neither is running. */
   daysLeft: number | null;
+  /** Monthly auto-pay, if one is set up: charging normally, retrying a failed charge, or stopped. */
+  autoPay: AutoPayState | null;
   limits: PlanLimits;
+}
+
+/** The auto-pay mandate that currently pays for the workspace. */
+export interface AutoPayDTO {
+  state: AutoPayState;
+  plan: PlanId;
+  /** Paise taken each month. */
+  amount: number;
+  nextChargeAt: number | null;
+}
+
+/** An auto-pay set-up that was started and is waiting for the payer to approve it on Razorpay's page. */
+export interface PendingSetupDTO {
+  plan: PlanId;
+  amount: number;
+  /** Razorpay's page for approving the mandate. */
+  url: string;
+  /** When the first charge will be taken; `null` = as soon as it is approved. */
+  firstChargeAt: number | null;
 }
 
 export interface BillingPaymentDTO {
@@ -97,6 +118,8 @@ export interface BillingPaymentDTO {
   periodStart: number | null;
   periodEnd: number | null;
   paidBy: string;
+  /** True for a charge taken by auto-pay rather than a one-off payment. */
+  autoPay: boolean;
 }
 
 export interface BillingUsage {
@@ -108,6 +131,8 @@ export interface BillingUsage {
 
 export interface BillingOverview {
   billing: BillingDTO;
+  autoPay: AutoPayDTO | null;
+  pendingSetup: PendingSetupDTO | null;
   usage: BillingUsage;
   payments: BillingPaymentDTO[];
 }

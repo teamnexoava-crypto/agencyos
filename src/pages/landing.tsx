@@ -309,7 +309,10 @@ const FAQS = [
     q: "Is there a free trial?",
     a: `Yes. Every new workspace gets ${TRIAL_DAYS} days with everything unlocked, and no card is needed to start. After that you choose a plan to keep working; your data stays safe either way.`,
   },
-  { q: "How do I pay?", a: "By UPI, card or netbanking on Razorpay's secure page. There is no auto-debit: you pay for a month or a year and renew when you choose." },
+  {
+    q: "How do I pay?",
+    a: "Monthly plans use auto-pay: you approve UPI AutoPay or a card once on Razorpay's secure page, the plan renews each month, and you can turn it off any time from Billing. A yearly plan is a single payment by UPI, card or netbanking, with nothing taken automatically. If you'd rather not use auto-pay, you can also pay month by month.",
+  },
   { q: "Do my clients need to create an account?", a: "No. Clients open a private link to view an invoice, sign a contract or follow their project. Nothing to install, nothing to remember." },
   { q: "Does it handle GST invoices?", a: "Yes. Add your GSTIN and choose CGST + SGST or IGST – the split is calculated for you and printed on the invoice. Invoices in other currencies work too." },
   { q: "Are the e-signatures valid?", a: "Each signature is recorded with the signer's name, the time, their IP address and device, and a fingerprint of the exact text they agreed to. Electronic signatures are widely accepted for ordinary business agreements; for special documents (like property deeds), check what your local law requires." },

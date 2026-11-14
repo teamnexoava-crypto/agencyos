@@ -37,7 +37,7 @@ import {
   STEP_STATUSES,
   TAX_MODES,
 } from "../../shared/constants";
-import { BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PLAN_IDS, TRIAL_DAYS } from "../../shared/plans";
+import { BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PLAN_IDS, SUBSCRIPTION_STATUSES, TRIAL_DAYS } from "../../shared/plans";
 import { newId } from "../lib/ids";
 
 /* ------------------------------------------------------------------------------------------------
@@ -135,17 +135,73 @@ export const workspaces = pgTable("workspaces", {
   paidUntil: timestamp({ withTimezone: true, mode: "date" }),
   /** Never charged and never locked (e.g. the product owner's own workspace). */
   billingExempt: boolean().notNull().default(false),
+  /**
+   * Auto-pay: the `billing_subscriptions` row that currently pays for this workspace, with a copy of
+   * its Razorpay status so the plan state can be worked out from this row alone. NULL = no auto-pay.
+   */
+  subscriptionId: text(),
+  subscriptionStatus: text({ enum: SUBSCRIPTION_STATUSES }),
+  subscriptionSyncedAt: timestamp({ withTimezone: true, mode: "date" }),
 
   ...timestamps(),
   deletedAt: deletedAt(),
 }).enableRLS();
 
-/** One attempt to pay for a plan. A row is created when checkout starts and settled when Razorpay confirms it. */
+/**
+ * A Razorpay subscription (monthly auto-pay). A row starts as `created` when the person is sent to
+ * Razorpay to approve the mandate, and becomes the workspace's live subscription once approved.
+ */
+export const billingSubscriptions = pgTable(
+  "billing_subscriptions",
+  {
+    id: id(),
+    workspaceId: workspaceRef(),
+    plan: text({ enum: PLAN_IDS }).notNull(),
+    cycle: text({ enum: BILLING_CYCLES }).notNull().default("monthly"),
+    /** Amount of each charge, in paise. Fixed for the life of the subscription. */
+    amount: bigint({ mode: "number" }).notNull(),
+    /** Razorpay ids: the subscription (sub_…) and the plan (plan_…) it bills. */
+    providerSubscriptionId: text(),
+    providerPlanId: text(),
+    /** Razorpay's page where the mandate is approved. */
+    shortUrl: text(),
+    /** Razorpay's status, as last seen. */
+    status: text({ enum: SUBSCRIPTION_STATUSES }).notNull().default("created"),
+    /** Charges already added to the workspace's paid time. */
+    paidCount: integer().notNull().default(0),
+    /** When billing starts: asked for at creation (a later date keeps trial or paid days), then as Razorpay reports it. */
+    startAt: timestamp({ withTimezone: true, mode: "date" }),
+    nextChargeAt: timestamp({ withTimezone: true, mode: "date" }),
+    syncedAt: timestamp({ withTimezone: true, mode: "date" }),
+    createdBy: text().references((): AnyPgColumn => workspaceMembers.id, { onDelete: "set null" }),
+    createdByName: text().notNull(),
+    ...timestamps(),
+  },
+  (t) => [index("billing_subscriptions_ws_idx").on(t.workspaceId, t.createdAt), uniqueIndex("billing_subscriptions_provider_uq").on(t.providerSubscriptionId)],
+).enableRLS();
+
+/**
+ * Razorpay plan ids we have created, keyed by "<key id>:<plan>:<cycle>:<amount>". A Razorpay plan can't
+ * be edited, so a new price simply gets a new one; test and live keys each get their own.
+ */
+export const billingProviderPlans = pgTable("billing_provider_plans", {
+  key: text().primaryKey(),
+  providerPlanId: text().notNull(),
+  createdAt: createdAt(),
+}).enableRLS();
+
+/**
+ * Money received for a plan: either a one-off payment (a row is created when checkout starts and
+ * settled when Razorpay confirms it) or one charge of an auto-pay subscription.
+ */
 export const billingPayments = pgTable(
   "billing_payments",
   {
     id: id(),
     workspaceId: workspaceRef(),
+    /** Set for auto-pay charges, with the number of the charge (1 = first) so each is recorded once. */
+    subscriptionId: text().references((): AnyPgColumn => billingSubscriptions.id, { onDelete: "set null" }),
+    cycleNo: integer(),
     plan: text({ enum: PLAN_IDS }).notNull(),
     cycle: text({ enum: BILLING_CYCLES }).notNull(),
     /** Amount charged, in paise. */
@@ -165,7 +221,11 @@ export const billingPayments = pgTable(
     createdByName: text().notNull(),
     ...timestamps(),
   },
-  (t) => [index("billing_payments_ws_idx").on(t.workspaceId, t.createdAt), uniqueIndex("billing_payments_link_uq").on(t.providerLinkId)],
+  (t) => [
+    index("billing_payments_ws_idx").on(t.workspaceId, t.createdAt),
+    uniqueIndex("billing_payments_link_uq").on(t.providerLinkId),
+    uniqueIndex("billing_payments_charge_uq").on(t.subscriptionId, t.cycleNo),
+  ],
 ).enableRLS();
 
 export const sessions = pgTable(

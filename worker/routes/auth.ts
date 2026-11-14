@@ -10,7 +10,7 @@ import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured 
 import { appOrigin, isHttps, isLocalhost, safeRedirectPath } from "../lib/request";
 import { createSession, csrfTokenFor, destroySession, purgeExpiredSessions } from "../lib/session";
 import { rateLimit } from "../middleware/rate-limit";
-import { billingOf } from "../services/billing";
+import { billingOf, refreshBillingIfDue } from "../services/billing";
 import { ensureWorkspace, findWorkspaceId, upsertGoogleUser } from "../services/users";
 import { toMembershipDTO, toSessionUser, toWorkspaceDTO } from "../services/workspaces";
 import type { AppEnv } from "../types";
@@ -57,11 +57,12 @@ export const authRoutes = new Hono<AppEnv>()
   .get("/me", rateLimit("PUBLIC_LIMITER"), async (c) => {
     const auth = c.var.auth;
     if (!auth) return c.json(null);
+    const workspace = auth.workspace ? await refreshBillingIfDue(c.var.db, c.env, auth.workspace, c.var.defer) : null;
     const body: MeResponse = {
       user: toSessionUser(auth.user),
-      workspace: auth.workspace ? toWorkspaceDTO(auth.workspace) : null,
+      workspace: workspace ? toWorkspaceDTO(workspace) : null,
       membership: auth.member ? toMembershipDTO(auth.member) : null,
-      billing: auth.workspace ? billingOf(c.env, auth.workspace) : null,
+      billing: workspace ? billingOf(c.env, workspace) : null,
       csrfToken: await csrfTokenFor(c.env, auth.sessionId),
     };
     return c.json(body);

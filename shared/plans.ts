@@ -90,6 +90,41 @@ export type BillingStatus = (typeof BILLING_STATUSES)[number];
 export const BILLING_PAYMENT_STATUSES = ["created", "paid", "failed", "expired"] as const;
 export type BillingPaymentStatus = (typeof BILLING_PAYMENT_STATUSES)[number];
 
+/**
+ * Auto-pay: a monthly plan can be paid by a Razorpay subscription (UPI AutoPay or a card mandate).
+ * These are Razorpay's own subscription statuses, stored as they arrive.
+ */
+export const SUBSCRIPTION_STATUSES = ["created", "authenticated", "active", "pending", "halted", "paused", "cancelled", "completed", "expired"] as const;
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+
+/**
+ * What auto-pay means for the person looking at it:
+ *  - `on`        the mandate is in place and the next charge will be taken automatically
+ *  - `retrying`  the last charge failed and Razorpay is trying again
+ *  - `stopped`   charging has stopped (retries ran out, or the payer paused the mandate)
+ */
+export type AutoPayState = "on" | "retrying" | "stopped";
+
+export function autoPayStateOf(status: SubscriptionStatus | null): AutoPayState | null {
+  if (status === "authenticated" || status === "active") return "on";
+  if (status === "pending") return "retrying";
+  if (status === "halted" || status === "paused") return "stopped";
+  return null;
+}
+
+/** Statuses after which a subscription can never charge again. */
+export const isSubscriptionOver = (status: SubscriptionStatus): boolean => status === "cancelled" || status === "completed" || status === "expired";
+
+/**
+ * A charge is collected on the day the paid period ends and can take a while to arrive (and Razorpay
+ * retries a failed one for a few days), so access continues this long past the paid date while
+ * auto-pay is on or retrying.
+ */
+export const AUTOPAY_GRACE_DAYS = 3;
+
+/** Billing cycles a subscription is set up for (5 years of months). After that it is set up again. */
+export const AUTOPAY_TOTAL_CYCLES = 60;
+
 /** A paid plan nearing its end shows a reminder this many days ahead. */
 export const RENEWAL_REMINDER_DAYS = 5;
 

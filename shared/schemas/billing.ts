@@ -7,6 +7,10 @@ export const checkoutSchema = z.object({
 });
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
+/** Starting monthly auto-pay for a plan. */
+export const subscribeSchema = z.object({ plan: z.enum(PLAN_IDS) });
+export type SubscribeInput = z.infer<typeof subscribeSchema>;
+
 /** What Razorpay appends to our address when it sends the payer back. Only the link id is used. */
 export const paymentCallbackQuery = z.object({
   razorpay_payment_link_id: z.string().regex(/^plink_[A-Za-z0-9]{6,40}$/),

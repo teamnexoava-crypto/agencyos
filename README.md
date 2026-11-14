@@ -134,25 +134,44 @@ screen and the server-side limits all read.
   client links (invoice, contract, portal) keep working so an agency's clients are never affected.
 - **Limits** (people, connected sheets, contracts per month, storage) are checked where the thing is
   created; the trial has the Team plan's limits.
-- **Payments are prepaid, with no auto-debit.** Checkout creates a Razorpay Payment Link for the
-  server-side price and redirects to Razorpay's hosted page, so no payment script runs in the app and
-  the content security policy is unchanged. Renewing adds to the paid time; switching plans converts
-  unused time at the old price into days at the new one (`nextPaidPeriod`).
-- **Nothing from the browser is trusted.** The return address and the webhook only say "look at this
-  payment link"; `settlePayment()` then reads the link from Razorpay with our keys and activates the
-  plan only if it is paid in full, in INR, for our reference. It is idempotent (row lock), so the
-  redirect, the webhook and the Billing page's own re-check can all arrive for the same payment.
+- **Monthly plans are paid by auto-pay; a year (or a single month) is one payment.** Auto-pay is a
+  Razorpay subscription: the payer approves a mandate once (UPI AutoPay or card) on Razorpay's hosted
+  page, opened in a new tab, and Razorpay collects each month. One-off payments use a Razorpay Payment
+  Link, which redirects back. Either way no payment script runs in the app, so the content security
+  policy is unchanged.
+- **Nothing from the browser or a webhook body is trusted.** A redirect or webhook only says "look at
+  this payment link / subscription"; `settlePayment()` and `syncSubscription()` then read it from
+  Razorpay with our keys. Both are idempotent (row locks; each auto-pay charge has a number and a
+  unique index), so the redirect, the webhooks and our own re-checks can all arrive for the same thing.
+- **Paid time.** A one-off payment adds its period after the time already paid for; switching plans
+  converts unused time at the old price into days at the new one (`nextPaidPeriod`). An auto-pay
+  mandate set up during the trial (or while paid time remains) starts billing when that time ends.
+  Each successful charge moves `paid_until` to the end of its cycle.
+- **Only one thing can ever charge.** A newly approved mandate stops the previous one before it
+  becomes the workspace's auto-pay; a one-off payment stops auto-pay before it is settled; deleting a
+  workspace stops its mandates first. If Razorpay can't confirm the stop, the step is not carried out
+  and is retried later (the webhook answers non-2xx so Razorpay redelivers).
+- **Failed charges.** While Razorpay retries (`pending`) the plan stays usable for
+  `AUTOPAY_GRACE_DAYS` past the paid date; once it gives up (`halted`) or the payer pauses the
+  mandate there is no grace. Turning auto-pay off keeps the plan until the date already paid for.
+- **It works without webhooks too.** Reading the session (`refreshBillingIfDue`) re-checks Razorpay
+  when a charge is due and once more just before a lock screen would be shown; opening Billing
+  re-checks everything still open. Webhooks only make it faster.
 - `billing_exempt = true` on a workspace means it is never charged or locked.
 
 **Switching payments on** (until then the status is `open`: nothing is limited, locked or chargeable):
 
 1. Razorpay Dashboard → Account & Settings → API keys → generate a key. Add `RAZORPAY_KEY_ID` and
    `RAZORPAY_KEY_SECRET` as secrets on the Worker (dashboard → Settings → Variables and Secrets).
-2. Razorpay Dashboard → Developers → Webhooks → add `https://<your-domain>/api/webhooks/razorpay`,
-   choose a secret, tick the `payment_link.paid` event, and save the same secret on the Worker as
-   `RAZORPAY_WEBHOOK_SECRET`. (Without the webhook, payments are still confirmed when the payer
-   returns or opens Billing; the webhook covers a closed tab.)
-3. Use test keys first: pay with Razorpay's test UPI/card and check that Billing shows the plan.
+2. Make sure **Subscriptions** is enabled on the Razorpay account (it is a separate product; ask
+   Razorpay support if the Subscriptions menu is missing). Without it, starting auto-pay fails with
+   "Auto-pay couldn't be started" and people can still pay month by month or yearly.
+3. Razorpay Dashboard → Developers → Webhooks → add `https://<your-domain>/api/webhooks/razorpay`,
+   choose a secret, tick `payment_link.paid` and every `subscription.*` event, and save the same
+   secret on the Worker as `RAZORPAY_WEBHOOK_SECRET`.
+4. Use test keys first: start auto-pay and make a one-off payment with Razorpay's test UPI/card, and
+   check that Billing shows the plan. Plans created at Razorpay are remembered per key, so switching
+   to live keys later simply creates live ones.
 
 ## How it is secured
 

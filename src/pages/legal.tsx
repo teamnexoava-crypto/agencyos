@@ -4,7 +4,7 @@ import { TRIAL_DAYS } from "@shared/plans";
 import { BrandLogo } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-const LAST_UPDATED = "13 November 2026";
+const LAST_UPDATED = "14 November 2026";
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -18,7 +18,7 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
       <main className="mx-auto max-w-3xl px-5 pt-6 pb-24 sm:px-8">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>
-        <div className="mt-10 space-y-8 text-[15px] leading-relaxed text-foreground/90 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-foreground [&_li]:ml-5 [&_li]:list-disc [&_p+p]:mt-3 [&_ul]:space-y-1.5">
+        <div className="mt-10 space-y-8 text-[15px] leading-relaxed text-foreground/90 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-foreground [&_li]:ml-5 [&_li]:list-disc [&_p+p]:mt-3 [&_p+ul]:mt-3 [&_ul]:space-y-1.5 [&_ul+p]:mt-3">
           {children}
         </div>
         <footer className="mt-14 flex gap-5 border-t pt-6 text-sm text-muted-foreground">
@@ -186,23 +186,36 @@ export function TermsPage() {
       <section id="plans">
         <h2>Free trial, plans and payments</h2>
         <p>
-          Every new workspace can use GrowUpliftOS free for {TRIAL_DAYS} days. To keep using it after that, the workspace needs a paid plan.
-          Plans are paid in advance for one month or one year, in Indian rupees, through Razorpay. There is no automatic renewal or
-          auto-debit: a plan simply runs until the date shown on your Billing page, and you choose whether to extend it.
+          Every new workspace can use GrowUpliftOS free for {TRIAL_DAYS} days. To keep using it after that, the workspace needs a paid plan,
+          charged in Indian rupees through Razorpay.
         </p>
+        <ul>
+          <li>
+            <strong>Monthly plans renew automatically.</strong> You approve a mandate once (UPI AutoPay or a card) on Razorpay's page,
+            and the plan's price is then collected every month until you turn auto-pay off. If you set it up during the trial, the
+            first payment is taken when the trial ends. Razorpay or your bank tells you before each payment, as the rules for
+            recurring payments require.
+          </li>
+          <li>
+            <strong>Yearly plans, and single months, are one payment.</strong> Nothing renews or is collected by itself; the plan runs
+            until the date shown on your Billing page.
+          </li>
+        </ul>
         <p>
-          When a trial or plan ends, the workspace is locked until a plan is bought. Your data is kept, links you already shared with
-          clients keep working, and you can still delete the workspace. Prices and plan limits are shown on the pricing page and may
-          change for future periods; a period you have already paid for is not affected.
+          If a payment fails, Razorpay retries it for a few days and the workspace stays usable meanwhile. When a trial or plan ends
+          without payment, the workspace is locked until a plan is bought: your data is kept, links you already shared with clients
+          keep working, and you can still delete the workspace. Prices and plan limits are shown on the pricing page and may change
+          for future periods; the amount of an auto-pay mandate you have approved never changes without a new approval from you.
         </p>
       </section>
 
       <section id="refunds">
         <h2>Cancellations and refunds</h2>
         <p>
-          You can stop at any time by not renewing; nothing further is charged. Because the free trial lets you try everything first,
-          payments for a period that has started are not refunded. If you were charged twice or charged by mistake, write to us within
-          7 days and we will refund the extra amount to the original payment method, normally within 5–7 working days.
+          You can turn off auto-pay at any time from Billing, or from your UPI app or bank. No further payments are taken, and the plan
+          stays active until the end of the period already paid for. Because the free trial lets you try everything first, payments
+          for a period that has started are not refunded. If you were charged twice or charged by mistake, write to us within 7 days
+          and we will refund the extra amount to the original payment method, normally within 5–7 working days.
         </p>
       </section>
 

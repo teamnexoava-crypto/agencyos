@@ -13,7 +13,9 @@ import { sniffImage } from "../lib/images";
 import { setActiveWorkspace } from "../lib/session";
 import { requireUser, tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
+import { isBillingConfigured } from "../lib/razorpay";
 import { requireAuth } from "../middleware/context";
+import { cancelAllSubscriptions } from "../services/billing";
 import { createWorkspaceForUser, logoUrlFromKey, toWorkspaceDTO } from "../services/workspaces";
 import type { AppEnv, WorkspaceRow } from "../types";
 
@@ -280,6 +282,15 @@ export const workspaceRoutes = new Hono<AppEnv>()
     t.requireRole("owner");
     if (c.req.valid("json").confirmName.trim() !== t.workspace.name) {
       throw new ApiError(400, "validation_error", "The name doesn't match.", { confirmName: "Type the workspace name exactly" });
+    }
+    // Auto-pay must be stopped at Razorpay before the records of it disappear, or it would keep charging.
+    if (isBillingConfigured(c.env)) {
+      try {
+        await cancelAllSubscriptions(t.db, c.env, t.workspaceId);
+      } catch (error) {
+        console.error("Could not stop auto-pay before deleting a workspace", error);
+        throw new ApiError(502, "payment_provider_error", "We couldn't turn off auto-pay, so nothing was deleted. Please try again in a minute.");
+      }
     }
     await purgeWorkspaceObjects(c.env.BUCKET, t.workspaceId);
     await t.db.delete(workspaces).where(eq(workspaces.id, t.workspaceId));

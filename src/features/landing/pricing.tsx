@@ -75,7 +75,7 @@ export function Pricing({ signedIn }: { signedIn: boolean }) {
         )}
       />
       <p className="mt-6 text-center text-[13px] text-muted-foreground">
-        Every plan starts with a {TRIAL_DAYS}-day free trial with everything in Team. No card needed · Pay by UPI, card or netbanking · No auto-debit.
+        Every plan starts with a {TRIAL_DAYS}-day free trial with everything in Team, and no card is needed to start. Monthly plans renew by UPI AutoPay or card – turn it off any time. Yearly plans are one payment.
       </p>
 
       <div className="mx-auto mt-16 max-w-5xl">

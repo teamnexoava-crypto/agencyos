@@ -1,42 +1,65 @@
-import { BadgeCheck, Clock, Gift, Sparkles } from "lucide-react";
-import { PLANS, TRIAL_DAYS, formatPlanPrice } from "@shared/plans";
-import type { BillingDTO, BillingOverview, BillingPaymentDTO } from "@shared/types";
+import { useState } from "react";
+import { BadgeCheck, Clock, Gift, LoaderCircle, Sparkles, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
+import { AUTOPAY_GRACE_DAYS, PLANS, TRIAL_DAYS, formatPlanPrice } from "@shared/plans";
+import type { AutoPayDTO, BillingDTO, BillingOverview, BillingPaymentDTO } from "@shared/types";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBilling, useBillingOverview } from "@/features/billing/api";
+import { useBilling, useBillingOverview, useCancelAutoPay } from "@/features/billing/api";
 import { PlanChooser } from "@/features/billing/plan-chooser";
 import { usePaymentResult } from "@/features/billing/use-payment-result";
+import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const formatDay = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
 const daysLeft = (count: number | null) => (count === null ? "" : count <= 1 ? "Last day" : `${count} days left`);
 
-function StatusCard({ billing }: { billing: BillingDTO }) {
-  const view = {
+function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPayDTO | null }) {
+  const [confirmOff, setConfirmOff] = useState(false);
+  const cancel = useCancelAutoPay();
+  const planName = billing.plan ? PLANS[billing.plan].name : "";
+  const paidUntil = billing.paidUntil ? formatDay(billing.paidUntil) : "";
+  const price = autoPay ? formatPlanPrice(autoPay.amount) : "";
+
+  const active = (): { text: string; tag: string | null; warn?: boolean } => {
+    if (autoPay?.state === "on") {
+      return { text: `Auto-pay is on: ${price} is taken on ${formatDay(autoPay.nextChargeAt ?? billing.paidUntil ?? 0)}, and every month after that, until you turn it off.`, tag: "Auto-pay on" };
+    }
+    if (autoPay?.state === "retrying") {
+      return {
+        text: `We couldn't collect ${price} for this month. Razorpay is trying again – look for its message, or a request in your UPI app, and approve it. If it keeps failing the workspace is locked on ${formatDay((billing.paidUntil ?? 0) + AUTOPAY_GRACE_DAYS * 86_400_000)}; you can also pay for a month below.`,
+        tag: "Payment failed",
+        warn: true,
+      };
+    }
+    if (autoPay?.state === "stopped") {
+      return { text: `Auto-pay has stopped – the payment kept failing, or the mandate was paused. Your plan runs until ${paidUntil}. Turn auto-pay on again below, or pay for a month.`, tag: daysLeft(billing.daysLeft), warn: true };
+    }
+    return { text: `Paid until ${paidUntil}. Auto-pay is off, so nothing is taken by itself – turn it on below, or pay again before that date.`, tag: daysLeft(billing.daysLeft) };
+  };
+
+  const view: { icon: LucideIcon; title: string; text: string; tag: string | null; warn?: boolean } = {
     open: { icon: Sparkles, title: "Everything is unlocked", text: `Online payments are being set up. Once they open, every workspace gets a ${TRIAL_DAYS}-day free trial and you can choose a plan here.`, tag: null },
     exempt: { icon: Gift, title: "This workspace is free", text: "It has full access with no limits and never needs a plan.", tag: null },
     trial: {
       icon: Clock,
       title: "Free trial",
-      text: `Your trial runs until ${formatDay(billing.trialEndsAt)}, with everything in the Team plan. Choose a plan any time – the days left in your trial are added on, so you lose nothing by paying early.`,
+      text: `Your trial runs until ${formatDay(billing.trialEndsAt)}, with everything in the Team plan. Choose a plan any time – billing only starts when the trial ends, so you lose nothing by choosing early.`,
       tag: daysLeft(billing.daysLeft),
     },
-    active: {
-      icon: BadgeCheck,
-      title: `${billing.plan ? PLANS[billing.plan].name : ""} plan`,
-      text: billing.paidUntil ? `Paid until ${formatDay(billing.paidUntil)}. Extend it any time – the new period starts when this one ends.` : "",
-      tag: daysLeft(billing.daysLeft),
-    },
+    active: { icon: BadgeCheck, title: `${planName} plan`, ...active() },
     expired: { icon: Clock, title: "No active plan", text: "Choose a plan below to unlock the workspace.", tag: null },
   }[billing.status];
 
   return (
-    <section className="flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-soft" aria-label="Current plan">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+    <section className={cn("flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-soft", view.warn && "border-amber-500/50")} aria-label="Current plan">
+      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", view.warn ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" : "bg-primary/10 text-primary")}>
         <view.icon className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
@@ -45,7 +68,23 @@ function StatusCard({ billing }: { billing: BillingDTO }) {
           {view.tag && <Badge variant="secondary">{view.tag}</Badge>}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{view.text}</p>
+        {autoPay && (
+          <Button variant="outline" size="sm" className="mt-3" disabled={cancel.isPending} onClick={() => setConfirmOff(true)}>
+            {cancel.isPending && <LoaderCircle className="animate-spin" />} Turn off auto-pay
+          </Button>
+        )}
       </div>
+      <ConfirmDialog
+        open={confirmOff}
+        onOpenChange={setConfirmOff}
+        title="Turn off auto-pay?"
+        description={`No more payments will be taken. Your ${planName} plan stays active until ${paidUntil}; after that the workspace is locked until you pay again.`}
+        confirmLabel="Turn off auto-pay"
+        onConfirm={() => {
+          setConfirmOff(false);
+          cancel.mutate(undefined, { onSuccess: () => toast.success("Auto-pay is off. Nothing more will be taken."), onError: (error) => toast.error(errorMessage(error, "Could not turn off auto-pay.")) });
+        }}
+      />
     </section>
   );
 }
@@ -58,7 +97,7 @@ function Meter({ label, used, limit, format = String }: { label: string; used: n
       <p className={cn("tabular mt-1 text-lg font-semibold tracking-tight", full && "text-amber-700 dark:text-amber-400")}>
         {format(used)} <span className="text-sm font-normal text-muted-foreground">{limit === null ? "· no limit" : `of ${format(limit)}`}</span>
       </p>
-      {limit !== null && <Progress value={(used / limit) * 100} label={`${label} used`} className="mt-3" />}
+      {limit !== null && <Progress value={(used / limit) * 100} label={`${label} used`} full="limit" className="mt-3" />}
     </div>
   );
 }
@@ -115,7 +154,7 @@ function Payments({ payments }: { payments: BillingPaymentDTO[] }) {
               <tr key={payment.id}>
                 <td className="tabular px-5 py-3 whitespace-nowrap">{formatDay(payment.paidAt ?? payment.createdAt)}</td>
                 <td className="px-3 py-3 whitespace-nowrap">
-                  {PLANS[payment.plan].name} · {payment.cycle === "yearly" ? "Yearly" : "Monthly"}
+                  {PLANS[payment.plan].name} · {payment.cycle === "yearly" ? "1 year" : payment.autoPay ? "Auto-pay" : "1 month"}
                 </td>
                 <td className="tabular px-3 py-3 whitespace-nowrap text-muted-foreground">{payment.periodStart && payment.periodEnd ? `${formatDay(payment.periodStart)} – ${formatDay(payment.periodEnd)}` : "—"}</td>
                 <td className="tabular px-3 py-3 text-right whitespace-nowrap">{formatPlanPrice(payment.amount)}</td>
@@ -144,7 +183,7 @@ export default function BillingPage() {
     <>
       <PageHeader title="Billing" description="Your plan, what you're using, and your payments." />
       <div className="grid grid-cols-[minmax(0,1fr)] gap-8">
-        <StatusCard billing={billing} />
+        <StatusCard billing={billing} autoPay={overview?.autoPay ?? null} />
 
         {isError ? (
           <ErrorState onRetry={() => void refetch()} />
@@ -157,7 +196,7 @@ export default function BillingPage() {
         {billing.status !== "exempt" && (
           <section aria-labelledby="plans-heading">
             <h2 id="plans-heading" className="mb-5 text-center text-xl font-semibold tracking-tight">
-              {billing.status === "active" ? "Extend or change your plan" : "Choose a plan"}
+              {billing.status === "active" ? "Change how you pay, or your plan" : "Choose a plan"}
             </h2>
             <PlanChooser billing={billing} />
           </section>
