@@ -175,6 +175,15 @@ export const billingRoutes = new Hono<AppEnv>()
     }
   })
 
+  /** "Not now": withdraws an auto-pay set-up that is waiting to be approved. Nothing has been charged for it. */
+  .post("/setup/cancel", rateLimit("AUTH_LIMITER"), async (c) => {
+    const t = tenant(c, { allowLocked: true });
+    t.requireRole("owner", "admin");
+    await cancelPendingSetups(t.db, c.env, t.workspaceId);
+    // If Razorpay would not confirm, the page simply stops being offered here once it expires.
+    return c.json({ ok: true });
+  })
+
   /** Turns auto-pay off: no further charges. The plan stays until the date already paid for. */
   .post("/auto-pay/cancel", rateLimit("AUTH_LIMITER"), async (c) => {
     const t = tenant(c, { allowLocked: true });

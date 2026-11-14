@@ -50,6 +50,15 @@ export function useSubscribe() {
   });
 }
 
+/** Withdraws an auto-pay set-up that is still waiting to be approved. */
+export function useCancelSetup() {
+  const refresh = useRefreshBilling();
+  return useMutation({
+    mutationFn: () => api<{ ok: true }>("/api/billing/setup/cancel", { method: "POST" }),
+    onSettled: () => void refresh(),
+  });
+}
+
 export function useCancelAutoPay() {
   const refresh = useRefreshBilling();
   return useMutation({

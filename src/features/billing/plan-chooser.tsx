@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, LoaderCircle } from "lucide-react";
+import { Check, ExternalLink, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PLANS, formatPlanPrice, type BillingCycle, type Plan, type PlanId } from "@shared/plans";
 import type { BillingDTO, PendingSetupDTO } from "@shared/types";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthConfig } from "@/features/auth/api";
 import { errorMessage } from "@/lib/api";
 import { queryKeys } from "@/lib/query-client";
-import { useBillingOverview, useCheckout, useSubscribe } from "./api";
+import { useBillingOverview, useCancelSetup, useCheckout, useSubscribe } from "./api";
 import { CycleSwitch, PlanCards } from "./plan-cards";
 
 const formatDay = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
@@ -18,6 +18,7 @@ const fingerprint = (billing: BillingDTO) => `${billing.status}|${billing.plan}|
 /** An auto-pay set-up that is waiting to be approved on Razorpay's page (usually open in another tab). */
 function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
   const price = formatPlanPrice(setup.amount);
+  const withdraw = useCancelSetup();
   return (
     <section role="status" className="mx-auto mb-8 flex max-w-2xl items-start gap-3 rounded-2xl border-2 border-primary/40 bg-primary/5 p-5">
       <LoaderCircle className="mt-0.5 size-5 shrink-0 animate-spin text-primary" aria-hidden="true" />
@@ -30,11 +31,16 @@ function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
             : `${price} is taken now, and then every month.`}{" "}
           This page updates by itself once it's done.
         </p>
-        <Button asChild size="sm" className="mt-3">
-          <a href={setup.url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink /> Open Razorpay's page
-          </a>
-        </Button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button asChild size="sm">
+            <a href={setup.url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink /> Open Razorpay's page
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" disabled={withdraw.isPending} onClick={() => withdraw.mutate()}>
+            Not now
+          </Button>
+        </div>
       </div>
     </section>
   );
@@ -45,7 +51,7 @@ function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
  * mandate approved once on Razorpay's page, in a new tab); a year – or a single month, for people who
  * don't want a mandate – is one payment on Razorpay's page, which sends them back here.
  */
-export function PlanChooser({ billing }: { billing: BillingDTO }) {
+export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading?: string }) {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
   const [monthByMonth, setMonthByMonth] = useState(false);
   const [chosen, setChosen] = useState<PlanId | null>(null);
@@ -64,6 +70,8 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
   const hasMandate = current.autoPay === "on" || current.autoPay === "retrying";
   const canPay = current.enabled && current.status !== "exempt";
   const autoPay = cycle === "monthly" && !monthByMonth;
+  // The plan the workspace is on (or, during the trial, the one auto-pay is set up for).
+  const activePlan = mandatePlan ?? onPlan;
   // Stays busy after a one-off checkout succeeds: the browser is on its way to the payment page.
   const busy = checkout.isPending || checkout.isSuccess || subscribe.isPending;
 
@@ -136,8 +144,6 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
 
   const label = (plan: Plan) => {
     if (!autoPay) return `Pay ${formatPlanPrice(plan.price[cycle])} for 1 ${cycle === "yearly" ? "year" : "month"}`;
-    if (plan.id === mandatePlan) return "Auto-pay is on";
-    if (plan.id === onPlan) return "Turn on auto-pay";
     return onPlan || mandatePlan ? `Switch to ${plan.name}` : `Choose ${plan.name}`;
   };
 
@@ -149,17 +155,41 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
         </p>
       )}
       {pending && <PendingSetup setup={pending} />}
-      <CycleSwitch value={cycle} onChange={setCycle} className="mx-auto" />
+      {heading ? (
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+          <h2 id="plans-heading" className="text-lg font-semibold tracking-tight">
+            {heading}
+          </h2>
+          <CycleSwitch value={cycle} onChange={setCycle} />
+        </div>
+      ) : (
+        <CycleSwitch value={cycle} onChange={setCycle} className="mx-auto" />
+      )}
       <PlanCards
         cycle={cycle}
-        className="mt-8"
-        badge={(plan) => (plan.id === (onPlan ?? mandatePlan) ? "Your plan" : null)}
-        action={(plan) => (
-          <Button variant={plan.popular ? "default" : "outline"} disabled={!canPay || busy || (autoPay && plan.id === mandatePlan)} onClick={() => choose(plan)}>
-            {busy && chosen === plan.id && <LoaderCircle className="animate-spin" />}
-            {label(plan)}
-          </Button>
-        )}
+        className={heading ? "mt-7" : "mt-8"}
+        badge={(plan) => (plan.id === activePlan ? "Your plan" : null)}
+        action={(plan) =>
+          // In the auto-pay view the current plan is simply "Active"; with one-off payments the same
+          // button extends it by a month or a year.
+          autoPay && plan.id === activePlan ? (
+            <div className="grid gap-1.5">
+              <Button variant="secondary" disabled className="w-full disabled:opacity-100">
+                <Check className="text-emerald-600 dark:text-emerald-400" /> Active
+              </Button>
+              {!mandatePlan && canPay && (
+                <button type="button" disabled={busy} className="text-[13px] font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50" onClick={() => choose(plan)}>
+                  Turn on auto-pay
+                </button>
+              )}
+            </div>
+          ) : (
+            <Button variant={plan.popular ? "default" : "outline"} disabled={!canPay || busy} onClick={() => choose(plan)}>
+              {busy && chosen === plan.id && <LoaderCircle className="animate-spin" />}
+              {label(plan)}
+            </Button>
+          )
+        }
       />
       <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] text-balance text-muted-foreground">
         {!canPay ? (

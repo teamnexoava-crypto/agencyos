@@ -35,7 +35,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
   const trial = (): { text: string; tag: string | null; warn?: boolean } => {
     const until = formatDay(billing.trialEndsAt);
     if (mandate === "on") {
-      return { text: `Your free trial runs until ${until}. Auto-pay is set up: ${autoPay ? `${price} for the ${mandatePlan} plan` : "your plan's price"} is taken that day and every month after – nothing before then.`, tag: "Auto-pay on" };
+      return { text: `Your free trial runs until ${until}. Auto-pay is set up: ${autoPay ? `${price} for the ${mandatePlan} plan` : "your plan's price"} is taken that day and every month after – nothing before then.`, tag: autoPay ? `${mandatePlan} plan chosen` : "Plan chosen" };
     }
     if (mandate === "retrying") return { text: `Your free trial has ended. ${retrying}`, tag: "Payment failed", warn: true };
     return {
@@ -46,7 +46,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
 
   const active = (): { text: string; tag: string | null; warn?: boolean } => {
     if (mandate === "on") {
-      return { text: autoPay ? `Auto-pay is on: ${price} is taken on ${formatDay(autoPay.nextChargeAt ?? billing.paidUntil ?? 0)}, and every month after that, until you turn it off.` : "Auto-pay is on, until you turn it off.", tag: "Auto-pay on" };
+      return { text: autoPay ? `Auto-pay is on: ${price} is taken on ${formatDay(autoPay.nextChargeAt ?? billing.paidUntil ?? 0)}, and every month after that, until you turn it off.` : "Auto-pay is on, until you turn it off.", tag: "Active" };
     }
     if (mandate === "retrying") return { text: retrying, tag: "Payment failed", warn: true };
     if (mandate === "stopped") {
@@ -188,8 +188,15 @@ export default function BillingPage() {
   return (
     <>
       <PageHeader title="Billing" description="Your plan, what you're using, and your payments." />
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-8">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-7">
         <StatusCard billing={billing} autoPay={overview?.autoPay ?? null} />
+
+        {/* The plans come straight after the summary: choosing one is what this page is mostly for. */}
+        {billing.status !== "exempt" && (
+          <section aria-labelledby="plans-heading">
+            <PlanChooser billing={sessionBilling} heading={billing.status === "active" || billing.autoPay ? "Plans" : "Choose a plan"} />
+          </section>
+        )}
 
         {isError ? (
           <ErrorState onRetry={() => void refetch()} />
@@ -197,15 +204,6 @@ export default function BillingPage() {
           <Skeleton className="h-24 rounded-2xl" role="status" aria-label="Loading usage" />
         ) : (
           limited && <Usage overview={overview} />
-        )}
-
-        {billing.status !== "exempt" && (
-          <section aria-labelledby="plans-heading">
-            <h2 id="plans-heading" className="mb-5 text-center text-xl font-semibold tracking-tight">
-              {billing.status === "active" ? "Change how you pay, or your plan" : "Choose a plan"}
-            </h2>
-            <PlanChooser billing={sessionBilling} />
-          </section>
         )}
 
         {overview && <Payments payments={overview.payments} />}
