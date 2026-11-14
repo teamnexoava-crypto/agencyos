@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** The AgencyOS mark (gradient rounded square with a stylised "A"). */
+/** The GrowUpliftOS mark (gradient rounded square with a stylised "G"). */
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={cn("size-8 shrink-0", className)}>
@@ -11,7 +11,7 @@ export function BrandMark({ className }: { className?: string }) {
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="9" fill="url(#aos-mark)" />
-      <path d="M9.5 22 16 9.5 22.5 22M12.2 17.6h7.6" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 11.8A6.5 6.5 0 1 0 22.5 16h-5.7" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -20,7 +20,7 @@ export function BrandLogo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <BrandMark />
-      <span className="text-[17px] font-semibold tracking-tight">AgencyOS</span>
+      <span className="text-[17px] font-semibold tracking-tight">GrowUpliftOS</span>
     </span>
   );
 }

@@ -3,6 +3,11 @@
  * Keep these as `as const` tuples so they can feed both Drizzle `enum` columns and Zod enums.
  */
 
+/** The product's name, wherever it is built into a message or stored with a record. */
+export const APP_NAME = "GrowUpliftOS";
+/** Notes written by the app itself carry its name as the author; older ones carry the previous name. */
+export const SYSTEM_AUTHOR_NAMES: readonly string[] = [APP_NAME, "AgencyOS"];
+
 export const ROLES = ["owner", "admin", "member"] as const;
 export type Role = (typeof ROLES)[number];
 
@@ -114,7 +119,7 @@ export const DEFAULT_WA_INVOICE_TEMPLATE =
 export const DEFAULT_WA_CONTRACT_TEMPLATE =
   "Hi {client_name}, please review and sign the agreement for {project}: {contract_link}";
 export const DEFAULT_WA_INVITE_TEMPLATE =
-  "Hi! {inviter_name} invited you to join {agency_name} on AgencyOS. Accept here: {invite_link}";
+  `Hi! {inviter_name} invited you to join {agency_name} on ${APP_NAME}. Accept here: {invite_link}`;
 
 /* ------------------------------------------------------------------------------------------------
  * CRM

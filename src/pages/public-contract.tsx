@@ -197,7 +197,7 @@ export default function PublicContractPage() {
           <span>
             Signed securely with{" "}
             <a href="/" className="font-medium hover:text-foreground">
-              AgencyOS
+              GrowUpliftOS
             </a>
           </span>
         </footer>

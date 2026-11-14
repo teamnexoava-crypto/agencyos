@@ -160,7 +160,7 @@ function LinkStep({ onBack, onPreview }: { onBack?: () => void; onPreview: (url:
       <ol className="grid gap-3 text-sm">
         {[
           ["Open your Google Sheet", "The first row should hold the column names – Name, Phone, Email and so on."],
-          ["Click Share → General access → “Anyone with the link”", "Keep the role as Viewer. This lets AgencyOS read the sheet; nobody can edit it."],
+          ["Click Share → General access → “Anyone with the link”", "Keep the role as Viewer. This lets GrowUpliftOS read the sheet; nobody can edit it."],
           ["Copy the link and paste it below", "From the Share window, or straight from the browser's address bar."],
         ].map(([title, text], index) => (
           <li key={title} className="flex gap-3">

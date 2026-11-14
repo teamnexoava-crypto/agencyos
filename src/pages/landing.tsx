@@ -303,7 +303,7 @@ const STEPS = [
 ];
 
 const FAQS = [
-  { q: "Is AgencyOS free?", a: "Yes – it's free to use while we're in early access. If paid plans are introduced later, you'll hear about it well before anything changes for you." },
+  { q: "Is GrowUpliftOS free?", a: "Yes – it's free to use while we're in early access. If paid plans are introduced later, you'll hear about it well before anything changes for you." },
   { q: "Do my clients need to create an account?", a: "No. Clients open a private link to view an invoice, sign a contract or follow their project. Nothing to install, nothing to remember." },
   { q: "Does it handle GST invoices?", a: "Yes. Add your GSTIN and choose CGST + SGST or IGST – the split is calculated for you and printed on the invoice. Invoices in other currencies work too." },
   { q: "Are the e-signatures valid?", a: "Each signature is recorded with the signer's name, the time, their IP address and device, and a fingerprint of the exact text they agreed to. Electronic signatures are widely accepted for ordinary business agreements; for special documents (like property deeds), check what your local law requires." },
@@ -327,7 +327,7 @@ function GetStarted({ signedIn, size = "lg" }: { signedIn: boolean; size?: "lg" 
   );
 }
 
-/** Public home page: what AgencyOS does, how it works, pricing and common questions. */
+/** Public home page: what GrowUpliftOS does, how it works, pricing and common questions. */
 export default function LandingPage() {
   const { data: me } = useMe();
   const signedIn = Boolean(me);
@@ -339,7 +339,7 @@ export default function LandingPage() {
 
       <header className="sticky top-0 z-30 border-b border-transparent bg-background/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3.5 sm:px-8">
-          <Link to="/" aria-label="AgencyOS home" className="rounded-lg">
+          <Link to="/" aria-label="GrowUpliftOS home" className="rounded-lg">
             <BrandLogo />
           </Link>
           <nav aria-label="Sections" className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
@@ -405,7 +405,7 @@ export default function LandingPage() {
         </section>
 
         {/* Spotlights */}
-        <section className="mx-auto grid max-w-6xl gap-20 px-5 py-20 sm:gap-28 sm:px-8 sm:py-28" aria-label="How AgencyOS helps">
+        <section className="mx-auto grid max-w-6xl gap-20 px-5 py-20 sm:gap-28 sm:px-8 sm:py-28" aria-label="How GrowUpliftOS helps">
           {SPOTLIGHTS.map((spotlight, index) => (
             <div key={spotlight.eyebrow} className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <Reveal className={cn(index % 2 === 1 && "lg:order-2")}>
@@ -433,7 +433,7 @@ export default function LandingPage() {
         {/* How it works */}
         <section id="how-it-works" className="scroll-mt-20 border-y bg-muted/30 py-20 sm:py-28">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
-            <SectionHeading eyebrow="How it works" title="Set up in an afternoon, not a quarter" text="No training, no implementation project. If you can use WhatsApp, you can use AgencyOS." />
+            <SectionHeading eyebrow="How it works" title="Set up in an afternoon, not a quarter" text="No training, no implementation project. If you can use WhatsApp, you can use GrowUpliftOS." />
             <ol className="mt-12 grid gap-4 md:grid-cols-3">
               {STEPS.map((step, index) => (
                 <Reveal key={step.title} delay={index * 0.08}>
@@ -520,7 +520,7 @@ export default function LandingPage() {
 
       <footer className="relative border-t">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:px-8">
-          <span>© {new Date().getFullYear()} AgencyOS</span>
+          <span>© {new Date().getFullYear()} GrowUpliftOS</span>
           <span className="flex gap-5">
             <a href="#features" className="hover:text-foreground">
               Features

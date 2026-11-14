@@ -1,5 +1,5 @@
 /**
- * AgencyOS – Cloudflare Worker configuration.
+ * GrowUpliftOS – Cloudflare Worker configuration.
  * Replace the placeholder IDs below after running the `wrangler hyperdrive create` /
  * `wrangler kv namespace create` commands described in the README. Local development works with the
  * placeholders as-is.

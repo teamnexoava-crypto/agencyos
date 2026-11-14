@@ -1,5 +1,5 @@
 /**
- * AgencyOS database schema (Supabase Postgres, via Drizzle).
+ * GrowUpliftOS database schema (Supabase Postgres, via Drizzle).
  *
  * Conventions
  *  - Column names are snake_case in SQL (Drizzle `casing: "snake_case"`), camelCase in TypeScript.

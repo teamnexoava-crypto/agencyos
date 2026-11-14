@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { DEFAULT_WA_CONTRACT_TEMPLATE } from "../../shared/constants";
+import { APP_NAME, DEFAULT_WA_CONTRACT_TEMPLATE } from "../../shared/constants";
 import { contractReference, escapeHtml, sanitizeContractHtml } from "../../shared/contract";
 import { SIGNATURE_MAX_BYTES } from "../../shared/schemas/contract";
 import type { ContractDocument, ContractSignatureDTO } from "../../shared/types";
@@ -210,7 +210,7 @@ function sealedHtml(doc: ContractDocument): string {
       ${doc.completedAt ? `<tr><td>Completed</td><td>${utcStamp(doc.completedAt)}</td></tr>` : ""}
       ${auditRows}
     </table>
-    <p class="note">The fingerprint is the SHA-256 hash of the agreement text at the moment it was signed. Both signatures were made against the same fingerprint. Signed electronically with AgencyOS.</p>
+    <p class="note">The fingerprint is the SHA-256 hash of the agreement text at the moment it was signed. Both signatures were made against the same fingerprint. Signed electronically with ${APP_NAME}.</p>
   </section>
 </main>
 </body>

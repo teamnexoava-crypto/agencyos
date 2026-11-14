@@ -9,7 +9,7 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
   return (
     <div className="min-h-dvh bg-background">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5 sm:px-8">
-        <Link to="/" aria-label="AgencyOS home" className="rounded-lg">
+        <Link to="/" aria-label="GrowUpliftOS home" className="rounded-lg">
           <BrandLogo />
         </Link>
         <ThemeToggle />
@@ -36,14 +36,14 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
   );
 }
 
-const CONTACT = "the support email shown on the AgencyOS Google sign-in screen";
+const CONTACT = "the support email shown on the GrowUpliftOS Google sign-in screen";
 
 export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy Policy">
       <section>
         <p>
-          AgencyOS is a workspace for agencies, freelancers and service providers to manage projects, team members, invoices and
+          GrowUpliftOS is a workspace for agencies, freelancers and service providers to manage projects, team members, invoices and
           contracts. This policy explains what information we collect, why, and the choices you have.
         </p>
       </section>
@@ -79,7 +79,7 @@ export function PrivacyPage() {
       <section>
         <h2>Google user data</h2>
         <p>
-          AgencyOS requests only your basic Google profile (name, email address and profile picture) and uses it solely to create and
+          GrowUpliftOS requests only your basic Google profile (name, email address and profile picture) and uses it solely to create and
           identify your account. Our use of information received from Google APIs adheres to the Google API Services User Data Policy,
           including the Limited Use requirements. We do not transfer this data to others except as needed to run the service, and we
           do not use it to train AI models.
@@ -141,7 +141,7 @@ export function TermsPage() {
     <LegalLayout title="Terms of Service">
       <section>
         <p>
-          These terms govern your use of AgencyOS. By creating an account or using the service you agree to them. If you use AgencyOS on
+          These terms govern your use of GrowUpliftOS. By creating an account or using the service you agree to them. If you use GrowUpliftOS on
           behalf of a business, you agree on that business's behalf.
         </p>
       </section>
@@ -157,7 +157,7 @@ export function TermsPage() {
       <section>
         <h2>Your content</h2>
         <p>
-          The content you add to AgencyOS remains yours. You give us permission to store and process it only as needed to operate the
+          The content you add to GrowUpliftOS remains yours. You give us permission to store and process it only as needed to operate the
           service for you. You are responsible for having the right to upload it and for the accuracy of documents you issue, such as
           invoices and contracts.
         </p>
@@ -176,7 +176,7 @@ export function TermsPage() {
       <section>
         <h2>Invoices, contracts and e-signatures</h2>
         <p>
-          AgencyOS provides tools to create documents and collect signatures; it does not provide legal, tax or accounting advice. You
+          GrowUpliftOS provides tools to create documents and collect signatures; it does not provide legal, tax or accounting advice. You
           are responsible for making sure your documents and tax calculations meet the requirements that apply to you.
         </p>
       </section>
@@ -192,14 +192,14 @@ export function TermsPage() {
       <section>
         <h2>Liability</h2>
         <p>
-          To the extent permitted by law, AgencyOS is not liable for indirect or consequential losses, or for loss of profits, revenue or
+          To the extent permitted by law, GrowUpliftOS is not liable for indirect or consequential losses, or for loss of profits, revenue or
           data arising from use of the service.
         </p>
       </section>
 
       <section>
         <h2>Ending use</h2>
-        <p>You may stop using AgencyOS at any time, and a workspace owner may delete their workspace. See the Privacy Policy for what happens to data.</p>
+        <p>You may stop using GrowUpliftOS at any time, and a workspace owner may delete their workspace. See the Privacy Policy for what happens to data.</p>
       </section>
 
       <section>

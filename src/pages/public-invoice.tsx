@@ -98,7 +98,7 @@ export default function PublicInvoicePage() {
           <span>
             Sent with{" "}
             <a href="/" className="font-medium hover:text-foreground">
-              AgencyOS
+              GrowUpliftOS
             </a>
           </span>
         </footer>

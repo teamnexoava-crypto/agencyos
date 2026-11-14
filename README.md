@@ -1,9 +1,13 @@
-# AgencyOS
+# GrowUpliftOS
 
 Multi-tenant SaaS for agency owners, freelancers and service providers: projects, team, finances,
 invoices, contracts and e-signatures, with a client-facing share link per project. The app runs on
 Cloudflare (Workers + Static Assets, R2, KV); the database is Postgres on Supabase, reached through
 Cloudflare Hyperdrive.
+
+The product was first called AgencyOS. The Worker (`agencyos`), its R2 bucket, the GitHub repository and
+the local demo accounts (`…@agencyos.local`) keep that name: renaming them would change live addresses
+and bindings for no visible benefit. The name people see comes from `APP_NAME` in `shared/constants.ts`.
 
 > **Build status — all 8 phases complete, plus a CRM.**
 > Google login and onboarding · clients · projects with milestones and tasks · team and roles ·

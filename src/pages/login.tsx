@@ -54,7 +54,7 @@ export default function LoginPage() {
         >
           <div className="flex flex-col items-center text-center">
             <BrandMark className="size-12" />
-            <h1 className="mt-5 text-2xl font-semibold tracking-tight">Welcome to AgencyOS</h1>
+            <h1 className="mt-5 text-2xl font-semibold tracking-tight">Welcome to GrowUpliftOS</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">Sign in or create your workspace in one click. No password needed.</p>
           </div>
 

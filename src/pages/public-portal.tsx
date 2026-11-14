@@ -372,7 +372,7 @@ export default function PublicPortalPage() {
           <span>
             Shared with{" "}
             <a href="/" className="font-medium hover:text-foreground">
-              AgencyOS
+              GrowUpliftOS
             </a>
           </span>
         </footer>

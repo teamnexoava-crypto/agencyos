@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { type LEAD_MAP_FIELDS, type LeadStage } from "../../shared/constants";
+import { APP_NAME, type LEAD_MAP_FIELDS, type LeadStage } from "../../shared/constants";
 import { idSchema } from "../../shared/schemas/common";
 import { leadNoteSchema, leadSchema, leadSourceSchema, leadSourceUpdateSchema, leadUpdateSchema, sheetPreviewSchema } from "../../shared/schemas/crm";
 import type { LeadDTO, LeadDetail, LeadNoteDTO, LeadSourceDTO, SheetPreview, SyncResult } from "../../shared/types";
@@ -209,7 +209,7 @@ async function syncSource(t: Tenant, source: SourceRow, testOrigin: string | und
       .onConflictDoNothing({ target: [leads.sourceId, leads.sourceKey] })
       .returning({ id: leads.id });
     if (inserted.length > 0) {
-      await t.db.insert(leadNotes).values(inserted.map((lead) => ({ workspaceId: t.workspaceId, leadId: lead.id, kind: "system" as const, body: `Imported from Google Sheet “${source.name}”`, authorName: "AgencyOS" })));
+      await t.db.insert(leadNotes).values(inserted.map((lead) => ({ workspaceId: t.workspaceId, leadId: lead.id, kind: "system" as const, body: `Imported from Google Sheet “${source.name}”`, authorName: APP_NAME })));
       added += inserted.length;
     }
   }

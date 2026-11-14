@@ -1,3 +1,4 @@
+import { APP_NAME } from "@shared/constants";
 import { renderInviteMessage } from "@shared/schemas/team";
 import type { InviteDTO } from "@shared/types";
 import { useSession } from "@/features/auth/api";
@@ -21,6 +22,6 @@ export function useInviteShare({ invite, template }: ShareProps) {
     copy: () => void copyToClipboard(link, "Invite link copied"),
     // No phone number on an invite → wa.me opens WhatsApp's own contact picker.
     whatsappHref: whatsappUrl(null, message),
-    mailHref: `mailto:${encodeURIComponent(invite.email)}?subject=${encodeURIComponent(`Join ${workspace.name} on AgencyOS`)}&body=${encodeURIComponent(message)}`,
+    mailHref: `mailto:${encodeURIComponent(invite.email)}?subject=${encodeURIComponent(`Join ${workspace.name} on ${APP_NAME}`)}&body=${encodeURIComponent(message)}`,
   };
 }

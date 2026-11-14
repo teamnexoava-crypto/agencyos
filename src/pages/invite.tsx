@@ -76,7 +76,7 @@ export default function InvitePage() {
         <h1 className="text-xl font-semibold tracking-tight">{dead?.title}</h1>
         <p className="text-sm text-muted-foreground">{dead?.body}</p>
         <Button asChild variant="outline" className="mt-2">
-          <Link to={me ? "/app" : "/login"}>{me ? "Open AgencyOS" : "Sign in"}</Link>
+          <Link to={me ? "/app" : "/login"}>{me ? "Open GrowUpliftOS" : "Sign in"}</Link>
         </Button>
       </div>
     );
@@ -86,7 +86,7 @@ export default function InvitePage() {
         <WorkspaceLogo name={invite.workspaceName ?? "Workspace"} logoUrl={invite.workspaceLogoUrl} className="size-16 rounded-2xl text-lg" />
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-balance">Join {invite.workspaceName}</h1>
         <p className="mt-2 text-sm text-balance text-muted-foreground">
-          {invite.inviterName ? <span className="font-medium text-foreground">{invite.inviterName}</span> : "Someone"} invited you to their workspace on AgencyOS as{" "}
+          {invite.inviterName ? <span className="font-medium text-foreground">{invite.inviterName}</span> : "Someone"} invited you to their workspace on GrowUpliftOS as{" "}
           {invite.role === "admin" ? "an admin" : "a member"}.
         </p>
 
@@ -136,7 +136,7 @@ export default function InvitePage() {
       <div aria-hidden="true" className="absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
       <div aria-hidden="true" className="absolute -top-40 left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
       <header className="relative flex items-center justify-between px-5 py-5 sm:px-8">
-        <Link to="/" aria-label="AgencyOS home" className="rounded-lg">
+        <Link to="/" aria-label="GrowUpliftOS home" className="rounded-lg">
           <BrandLogo />
         </Link>
         <ThemeToggle />

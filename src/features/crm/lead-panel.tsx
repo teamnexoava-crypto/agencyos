@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, Building2, CalendarClock, LoaderCircle, Mail, MessageCircle, Pencil, Phone, Trash2, UserRoundCheck } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { LEAD_NOTE_KINDS, LEAD_STAGES, type LeadNoteKind, type LeadStage } from "@shared/constants";
+import { LEAD_NOTE_KINDS, LEAD_STAGES, SYSTEM_AUTHOR_NAMES, type LeadNoteKind, type LeadStage } from "@shared/constants";
 import type { LeadDetail, MemberSummary } from "@shared/types";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
@@ -155,7 +155,7 @@ function Notes({ lead }: { lead: LeadDetail }) {
                   {system ? (
                     <p className="pt-1 text-[13px] text-muted-foreground">
                       {note.body}
-                      {note.authorName && note.authorName !== "AgencyOS" && ` · ${note.authorName}`} · {formatInstant(note.createdAt)}
+                      {note.authorName && !SYSTEM_AUTHOR_NAMES.includes(note.authorName) && ` · ${note.authorName}`} · {formatInstant(note.createdAt)}
                     </p>
                   ) : (
                     <>
