@@ -20,7 +20,7 @@ export const PLANS: Plan[] = [
     tagline: "Try it with real client work.",
     monthly: 0,
     yearly: 0,
-    highlights: ["1 user", "3 active projects", "5 invoices a month", "2 contracts with e-sign a month", "Client portal with AgencyOS badge", "CRM for up to 50 leads"],
+    highlights: ["1 user", "3 active projects", "5 invoices a month", "2 contracts with e-sign a month", "Client portal with GrowUpliftOS badge", "CRM for up to 50 leads"],
   },
   {
     id: "solo",
