@@ -58,7 +58,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
 
   const view: { icon: LucideIcon; title: string; text: string; tag: string | null; warn?: boolean } = {
     open: { icon: Sparkles, title: "Everything is unlocked", text: `Online payments are being set up. Once they open, every workspace gets a ${TRIAL_DAYS}-day free trial and you can choose a plan here.`, tag: null },
-    exempt: { icon: Gift, title: "This workspace is free", text: "It has full access with no limits and never needs a plan.", tag: null },
+    exempt: { icon: Gift, title: "This workspace is free", text: "It has everything, with no limits, and never needs a plan. The plans below are what your customers see and choose from.", tag: null },
     trial: { icon: Clock, title: "Premium free trial", ...trial() },
     active: { icon: BadgeCheck, title: `${planName} plan`, ...active() },
     free: {
@@ -203,11 +203,9 @@ export default function BillingPage() {
         <StatusCard billing={billing} autoPay={overview?.autoPay ?? null} />
 
         {/* The plans come straight after the summary: choosing one is what this page is mostly for. */}
-        {billing.status !== "exempt" && (
-          <section aria-labelledby="plans-heading">
-            <PlanChooser billing={sessionBilling} heading="Plans" />
-          </section>
-        )}
+        <section aria-labelledby="plans-heading">
+          <PlanChooser billing={sessionBilling} heading="Plans" />
+        </section>
 
         {isError ? (
           <ErrorState onRetry={() => void refetch()} />

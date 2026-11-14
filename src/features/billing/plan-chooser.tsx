@@ -178,7 +178,9 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
                 <Check className="text-emerald-600 dark:text-emerald-400" /> Active
               </Button>
             ) : (
-              <p className="flex h-9 items-center justify-center text-center text-[13px] text-muted-foreground">{current.status === "trial" ? "Yours after the trial, if you don't upgrade" : "Yours if your plan ends"}</p>
+              <p className="flex h-9 items-center justify-center text-center text-[13px] text-muted-foreground">
+                {current.status === "exempt" ? "Where customers land after their trial" : current.status === "trial" ? "Yours after the trial, if you don't upgrade" : "Yours if your plan ends"}
+              </p>
             );
           }
           // In the auto-pay view the current plan is simply "Active"; with one-off payments the same
@@ -208,7 +210,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
       <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] text-balance text-muted-foreground">
         {!canPay ? (
           current.status === "exempt" ? (
-            "This workspace doesn't need a plan."
+            "Shown for reference – this workspace is free, so there is nothing to pay here."
           ) : (
             "Online payments are being set up. Everything stays unlocked until then."
           )
