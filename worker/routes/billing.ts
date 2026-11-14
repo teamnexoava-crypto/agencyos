@@ -12,7 +12,20 @@ import { appOrigin } from "../lib/request";
 import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
 import { rateLimit } from "../middleware/rate-limit";
-import { CHECKOUT_TTL_MS, autoPayOverview, billingOf, cancelSubscription, ensureProviderPlan, reconcileBilling, settlePayment, syncSubscription, toPaymentDTO, usageOf } from "../services/billing";
+import {
+  CHECKOUT_TTL_MS,
+  autoPayOverview,
+  basisOf,
+  billingOf,
+  cancelPendingSetups,
+  cancelSubscription,
+  ensureProviderPlan,
+  reconcileBilling,
+  settlePayment,
+  syncSubscription,
+  toPaymentDTO,
+  usageOf,
+} from "../services/billing";
 import type { AppEnv } from "../types";
 
 /** Only ever send people to Razorpay's own payment pages. */
@@ -94,15 +107,21 @@ export const billingRoutes = new Hono<AppEnv>()
     // Decide on current facts: a charge or an approval may have happened since this page was loaded.
     await reconcileBilling(t.db, c.env, t.workspaceId);
     const ws = await freshWorkspace(t);
-    const billing = billingOf(c.env, ws);
-    if (billing.status === "active" && billing.autoPay === "on" && ws.plan === plan) {
-      throw new ApiError(409, "conflict", `Auto-pay is already on for the ${PLANS[plan].name} plan.`);
+    if (billingOf(c.env, ws).autoPay === "on" && ws.subscriptionId) {
+      const [live] = await t.db
+        .select({ plan: billingSubscriptions.plan })
+        .from(billingSubscriptions)
+        .where(t.where(billingSubscriptions, eq(billingSubscriptions.id, ws.subscriptionId)))
+        .limit(1);
+      if (live?.plan === plan) throw new ApiError(409, "conflict", `Auto-pay is already on for the ${PLANS[plan].name} plan.`);
     }
 
     const amount = PLANS[plan].price.monthly;
     const now = new Date();
 
-    // A double click, or coming back to try again, reuses the page that is still open.
+    // A double click, or coming back to try again, reuses the page that is still open – as long as
+    // the workspace is still as it was when that page was priced.
+    const basis = basisOf(ws);
     const [open] = await t.db
       .select()
       .from(billingSubscriptions)
@@ -118,7 +137,9 @@ export const billingRoutes = new Hono<AppEnv>()
       )
       .orderBy(desc(billingSubscriptions.createdAt))
       .limit(1);
-    if (open?.shortUrl && isPaymentPage(open.shortUrl, c.env)) return c.json({ url: open.shortUrl });
+    if (open?.shortUrl && open.basis === basis && isPaymentPage(open.shortUrl, c.env)) return c.json({ url: open.shortUrl });
+    // Only one approval page is valid at a time: earlier ones (another plan, or out of date) are withdrawn.
+    await cancelPendingSetups(t.db, c.env, t.workspaceId);
 
     // Billing starts when the time already covered runs out – the rest of the trial, or days already
     // paid for (converted to the new plan's price). If that is less than an hour away it starts now.
@@ -129,7 +150,7 @@ export const billingRoutes = new Hono<AppEnv>()
       throw autoPayProblem(error);
     });
     const id = newId();
-    await t.db.insert(billingSubscriptions).values({ id, workspaceId: t.workspaceId, plan, cycle: "monthly", amount, providerPlanId, startAt, createdBy: t.member.id, createdByName: t.user.name });
+    await t.db.insert(billingSubscriptions).values({ id, workspaceId: t.workspaceId, plan, cycle: "monthly", amount, providerPlanId, startAt, basis, createdBy: t.member.id, createdByName: t.user.name });
     try {
       const created = await createSubscription(c.env, {
         providerPlanId,
@@ -198,7 +219,7 @@ export const billingRoutes = new Hono<AppEnv>()
       amount,
       description: `${APP_NAME} ${PLANS[plan].name} plan – ${cycle === "yearly" ? "1 year" : "1 month"} for ${t.workspace.name}`.slice(0, 250),
       referenceId: paymentId,
-      customer: { name: t.user.name.slice(0, 100), email: t.user.email },
+      customer: { email: t.user.email },
       callbackUrl: `${appOrigin(c)}/api/billing/callback`,
       expireBy: Math.floor((Date.now() + CHECKOUT_TTL_MS) / 1000),
       notes: { workspace_id: t.workspaceId, plan, cycle },
@@ -254,6 +275,8 @@ interface WebhookEvent {
  * Razorpay. An error answers 5xx, and Razorpay delivers the event again later.
  */
 export const webhookRoutes = new Hono<AppEnv>().post("/razorpay", async (c) => {
+  // Refuse anything oversized before reading it.
+  if (Number(c.req.header("Content-Length") ?? 0) > 200_000) throw new ApiError(413, "too_large", "Too large.");
   const raw = await c.req.text();
   if (raw.length > 200_000 || !(await isValidWebhookSignature(c.env, raw, c.req.header("X-Razorpay-Signature")))) {
     throw new ApiError(401, "unauthorized", "Invalid signature.");

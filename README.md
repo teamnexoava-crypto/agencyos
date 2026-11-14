@@ -143,13 +143,18 @@ screen and the server-side limits all read.
   this payment link / subscription"; `settlePayment()` and `syncSubscription()` then read it from
   Razorpay with our keys. Both are idempotent (row locks; each auto-pay charge has a number and a
   unique index), so the redirect, the webhooks and our own re-checks can all arrive for the same thing.
-- **Paid time.** A one-off payment adds its period after the time already paid for; switching plans
-  converts unused time at the old price into days at the new one (`nextPaidPeriod`). An auto-pay
-  mandate set up during the trial (or while paid time remains) starts billing when that time ends.
-  Each successful charge moves `paid_until` to the end of its cycle.
+- **Paid time.** A one-off payment adds its period exactly where the time already paid for ends;
+  switching plans converts unused *paid* time at the old price into days at the new one
+  (`nextPaidPeriod`). Trial days are never treated as paid: a mandate approved during the trial
+  leaves the workspace on its trial and gives it its plan with the first charge. Each successful
+  charge moves `paid_until` to the end of its cycle.
+- **Money is never dropped.** A charge taken by a mandate that is not (or no longer) the workspace's
+  auto-pay still buys time on the workspace's current plan.
 - **Only one thing can ever charge.** A newly approved mandate stops the previous one before it
   becomes the workspace's auto-pay; a one-off payment stops auto-pay before it is settled; deleting a
-  workspace stops its mandates first. If Razorpay can't confirm the stop, the step is not carried out
+  workspace stops its mandates first. Every set-up remembers what it was priced on (`basis`): starting
+  another, or paying another way, withdraws it, and if it is approved anyway after the workspace has
+  moved on it is stopped instead of used. If Razorpay can't confirm the stop, the step is not carried out
   and is retried later (the webhook answers non-2xx so Razorpay redelivers).
 - **Failed charges.** While Razorpay retries (`pending`) the plan stays usable for
   `AUTOPAY_GRACE_DAYS` past the paid date; once it gives up (`halted`) or the payer pauses the
@@ -157,6 +162,8 @@ screen and the server-side limits all read.
 - **It works without webhooks too.** Reading the session (`refreshBillingIfDue`) re-checks Razorpay
   when a charge is due and once more just before a lock screen would be shown; opening Billing
   re-checks everything still open. Webhooks only make it faster.
+- **Switching on is fair to existing workspaces.** The first time the keys are present
+  (`ensureBillingSwitchedOn`), every workspace that has not paid gets a full trial from that moment.
 - `billing_exempt = true` on a workspace means it is never charged or locked.
 
 **Switching payments on** (until then the status is `open`: nothing is limited, locked or chargeable):

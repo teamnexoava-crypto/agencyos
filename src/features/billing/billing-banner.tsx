@@ -13,16 +13,18 @@ export function BillingBanner() {
   const { canManage } = useSession();
   const { pathname } = useLocation();
 
-  const trial = billing.status === "trial";
-  // A failed auto-pay charge that Razorpay is retrying: the plan is on borrowed time.
-  const retrying = billing.status === "active" && billing.autoPay === "retrying";
+  // With auto-pay set up, the trial rolls into the plan by itself: nothing to nag about.
+  // A failed auto-pay charge that Razorpay is retrying: the workspace is on borrowed time.
+  const retrying = billing.autoPay === "retrying" && (billing.status === "active" || billing.status === "trial");
+  // With auto-pay set up, the trial rolls into the plan by itself: nothing to nag about.
+  const trial = billing.status === "trial" && billing.autoPay !== "on" && !retrying;
   // With auto-pay on the plan renews by itself, so there is nothing to remind anyone of.
   const ending = billing.status === "active" && billing.autoPay !== "on" && !retrying && billing.daysLeft !== null && billing.daysLeft <= RENEWAL_REMINDER_DAYS;
   if ((!trial && !ending && !retrying) || billing.daysLeft === null || pathname === "/app/billing") return null;
 
   const urgent = retrying || billing.daysLeft <= 2;
   const planName = billing.plan ? PLANS[billing.plan].name : "";
-  const text = trial ? `Your free trial ends ${days(billing.daysLeft)}.` : retrying ? `We couldn't collect the payment for your ${planName} plan.` : `Your ${planName} plan ends ${days(billing.daysLeft)}.`;
+  const text = trial ? `Your free trial ends ${days(billing.daysLeft)}.` : retrying ? `We couldn't collect the payment for your ${planName ? `${planName} plan` : "plan"}.` : `Your ${planName} plan ends ${days(billing.daysLeft)}.`;
 
   return (
     <div role="status" className={cn("flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-4 py-2 text-center text-[13px] print:hidden", urgent ? "bg-amber-500/15 text-amber-900 dark:text-amber-200" : "bg-primary/10 text-foreground")}>

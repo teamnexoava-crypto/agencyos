@@ -57,12 +57,22 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
   // The overview is checked against Razorpay each time it loads, so it can be ahead of the session.
   const current = overview?.billing ?? billing;
   const onPlan = current.status === "active" ? current.plan : null;
-  const autoPayOn = current.status === "active" && current.autoPay === "on";
+  // The plan a working mandate collects for – during the trial that is not yet the workspace's plan.
+  const mandatePlan = overview?.autoPay?.state === "on" ? overview.autoPay.plan : null;
   const hasMandate = current.autoPay === "on" || current.autoPay === "retrying";
   const canPay = current.enabled && current.status !== "exempt";
   const autoPay = cycle === "monthly" && !monthByMonth;
   // Stays busy after a one-off checkout succeeds: the browser is on its way to the payment page.
   const busy = checkout.isPending || checkout.isSuccess || subscribe.isPending;
+
+  // Coming back with the browser's Back button restores this page as it was left – buttons still
+  // "busy". Clear that so another plan can be chosen.
+  const resetCheckout = checkout.reset;
+  useEffect(() => {
+    const onShow = (event: PageTransitionEvent) => event.persisted && resetCheckout();
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, [resetCheckout]);
 
   // When the overview has moved on (a mandate approved, a charge received), bring the session along –
   // that is what unlocks the app and updates the banner.
@@ -124,8 +134,9 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
 
   const label = (plan: Plan) => {
     if (!autoPay) return `Pay ${formatPlanPrice(plan.price[cycle])} for 1 ${cycle === "yearly" ? "year" : "month"}`;
-    if (plan.id === onPlan) return autoPayOn ? "Auto-pay is on" : "Turn on auto-pay";
-    return onPlan ? `Switch to ${plan.name}` : `Choose ${plan.name}`;
+    if (plan.id === mandatePlan) return "Auto-pay is on";
+    if (plan.id === onPlan) return "Turn on auto-pay";
+    return onPlan || mandatePlan ? `Switch to ${plan.name}` : `Choose ${plan.name}`;
   };
 
   return (
@@ -135,9 +146,9 @@ export function PlanChooser({ billing }: { billing: BillingDTO }) {
       <PlanCards
         cycle={cycle}
         className="mt-8"
-        badge={(plan) => (plan.id === onPlan ? "Your plan" : null)}
+        badge={(plan) => (plan.id === (onPlan ?? mandatePlan) ? "Your plan" : null)}
         action={(plan) => (
-          <Button variant={plan.popular ? "default" : "outline"} disabled={!canPay || busy || (autoPay && plan.id === onPlan && autoPayOn)} onClick={() => choose(plan)}>
+          <Button variant={plan.popular ? "default" : "outline"} disabled={!canPay || busy || (autoPay && plan.id === mandatePlan)} onClick={() => choose(plan)}>
             {busy && chosen === plan.id && <LoaderCircle className="animate-spin" />}
             {label(plan)}
           </Button>

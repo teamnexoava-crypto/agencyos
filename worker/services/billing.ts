@@ -1,14 +1,16 @@
-import { and, desc, eq, gt, gte, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, ne, notInArray, sql } from "drizzle-orm";
 import { APP_NAME } from "../../shared/constants";
 import {
   AUTOPAY_GRACE_DAYS,
   NO_LIMITS,
   PLANS,
+  TRIAL_DAYS,
   TRIAL_PLAN,
   addMonths,
   autoPayStateOf,
   isSubscriptionOver,
   nextPaidPeriod,
+  paidTimeFor,
   type BillingCycle,
   type BillingPaymentStatus,
   type PlanId,
@@ -16,7 +18,7 @@ import {
 } from "../../shared/plans";
 import type { AutoPayDTO, BillingDTO, BillingPaymentDTO, BillingUsage, PendingSetupDTO } from "../../shared/types";
 import type { Database } from "../db";
-import { billingPayments, billingProviderPlans, billingSubscriptions, contracts, files, invites, leadSources, workspaceMembers, workspaces } from "../db/schema";
+import { appFlags, billingPayments, billingProviderPlans, billingSubscriptions, contracts, files, invites, leadSources, workspaceMembers, workspaces } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import {
   RazorpayError,
@@ -45,18 +47,32 @@ export function billingOf(env: Env, ws: WorkspaceRow, now = new Date()): Billing
   const base = { plan: ws.plan, trialEndsAt: ws.trialEndsAt.getTime(), paidUntil: ws.paidUntil?.getTime() ?? null };
   if (!isBillingConfigured(env)) return { ...base, enabled: false, status: "open", daysLeft: null, autoPay: null, limits: NO_LIMITS };
   if (ws.billingExempt) return { ...base, enabled: true, status: "exempt", daysLeft: null, autoPay: null, limits: NO_LIMITS };
-  if (ws.plan && ws.paidUntil) {
-    // An auto-pay charge is taken on the day the paid period ends and may land a little later (and a
-    // failed one is retried), so the plan stays usable for a few days past that date while it does.
-    const usableUntil = ws.paidUntil.getTime() + (autoPay === "on" || autoPay === "retrying" ? GRACE_MS : 0);
-    if (usableUntil > now.getTime()) {
-      return { ...base, enabled: true, status: "active", daysLeft: daysUntil(ws.paidUntil, now), autoPay, limits: PLANS[ws.plan].limits };
-    }
+  // An auto-pay charge is taken on the day the covered time ends and may land a little later (and a
+  // failed one is retried), so the workspace stays usable for a few days past that date while it does.
+  const grace = autoPay === "on" || autoPay === "retrying" ? GRACE_MS : 0;
+  if (ws.plan && ws.paidUntil && ws.paidUntil.getTime() + grace > now.getTime()) {
+    return { ...base, enabled: true, status: "active", daysLeft: daysUntil(ws.paidUntil, now), autoPay, limits: PLANS[ws.plan].limits };
   }
-  if (!ws.plan && ws.trialEndsAt > now) {
+  // A mandate approved during the trial takes its first payment the day the trial ends; until that
+  // payment arrives nothing has been paid, so the workspace is simply still on its trial.
+  if (!ws.plan && ws.trialEndsAt.getTime() + grace > now.getTime()) {
     return { ...base, enabled: true, status: "trial", daysLeft: daysUntil(ws.trialEndsAt, now), autoPay, limits: PLANS[TRIAL_PLAN].limits };
   }
   return { ...base, enabled: true, status: "expired", daysLeft: null, autoPay, limits: PLANS[ws.plan ?? TRIAL_PLAN].limits };
+}
+
+/**
+ * What an auto-pay set-up is priced on: the plan, the time paid for and the mandate in place when it
+ * was created. If any of that has changed by the time the payer approves it (they paid another way in
+ * the meantime, say), its start date and plan no longer fit and it must not be used.
+ */
+export const basisOf = (ws: WorkspaceRow): string => `${ws.plan ?? ""}|${ws.paidUntil?.getTime() ?? ""}|${ws.subscriptionId ?? ""}`;
+
+/** A set-up still fits if plan and paid time are as they were; the old mandate may be the same one or already stopped. */
+export function isSetupFresh(basis: string | null, ws: WorkspaceRow): boolean {
+  if (basis === null) return true;
+  const [plan, paidUntil, mandate] = basis.split("|");
+  return plan === (ws.plan ?? "") && paidUntil === String(ws.paidUntil?.getTime() ?? "") && (ws.subscriptionId === null || ws.subscriptionId === mandate);
 }
 
 /** Thrown by `tenant()` for every request except billing itself once the trial or plan has run out. */
@@ -201,6 +217,8 @@ export async function settlePayment(db: Database, env: Env, paymentId: string, o
     if (!locked || locked.status !== "created") return;
     const [ws] = await tx.select().from(workspaces).where(eq(workspaces.id, locked.workspaceId)).for("update");
     if (!ws) return;
+    // A mandate became live between the check above and this lock: back out and come round again.
+    if (ws.subscriptionId) throw new ApiError(409, "conflict", "Auto-pay changed while this payment was being confirmed.");
 
     const now = new Date();
     const period = nextPaidPeriod({ plan: ws.plan, paidUntil: ws.paidUntil, trialEndsAt: ws.trialEndsAt }, { plan: locked.plan, cycle: locked.cycle }, now);
@@ -210,6 +228,8 @@ export async function settlePayment(db: Database, env: Env, paymentId: string, o
       .set({ status: "paid", paidAt: now, periodStart: period.start, periodEnd: period.end, providerPaymentId })
       .where(eq(billingPayments.id, locked.id));
   });
+  // Any auto-pay set-up still waiting to be approved was priced on the old state: withdraw it.
+  await cancelPendingSetups(db, env, payment.workspaceId);
   return "paid";
 }
 
@@ -239,10 +259,11 @@ const isApproved = (entity: ProviderSubscription) => (entity.status !== "created
 
 /**
  * Writes what Razorpay says about one subscription into our records, in one transaction:
- *  - the first time the mandate is approved, the subscription becomes the workspace's auto-pay and
- *    its plan (`promote`);
- *  - every charge not yet counted adds its month to the workspace's paid time and a row to the
- *    payment history (each charge has a number, so none is ever counted twice);
+ *  - the first time the mandate is approved it becomes the workspace's auto-pay (`promote`), provided
+ *    the workspace is still as it was when the set-up was priced;
+ *  - every charge not yet counted is turned into paid time and a row in the payment history. Each
+ *    charge has a number, so none is ever counted twice – and none is ever dropped: money taken by a
+ *    mandate that is not (or no longer) the workspace's auto-pay still buys time on its current plan;
  *  - once Razorpay says the subscription is over, the workspace is detached from it. The plan and
  *    the time already paid for stay.
  */
@@ -259,35 +280,36 @@ async function applySubscription(db: Database, subscriptionId: string, entity: P
     let live = ws.subscriptionId === sub.id;
     let plan = ws.plan;
     let paidUntil = ws.paidUntil;
+    let startedNow = false;
 
-    let promotedToStartNow = false;
     if (options.promote && !live && sub.status === "created" && isApproved(entity)) {
+      // The caller has already dealt with a stale set-up and with any earlier mandate; reaching either
+      // of these means something changed in between, so nothing is written and the step is retried.
+      if (!isSetupFresh(sub.basis, ws)) throw new ApiError(409, "conflict", "The workspace changed while auto-pay was being set up.");
       if (ws.subscriptionId) {
-        // The caller stops any earlier mandate before promoting a new one; reaching this means it
-        // could not, so nothing is changed and the step is tried again later.
         const [other] = await tx.select({ status: billingSubscriptions.status }).from(billingSubscriptions).where(eq(billingSubscriptions.id, ws.subscriptionId)).limit(1);
         if (other && !isSubscriptionOver(other.status)) throw new ApiError(409, "conflict", "Another auto-pay mandate is still active.");
       }
       live = true;
-      // Until the first charge lands the workspace is covered up to the planned start (the end of the
-      // trial, or of the time already paid for, converted to the new plan) – or just until now.
-      const startsLater = sub.startAt !== null && sub.startAt > now;
-      const keepsTime = ws.plan === sub.plan && ws.paidUntil && ws.paidUntil > now ? ws.paidUntil : now;
-      paidUntil = startsLater ? sub.startAt : keepsTime;
-      plan = sub.plan;
-      promotedToStartNow = !startsLater;
+      if (sub.startAt === null) {
+        // Billing starts with the approval itself.
+        plan = sub.plan;
+        paidUntil = ws.plan === sub.plan && ws.paidUntil && ws.paidUntil > now ? ws.paidUntil : now;
+        startedNow = true;
+      } else if (ws.plan !== null || sub.startAt <= now) {
+        // Billing starts when the time already paid for runs out (converted, if the plan changes).
+        plan = sub.plan;
+        paidUntil = sub.startAt;
+      }
+      // Otherwise it was approved during the trial: nothing has been paid yet, so the workspace stays
+      // on its trial and gets its plan with the first charge.
     }
 
-    const step = sub.cycle === "yearly" ? 12 : 1;
+    const months = sub.cycle === "yearly" ? 12 : 1;
     // No single charge can pay for more than one cycle from today (plus slack for time zones).
-    const cap = new Date(addMonths(now, step).getTime() + 7 * DAY_MS);
-    const record = async (number: number, wanted: Date, paymentId: string | null) => {
-      let periodEnd = wanted;
-      if (periodEnd > cap) {
-        console.error("Subscription period end looked wrong and was capped", { subscriptionId: sub.id, periodEnd, cap });
-        periodEnd = cap;
-      }
-      await tx
+    const cap = new Date(addMonths(now, months).getTime() + 7 * DAY_MS);
+    const record = (number: number, start: Date, end: Date, paymentId: string | null) =>
+      tx
         .insert(billingPayments)
         .values({
           workspaceId: sub.workspaceId,
@@ -298,62 +320,80 @@ async function applySubscription(db: Database, subscriptionId: string, entity: P
           amount: sub.amount,
           status: "paid",
           paidAt: now,
-          periodStart: addMonths(periodEnd, -step),
-          periodEnd,
+          periodStart: start,
+          periodEnd: end,
           providerPaymentId: paymentId,
           createdBy: sub.createdBy,
           createdByName: sub.createdByName,
         })
         .onConflictDoNothing();
-      return periodEnd;
+    const capped = (wanted: Date) => {
+      if (wanted <= cap) return wanted;
+      console.error("Subscription period end looked wrong and was capped", { subscriptionId: sub.id, wanted, cap });
+      return cap;
     };
 
     let counted = sub.paidCount;
     const cycleEnd = status === "active" ? fromUnix(entity.current_end) : null;
-    if (charges > counted) {
-      // The normal case: Razorpay's count of successful charges has gone up.
+    if (charges > counted && live) {
+      // The normal case: Razorpay's count of successful charges on the workspace's mandate went up.
       const anchor = fromUnix(entity.start_at) ?? sub.startAt ?? now;
-      let creditedEnd: Date | null = null;
       for (let number = counted + 1; number <= charges; number++) {
         const latest = number === charges;
         // While the subscription is in good standing Razorpay's own cycle end is the paid-through date;
         // otherwise (a later charge is failing) it is worked out from the number of charges received.
-        creditedEnd = await record(number, latest && cycleEnd ? cycleEnd : addMonths(anchor, number * step), latest ? (options.paymentId ?? null) : null);
+        const end = capped(latest && cycleEnd ? cycleEnd : addMonths(anchor, number * months));
+        await record(number, addMonths(end, -months), end, latest ? (options.paymentId ?? null) : null);
+        paidUntil = later(paidUntil, end);
       }
+      plan = sub.plan;
       counted = charges;
-      if (live && creditedEnd) {
-        paidUntil = later(paidUntil, creditedEnd);
-        plan = sub.plan;
-      } else if (!live) {
-        console.error("A charge arrived on a subscription that is not the workspace's auto-pay", { subscriptionId: sub.id });
+    } else if (charges > counted) {
+      // Money taken by a mandate that is not the workspace's auto-pay (a set-up approved after the
+      // workspace had moved on, or a last charge on one being stopped). It is never lost: each charge
+      // buys time on the plan the workspace is on, after everything already covered.
+      const target: PlanId = ws.plan ?? sub.plan;
+      for (let number = counted + 1; number <= charges; number++) {
+        const start = later(later(paidUntil, ws.trialEndsAt), now);
+        const end = new Date(start.getTime() + paidTimeFor(sub.amount, target));
+        await record(number, start, end, number === charges ? (options.paymentId ?? null) : null);
+        paidUntil = end;
       }
-    } else if (live && cycleEnd && cycleEnd > now && (!paidUntil || cycleEnd.getTime() > paidUntil.getTime() + DAY_MS)) {
+      plan = target;
+      counted = charges;
+    } else if (live && cycleEnd && cycleEnd > now) {
       // A safety net, in case the count above ever lags behind what Razorpay has collected. Razorpay
       // says the subscription is active in a cycle that runs past what we have counted. That is taken
       // as paid in two situations only: the mandate was approved a moment ago with billing starting at
-      // once (so "active" can only mean the first payment went through), or the paid date passed more
-      // than a day ago – by then a failed charge would show as "pending", not "active".
-      const overdue = paidUntil !== null && now.getTime() > paidUntil.getTime() + DAY_MS;
-      if (promotedToStartNow || overdue) {
+      // once (so "active" can only mean the first payment went through), or the covered date passed
+      // more than a day ago – by then a failed charge would show as "pending", not "active".
+      const covered = paidUntil ?? sub.startAt;
+      const behind = !covered || cycleEnd.getTime() > covered.getTime() + DAY_MS;
+      const overdue = covered !== null && now.getTime() > covered.getTime() + DAY_MS;
+      if (behind && (startedNow || overdue)) {
         console.error("Counted a subscription cycle from its dates rather than its charge count", { subscriptionId: sub.id, charges, counted });
         counted += 1;
-        paidUntil = later(paidUntil, await record(counted, cycleEnd, options.paymentId ?? null));
+        const end = capped(cycleEnd);
+        await record(counted, addMonths(end, -months), end, options.paymentId ?? null);
+        paidUntil = later(paidUntil, end);
         plan = sub.plan;
       }
     }
 
     await tx
       .update(billingSubscriptions)
-      .set({ status, paidCount: Math.max(counted, charges), startAt: fromUnix(entity.start_at) ?? sub.startAt, nextChargeAt: fromUnix(entity.charge_at), syncedAt: now })
+      .set({ status, paidCount: Math.max(counted, charges), nextChargeAt: fromUnix(entity.charge_at), syncedAt: now })
       .where(eq(billingSubscriptions.id, sub.id));
 
-    if (live) {
-      const over = isSubscriptionOver(status);
-      await tx
-        .update(workspaces)
-        .set({ plan, paidUntil, subscriptionId: over ? null : sub.id, subscriptionStatus: over ? null : status, subscriptionSyncedAt: now })
-        .where(eq(workspaces.id, ws.id));
-    }
+    const over = isSubscriptionOver(status);
+    await tx
+      .update(workspaces)
+      .set({
+        plan,
+        paidUntil,
+        ...(live ? { subscriptionId: over ? null : sub.id, subscriptionStatus: over ? null : status, subscriptionSyncedAt: now } : {}),
+      })
+      .where(eq(workspaces.id, ws.id));
   });
 }
 
@@ -367,13 +407,31 @@ export async function syncSubscription(db: Database, env: Env, subscriptionId: s
   if (!sub?.providerSubscriptionId || isSubscriptionOver(sub.status)) return;
 
   const entity = await fetchSubscription(env, sub.providerSubscriptionId, options.timeoutMs);
-  if (sub.status === "created" && isApproved(entity)) {
-    // A newly approved mandate replaces whatever was paying before. The old one is stopped first, so
-    // there are never two that can both charge; if that fails, this throws and is tried again later.
-    const [ws] = await db.select({ subscriptionId: workspaces.subscriptionId }).from(workspaces).where(eq(workspaces.id, sub.workspaceId)).limit(1);
-    if (ws?.subscriptionId && ws.subscriptionId !== sub.id) await cancelSubscription(db, env, ws.subscriptionId);
+  if (sub.status !== "created" || !isApproved(entity)) return applySubscription(db, sub.id, entity, { promote: false, paymentId: options.paymentId });
+
+  // A set-up has just been approved. Any failure below throws, and the whole step is tried again later.
+  const workspace = async () => (await db.select().from(workspaces).where(eq(workspaces.id, sub.workspaceId)).limit(1))[0];
+  let ws = await workspace();
+  if (!ws) return;
+  if (ws.subscriptionId && ws.subscriptionId !== sub.id) {
+    // Look at the mandate it would replace first, so a charge that one has just taken is counted
+    // before deciding whether this set-up still fits.
+    await syncSubscription(db, env, ws.subscriptionId, { timeoutMs: options.timeoutMs });
+    ws = await workspace();
+    if (!ws) return;
   }
+  if (!isSetupFresh(sub.basis, ws)) {
+    // The workspace has moved on since this set-up was priced (paid another way, another set-up
+    // approved first…). Using it would start billing on the wrong date or plan, so it is stopped
+    // instead; anything it has already taken is turned into paid time on the way.
+    console.error("An out-of-date auto-pay set-up was approved and has been stopped", { subscriptionId: sub.id });
+    return cancelSubscription(db, env, sub.id);
+  }
+  // It replaces whatever was paying before. The old mandate is stopped first, so there are never two
+  // that can both charge.
+  if (ws.subscriptionId && ws.subscriptionId !== sub.id) await cancelSubscription(db, env, ws.subscriptionId);
   await applySubscription(db, sub.id, entity, { promote: true, paymentId: options.paymentId });
+  await cancelPendingSetups(db, env, sub.workspaceId, sub.id);
 }
 
 /**
@@ -420,55 +478,105 @@ export async function cancelSubscription(db: Database, env: Env, subscriptionId:
   await applySubscription(db, sub.id, isSubscriptionOver(entity.status) ? entity : { ...entity, status: "cancelled" }, { promote: false });
 }
 
+const NOT_OVER = notInArray(billingSubscriptions.status, ["cancelled", "completed", "expired"]);
+
+/**
+ * Withdraws auto-pay set-ups that are still waiting to be approved – they were priced on a state the
+ * workspace has now left. Best effort: if Razorpay won't confirm, the set-up is caught as out of date
+ * if it is ever approved.
+ */
+export async function cancelPendingSetups(db: Database, env: Env, workspaceId: string, exceptId?: string): Promise<void> {
+  const rows = await db
+    .select({ id: billingSubscriptions.id })
+    .from(billingSubscriptions)
+    .where(and(eq(billingSubscriptions.workspaceId, workspaceId), eq(billingSubscriptions.status, "created"), isNotNull(billingSubscriptions.providerSubscriptionId), exceptId ? ne(billingSubscriptions.id, exceptId) : undefined));
+  for (const row of rows) {
+    try {
+      await cancelSubscription(db, env, row.id);
+    } catch (error) {
+      console.error("Could not withdraw a pending auto-pay set-up", error);
+    }
+  }
+}
+
 /** Stops every subscription of a workspace that could still charge (used before the workspace is deleted). */
 export async function cancelAllSubscriptions(db: Database, env: Env, workspaceId: string): Promise<void> {
   const rows = await db
     .select({ id: billingSubscriptions.id })
     .from(billingSubscriptions)
-    .where(and(eq(billingSubscriptions.workspaceId, workspaceId), isNotNull(billingSubscriptions.providerSubscriptionId), notInArray(billingSubscriptions.status, ["cancelled", "completed", "expired"])));
+    .where(and(eq(billingSubscriptions.workspaceId, workspaceId), isNotNull(billingSubscriptions.providerSubscriptionId), NOT_OVER));
   for (const row of rows) await cancelSubscription(db, env, row.id);
 }
 
-/** One-off payments started recently but never confirmed are looked at again for this long. */
-const RECHECK_WINDOW_MS = 24 * 3_600_000;
-
 /**
  * The safety net behind the redirect and the webhooks: asks Razorpay about everything of this
- * workspace that might have changed – one-off payments still open, auto-pay set-ups not yet approved,
- * and the live mandate. Problems are logged and skipped; the next call tries again.
+ * workspace that might have changed – one-off payments still open, the live mandate, and auto-pay
+ * set-ups not yet approved. Problems are logged and skipped, and the answer says whether every check
+ * went through; only then is the workspace marked as checked, so a failed look is repeated soon.
  */
-export async function reconcileBilling(db: Database, env: Env, workspaceId: string, options: { timeoutMs?: number } = {}): Promise<void> {
-  if (!isBillingConfigured(env)) return;
-  const [payments, subscriptions] = await Promise.all([
+export async function reconcileBilling(db: Database, env: Env, workspaceId: string, options: { timeoutMs?: number } = {}): Promise<boolean> {
+  if (!isBillingConfigured(env)) return true;
+  const [payments, subscriptions, wsRows] = await Promise.all([
+    // Every payment page that was opened and not yet seen paid or closed. Pages expire after half an
+    // hour, so each of these settles one way or the other the next time it is looked at.
     db
       .select({ id: billingPayments.id })
       .from(billingPayments)
-      .where(and(eq(billingPayments.workspaceId, workspaceId), eq(billingPayments.status, "created"), isNotNull(billingPayments.providerLinkId), gt(billingPayments.createdAt, new Date(Date.now() - RECHECK_WINDOW_MS))))
-      .orderBy(desc(billingPayments.createdAt))
-      .limit(3),
+      .where(and(eq(billingPayments.workspaceId, workspaceId), eq(billingPayments.status, "created"), isNotNull(billingPayments.providerLinkId)))
+      .orderBy(asc(billingPayments.createdAt))
+      .limit(5),
     db
       .select({ id: billingSubscriptions.id })
       .from(billingSubscriptions)
-      .where(and(eq(billingSubscriptions.workspaceId, workspaceId), isNotNull(billingSubscriptions.providerSubscriptionId), notInArray(billingSubscriptions.status, ["cancelled", "completed", "expired"])))
+      .where(and(eq(billingSubscriptions.workspaceId, workspaceId), isNotNull(billingSubscriptions.providerSubscriptionId), NOT_OVER))
       .orderBy(desc(billingSubscriptions.createdAt))
-      .limit(4),
+      .limit(5),
+    db.select({ subscriptionId: workspaces.subscriptionId }).from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1),
   ]);
+  let ok = true;
   for (const payment of payments) {
     try {
       await settlePayment(db, env, payment.id, { timeoutMs: options.timeoutMs });
     } catch (error) {
+      ok = false;
       console.error("Could not re-check a pending payment", error);
     }
   }
-  // Oldest first, so that if two set-ups were both approved the newest ends up as the live one.
-  for (const subscription of subscriptions.reverse()) {
+  // The live mandate first (always, however many set-ups there are), then set-ups from the newest:
+  // the first one found approved is used, and any older one is then out of date.
+  const liveId = wsRows[0]?.subscriptionId ?? null;
+  const ids = [...(liveId ? [liveId] : []), ...subscriptions.map((row) => row.id).filter((id) => id !== liveId)];
+  for (const id of ids) {
     try {
-      await syncSubscription(db, env, subscription.id, { timeoutMs: options.timeoutMs });
+      await syncSubscription(db, env, id, { timeoutMs: options.timeoutMs });
     } catch (error) {
+      ok = false;
       console.error("Could not re-check a subscription", error);
     }
   }
-  await db.update(workspaces).set({ subscriptionSyncedAt: new Date() }).where(eq(workspaces.id, workspaceId));
+  if (ok) await db.update(workspaces).set({ subscriptionSyncedAt: new Date() }).where(eq(workspaces.id, workspaceId));
+  return ok;
+}
+
+/** Whether this isolate has already made sure the switch-on step below has run. */
+let switchedOn = false;
+
+/**
+ * The first time payments are found switched on, every workspace that has not paid gets a full trial
+ * from that moment – the trial clock should not have been running while nobody could pay. Returns
+ * true when it has just done so.
+ */
+export async function ensureBillingSwitchedOn(db: Database, env: Env): Promise<boolean> {
+  if (switchedOn || !isBillingConfigured(env)) return false;
+  const first = await db.insert(appFlags).values({ key: "billing_switched_on" }).onConflictDoNothing().returning({ key: appFlags.key });
+  switchedOn = true;
+  if (first.length === 0) return false;
+  const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * DAY_MS);
+  await db
+    .update(workspaces)
+    .set({ trialEndsAt })
+    .where(and(isNull(workspaces.plan), eq(workspaces.billingExempt, false), lt(workspaces.trialEndsAt, trialEndsAt)));
+  return true;
 }
 
 /** While nothing is known to be due, a workspace is checked against Razorpay at most this often on page loads. */
@@ -477,29 +585,32 @@ const LAZY_CHECK_EVERY_MS = 15 * 60_000;
 /**
  * Called when the session is read (every page load). Keeps billing correct even if no webhook ever
  * arrives, without a scheduled job:
- *  - just before the lock screen would be shown, Razorpay is asked once more, so a mandate approved
- *    or a charge taken that we never heard about unlocks the workspace instead;
+ *  - just before the lock screen would be shown, Razorpay is asked once more, so a payment made or a
+ *    mandate approved that we never heard about unlocks the workspace instead;
  *  - when an auto-pay charge is due, the check runs after the response and shows on the next load.
  * Returns the workspace row to use for this response.
  */
 export async function refreshBillingIfDue(db: Database, env: Env, ws: WorkspaceRow, defer: (task: Promise<unknown>) => void): Promise<WorkspaceRow> {
   if (!isBillingConfigured(env) || ws.billingExempt) return ws;
-  const now = Date.now();
-  if (ws.subscriptionSyncedAt && now - ws.subscriptionSyncedAt.getTime() < LAZY_CHECK_EVERY_MS) return ws;
+  const reload = async () => (await db.select().from(workspaces).where(eq(workspaces.id, ws.id)).limit(1))[0] ?? ws;
+  let current = ws;
+  if (await ensureBillingSwitchedOn(db, env)) current = await reload();
 
-  if (billingOf(env, ws).status === "expired") {
+  const now = Date.now();
+  if (current.subscriptionSyncedAt && now - current.subscriptionSyncedAt.getTime() < LAZY_CHECK_EVERY_MS) return current;
+
+  if (billingOf(env, current).status === "expired") {
     try {
-      await reconcileBilling(db, env, ws.id, { timeoutMs: 4_000 });
-      const [fresh] = await db.select().from(workspaces).where(eq(workspaces.id, ws.id)).limit(1);
-      return fresh ?? ws;
+      await reconcileBilling(db, env, current.id, { timeoutMs: 4_000 });
+      return await reload();
     } catch (error) {
       console.error("Could not re-check billing before locking", error);
-      return ws;
+      return current;
     }
   }
-  const chargeDue = ws.subscriptionId !== null && ws.paidUntil !== null && now > ws.paidUntil.getTime() - 3_600_000;
-  if (chargeDue) defer(reconcileBilling(db, env, ws.id));
-  return ws;
+  const coveredUntil = (current.paidUntil ?? current.trialEndsAt).getTime();
+  if (current.subscriptionId !== null && now > coveredUntil - 3_600_000) defer(reconcileBilling(db, env, current.id));
+  return current;
 }
 
 /** How long Razorpay's page for approving a mandate (or a one-off payment page) stays open. */
@@ -518,9 +629,10 @@ export async function autoPayOverview(db: Database, ws: WorkspaceRow): Promise<{
       .limit(1),
   ]);
   const live = liveRows[0];
-  const pending = pendingRows[0];
+  // A set-up priced on a state the workspace has left is not offered again.
+  const pending = pendingRows[0] && isSetupFresh(pendingRows[0].basis, ws) ? pendingRows[0] : undefined;
   return {
-    autoPay: live && state ? { state, plan: live.plan, amount: live.amount, nextChargeAt: state === "stopped" ? null : (live.nextChargeAt?.getTime() ?? ws.paidUntil?.getTime() ?? null) } : null,
+    autoPay: live && state ? { state, plan: live.plan, amount: live.amount, nextChargeAt: state === "stopped" ? null : (live.nextChargeAt ?? ws.paidUntil ?? ws.trialEndsAt).getTime() } : null,
     pendingSetup: pending?.shortUrl ? { plan: pending.plan, amount: pending.amount, url: pending.shortUrl, firstChargeAt: pending.startAt?.getTime() ?? null } : null,
   };
 }

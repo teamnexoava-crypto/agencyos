@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -15,6 +15,10 @@ export function usePaymentResult() {
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
   const result = params.get("payment");
+  // The follow-up checks must outlive the effect below (which re-runs as soon as it tidies the
+  // address), so they are kept here and only cancelled when the screen goes away.
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
 
   useEffect(() => {
     if (!result) return;
@@ -40,17 +44,20 @@ export function usePaymentResult() {
 
     toast.info("We're confirming your payment. This usually takes a few seconds.");
     // Opening the billing overview makes the server ask Razorpay again.
-    const timers = [4_000, 12_000, 30_000].map((delay) =>
+    let confirmed = false;
+    timers.current = [4_000, 12_000, 30_000].map((delay) =>
       window.setTimeout(() => {
+        if (confirmed) return;
         void api<BillingOverview>("/api/billing")
           .then((overview) => {
-            if (overview.billing.status === "active") toast.success("Payment received – your plan is active. Thank you!");
+            if (confirmed || !overview.payments.some((payment) => !payment.autoPay && payment.status === "paid" && Date.now() - (payment.paidAt ?? 0) < 120_000)) return;
+            confirmed = true;
+            toast.success("Payment received – your plan is active. Thank you!");
           })
           .catch(() => undefined)
           .finally(() => void refresh());
       }, delay),
     );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
     // Runs once per value of `?payment=`; the setters are stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);

@@ -145,22 +145,31 @@ const DAY_MS = 86_400_000;
 
 /**
  * The paid period a payment buys.
- *  - Renewing the same plan adds to the time already paid for.
+ *  - Renewing the same plan starts exactly where the time already paid for ends.
  *  - A first purchase during the trial starts when the trial ends, so no trial days are lost.
- *  - Switching plans converts the unused time at the old price into extra days at the new price.
+ *  - Switching plans converts the unused paid time at the old price into whole days at the new
+ *    price. Trial days are never converted: they are free on any plan.
  */
 export function nextPaidPeriod(
   current: { plan: PlanId | null; paidUntil: Date | null; trialEndsAt: Date },
   purchase: { plan: PlanId; cycle: BillingCycle },
   now: Date,
 ): { start: Date; end: Date } {
-  let start = now;
-  const paidLeft = current.plan && current.paidUntil ? current.paidUntil.getTime() - now.getTime() : 0;
-  if (current.plan && paidLeft > 0) {
-    const ratio = current.plan === purchase.plan ? 1 : PLANS[current.plan].price.monthly / PLANS[purchase.plan].price.monthly;
-    start = new Date(now.getTime() + Math.floor((paidLeft * ratio) / DAY_MS) * DAY_MS);
-  } else if (!current.plan && current.trialEndsAt.getTime() > now.getTime()) {
-    start = current.trialEndsAt;
+  // Nothing can be bought for a moment that is still covered by the trial.
+  const free = current.trialEndsAt > now ? current.trialEndsAt : now;
+  let start = free;
+  if (current.plan && current.paidUntil && current.paidUntil > free) {
+    if (current.plan === purchase.plan) {
+      start = current.paidUntil;
+    } else {
+      const ratio = PLANS[current.plan].price.monthly / PLANS[purchase.plan].price.monthly;
+      start = new Date(free.getTime() + Math.floor(((current.paidUntil.getTime() - free.getTime()) * ratio) / DAY_MS) * DAY_MS);
+    }
   }
   return { start, end: addMonths(start, purchase.cycle === "yearly" ? 12 : 1) };
+}
+
+/** How long one payment of `amount` paise lasts on a plan, in milliseconds (a month at the plan's own price). */
+export function paidTimeFor(amount: number, plan: PlanId): number {
+  return Math.floor((30 * amount) / PLANS[plan].price.monthly) * DAY_MS;
 }

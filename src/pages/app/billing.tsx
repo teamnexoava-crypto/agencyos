@@ -23,22 +23,33 @@ const daysLeft = (count: number | null) => (count === null ? "" : count <= 1 ? "
 function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPayDTO | null }) {
   const [confirmOff, setConfirmOff] = useState(false);
   const cancel = useCancelAutoPay();
-  const planName = billing.plan ? PLANS[billing.plan].name : "";
-  const paidUntil = billing.paidUntil ? formatDay(billing.paidUntil) : "";
-  const price = autoPay ? formatPlanPrice(autoPay.amount) : "";
+  // The session knows whether auto-pay is on; the amount and date arrive with the overview a moment later.
+  const mandate = autoPay?.state ?? billing.autoPay;
+  const mandatePlan = autoPay ? PLANS[autoPay.plan].name : "";
+  const planName = billing.plan ? PLANS[billing.plan].name : mandatePlan;
+  const paidUntil = billing.paidUntil ? formatDay(billing.paidUntil) : formatDay(billing.trialEndsAt);
+  const price = autoPay ? formatPlanPrice(autoPay.amount) : "The payment";
+  const lockDay = formatDay((billing.paidUntil ?? billing.trialEndsAt) + AUTOPAY_GRACE_DAYS * 86_400_000);
+  const retrying = `We couldn't collect ${autoPay ? price : "the payment"}. Razorpay is trying again – look for its message, or a request in your UPI app, and approve it. If it keeps failing the workspace is locked on ${lockDay}; you can also pay for a month below.`;
+
+  const trial = (): { text: string; tag: string | null; warn?: boolean } => {
+    const until = formatDay(billing.trialEndsAt);
+    if (mandate === "on") {
+      return { text: `Your free trial runs until ${until}. Auto-pay is set up: ${autoPay ? `${price} for the ${mandatePlan} plan` : "your plan's price"} is taken that day and every month after – nothing before then.`, tag: "Auto-pay on" };
+    }
+    if (mandate === "retrying") return { text: `Your free trial has ended. ${retrying}`, tag: "Payment failed", warn: true };
+    return {
+      text: `Your trial runs until ${until}, with everything in the Team plan. Choose a plan any time – billing only starts when the trial ends, so you lose nothing by choosing early.`,
+      tag: daysLeft(billing.daysLeft),
+    };
+  };
 
   const active = (): { text: string; tag: string | null; warn?: boolean } => {
-    if (autoPay?.state === "on") {
-      return { text: `Auto-pay is on: ${price} is taken on ${formatDay(autoPay.nextChargeAt ?? billing.paidUntil ?? 0)}, and every month after that, until you turn it off.`, tag: "Auto-pay on" };
+    if (mandate === "on") {
+      return { text: autoPay ? `Auto-pay is on: ${price} is taken on ${formatDay(autoPay.nextChargeAt ?? billing.paidUntil ?? 0)}, and every month after that, until you turn it off.` : "Auto-pay is on, until you turn it off.", tag: "Auto-pay on" };
     }
-    if (autoPay?.state === "retrying") {
-      return {
-        text: `We couldn't collect ${price} for this month. Razorpay is trying again – look for its message, or a request in your UPI app, and approve it. If it keeps failing the workspace is locked on ${formatDay((billing.paidUntil ?? 0) + AUTOPAY_GRACE_DAYS * 86_400_000)}; you can also pay for a month below.`,
-        tag: "Payment failed",
-        warn: true,
-      };
-    }
-    if (autoPay?.state === "stopped") {
+    if (mandate === "retrying") return { text: retrying, tag: "Payment failed", warn: true };
+    if (mandate === "stopped") {
       return { text: `Auto-pay has stopped – the payment kept failing, or the mandate was paused. Your plan runs until ${paidUntil}. Turn auto-pay on again below, or pay for a month.`, tag: daysLeft(billing.daysLeft), warn: true };
     }
     return { text: `Paid until ${paidUntil}. Auto-pay is off, so nothing is taken by itself – turn it on below, or pay again before that date.`, tag: daysLeft(billing.daysLeft) };
@@ -47,12 +58,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
   const view: { icon: LucideIcon; title: string; text: string; tag: string | null; warn?: boolean } = {
     open: { icon: Sparkles, title: "Everything is unlocked", text: `Online payments are being set up. Once they open, every workspace gets a ${TRIAL_DAYS}-day free trial and you can choose a plan here.`, tag: null },
     exempt: { icon: Gift, title: "This workspace is free", text: "It has full access with no limits and never needs a plan.", tag: null },
-    trial: {
-      icon: Clock,
-      title: "Free trial",
-      text: `Your trial runs until ${formatDay(billing.trialEndsAt)}, with everything in the Team plan. Choose a plan any time – billing only starts when the trial ends, so you lose nothing by choosing early.`,
-      tag: daysLeft(billing.daysLeft),
-    },
+    trial: { icon: Clock, title: "Free trial", ...trial() },
     active: { icon: BadgeCheck, title: `${planName} plan`, ...active() },
     expired: { icon: Clock, title: "No active plan", text: "Choose a plan below to unlock the workspace.", tag: null },
   }[billing.status];
@@ -68,7 +74,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
           {view.tag && <Badge variant="secondary">{view.tag}</Badge>}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{view.text}</p>
-        {autoPay && (
+        {mandate && (
           <Button variant="outline" size="sm" className="mt-3" disabled={cancel.isPending} onClick={() => setConfirmOff(true)}>
             {cancel.isPending && <LoaderCircle className="animate-spin" />} Turn off auto-pay
           </Button>
@@ -78,7 +84,7 @@ function StatusCard({ billing, autoPay }: { billing: BillingDTO; autoPay: AutoPa
         open={confirmOff}
         onOpenChange={setConfirmOff}
         title="Turn off auto-pay?"
-        description={`No more payments will be taken. Your ${planName} plan stays active until ${paidUntil}; after that the workspace is locked until you pay again.`}
+        description={`No more payments will be taken. ${billing.status === "trial" ? "Your free trial" : `Your ${planName} plan`} runs until ${paidUntil}; after that the workspace is locked until you pay again.`}
         confirmLabel="Turn off auto-pay"
         onConfirm={() => {
           setConfirmOff(false);
@@ -198,7 +204,7 @@ export default function BillingPage() {
             <h2 id="plans-heading" className="mb-5 text-center text-xl font-semibold tracking-tight">
               {billing.status === "active" ? "Change how you pay, or your plan" : "Choose a plan"}
             </h2>
-            <PlanChooser billing={billing} />
+            <PlanChooser billing={sessionBilling} />
           </section>
         )}
 

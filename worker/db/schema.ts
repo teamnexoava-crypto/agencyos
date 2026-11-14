@@ -169,8 +169,13 @@ export const billingSubscriptions = pgTable(
     status: text({ enum: SUBSCRIPTION_STATUSES }).notNull().default("created"),
     /** Charges already added to the workspace's paid time. */
     paidCount: integer().notNull().default(0),
-    /** When billing starts: asked for at creation (a later date keeps trial or paid days), then as Razorpay reports it. */
+    /** When billing was asked to start; NULL = as soon as the mandate is approved. A later date keeps trial or paid days. */
     startAt: timestamp({ withTimezone: true, mode: "date" }),
+    /**
+     * What the workspace looked like when this set-up was priced ("plan|paid until|live mandate"). If it
+     * has changed by the time the mandate is approved, the set-up is out of date and is not used.
+     */
+    basis: text(),
     nextChargeAt: timestamp({ withTimezone: true, mode: "date" }),
     syncedAt: timestamp({ withTimezone: true, mode: "date" }),
     createdBy: text().references((): AnyPgColumn => workspaceMembers.id, { onDelete: "set null" }),
@@ -179,6 +184,12 @@ export const billingSubscriptions = pgTable(
   },
   (t) => [index("billing_subscriptions_ws_idx").on(t.workspaceId, t.createdAt), uniqueIndex("billing_subscriptions_provider_uq").on(t.providerSubscriptionId)],
 ).enableRLS();
+
+/** One-off facts about this installation, e.g. the moment payments were first switched on. */
+export const appFlags = pgTable("app_flags", {
+  key: text().primaryKey(),
+  createdAt: createdAt(),
+}).enableRLS();
 
 /**
  * Razorpay plan ids we have created, keyed by "<key id>:<plan>:<cycle>:<amount>". A Razorpay plan can't

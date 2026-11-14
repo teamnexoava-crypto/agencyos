@@ -77,7 +77,8 @@ interface NewPaymentLink {
   description: string;
   /** Our own id for the payment; Razorpay requires it to be unique. */
   referenceId: string;
-  customer: { name: string; email: string };
+  /** Used to send Razorpay's receipt. (No name: Razorpay is strict about what a name may contain.) */
+  customer: { email: string };
   /** Where Razorpay sends the payer afterwards. */
   callbackUrl: string;
   /** Seconds since the epoch. */
@@ -177,7 +178,7 @@ export function fetchSubscription(env: Env, subscriptionId: string, timeoutMs?: 
 /** Stops a subscription now: no further charges are taken. Cannot be undone. */
 export function cancelProviderSubscription(env: Env, subscriptionId: string): Promise<ProviderSubscription> {
   if (!isSubscriptionId(subscriptionId)) throw new ApiError(400, "bad_request", "Unknown subscription.");
-  return call<ProviderSubscription>(env, "POST", `/subscriptions/${subscriptionId}/cancel`, { cancel_at_cycle_end: false });
+  return call<ProviderSubscription>(env, "POST", `/subscriptions/${subscriptionId}/cancel`, { cancel_at_cycle_end: 0 });
 }
 
 /* ------------------------------------------------------------------------------------------------
