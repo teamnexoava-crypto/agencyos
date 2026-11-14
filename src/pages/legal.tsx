@@ -90,7 +90,8 @@ export function PrivacyPage() {
         <h2>Cookies</h2>
         <p>
           We use one essential cookie to keep you signed in, plus short-lived cookies during Google sign-in. Your theme and sidebar
-          preferences are kept in your browser's local storage. We do not use advertising or third-party tracking cookies.
+          preferences are kept in your browser's local storage. We do not use advertising or third-party tracking cookies. Page visits are counted with
+          Cloudflare Web Analytics, which sets no cookies and does not identify you.
         </p>
       </section>
 
