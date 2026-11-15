@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { motion } from "motion/react";
 import { CircleCheckBig, Clock, FileX2, LoaderCircle, PenLine, Printer } from "lucide-react";
 import { useParams } from "react-router";
@@ -125,6 +126,7 @@ function SignPanel({ token, contract, onReload }: { token: string; contract: Con
 export default function PublicContractPage() {
   const { token = "" } = useParams();
   const { data: contract, isPending, refetch } = usePublicContract(token);
+  useDocumentTitle(contract ? `${contract.title} · ${contract.agency.name}` : null, { brand: false });
   const signRef = useRef<HTMLDivElement>(null);
 
   if (isPending) {

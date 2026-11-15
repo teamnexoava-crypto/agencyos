@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { ProjectStatus } from "@shared/constants";
 import type { ProjectInput, ProjectUpdateInput, StepInput, StepUpdateInput, TaskInput, TaskUpdateInput } from "@shared/schemas/project";
-import type { ProjectDetail, ProjectSummary, StepDTO, TaskDTO } from "@shared/types";
-import { api } from "@/lib/api";
+import { toast } from "sonner";
+import type { MyTaskDTO, ProjectDetail, ProjectSummary, StepDTO, TaskDTO } from "@shared/types";
+import { api, errorMessage } from "@/lib/api";
 
 export const projectKeys = {
   all: ["projects"] as const,
@@ -30,7 +31,10 @@ function patchDetail(queryClient: QueryClient, projectId: string, update: (proje
 function refreshLists(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: projectKeys.all, exact: true });
   void queryClient.invalidateQueries({ queryKey: ["clients"] });
+  void queryClient.invalidateQueries({ queryKey: myTaskKeys.all });
 }
+
+export const myTaskKeys = { all: ["tasks", "mine"] as const };
 
 /* ------------------------------------------------------------------------------------------------ projects */
 
@@ -239,6 +243,7 @@ export function useUpdateTask(projectId: string) {
             ? {
                 ...task,
                 ...(input.title !== undefined && { title: input.title }),
+                ...(input.description !== undefined && { description: input.description === "" ? null : input.description }),
                 ...(input.done !== undefined && { done: input.done }),
                 ...(input.assigneeId !== undefined && { assigneeId: input.assigneeId === "" ? null : input.assigneeId }),
                 ...(input.dueDate !== undefined && { dueDate: input.dueDate === "" ? null : input.dueDate }),
@@ -272,5 +277,84 @@ export function useDeleteTask(projectId: string) {
       if (context?.previous) queryClient.setQueryData(projectKeys.detail(projectId), context.previous);
     },
     onSettled: () => refreshLists(queryClient),
+  });
+}
+
+/** How long "Undo" is offered after deleting a task before it is really deleted. */
+const UNDO_MS = 6000;
+
+/**
+ * Deleting a task with a chance to take it back: it disappears at once and a toast offers "Undo" for
+ * a few seconds; only then is it deleted on the server. Leaving the page meanwhile still deletes it.
+ */
+export function useDeleteTaskWithUndo(projectId: string) {
+  const queryClient = useQueryClient();
+  return (task: TaskDTO) => {
+    const previous = queryClient.getQueryData<ProjectDetail>(projectKeys.detail(projectId));
+    const restore = () => {
+      const current = queryClient.getQueryData<ProjectDetail>(projectKeys.detail(projectId));
+      if (current && !current.tasks.some((item) => item.id === task.id)) patchDetail(queryClient, projectId, (project) => ({ ...project, tasks: [...project.tasks, task] }));
+      else if (!current && previous) queryClient.setQueryData(projectKeys.detail(projectId), previous);
+    };
+    patchDetail(queryClient, projectId, (project) => ({ ...project, tasks: project.tasks.filter((item) => item.id !== task.id) }));
+    const previousMine = queryClient.getQueryData<MyTaskDTO[]>(myTaskKeys.all);
+    queryClient.setQueryData<MyTaskDTO[]>(myTaskKeys.all, (tasks) => tasks?.filter((item) => item.id !== task.id));
+
+    let undone = false;
+    const timer = window.setTimeout(() => {
+      if (undone) return;
+      api<{ ok: true }>(`/api/projects/${projectId}/tasks/${task.id}`, { method: "DELETE" })
+        .then(() => refreshLists(queryClient))
+        .catch((error: unknown) => {
+          restore();
+          void queryClient.invalidateQueries({ queryKey: myTaskKeys.all });
+          toast.error(errorMessage(error, "Could not delete the task."));
+        });
+    }, UNDO_MS);
+    toast(`Task deleted: “${task.title.length > 40 ? `${task.title.slice(0, 40)}…` : task.title}”`, {
+      duration: UNDO_MS,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          undone = true;
+          window.clearTimeout(timer);
+          restore();
+          if (previousMine) queryClient.setQueryData(myTaskKeys.all, previousMine);
+        },
+      },
+    });
+  };
+}
+
+/** Everything assigned to the signed-in person, across their projects. */
+export function useMyTasks() {
+  return useQuery({
+    queryKey: myTaskKeys.all,
+    queryFn: async ({ signal }) => (await api<{ tasks: MyTaskDTO[] }>("/api/tasks/mine", { signal })).tasks,
+  });
+}
+
+/** Changing a task from "My tasks", where it isn't inside its project's page. */
+export function useUpdateMyTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, taskId, input }: { projectId: string; taskId: string; input: TaskUpdateInput }) =>
+      (await api<{ task: TaskDTO }>(`/api/projects/${projectId}/tasks/${taskId}`, { method: "PATCH", json: input })).task,
+    onMutate: async ({ taskId, input }) => {
+      await queryClient.cancelQueries({ queryKey: myTaskKeys.all });
+      const previous = queryClient.getQueryData<MyTaskDTO[]>(myTaskKeys.all);
+      queryClient.setQueryData<MyTaskDTO[]>(myTaskKeys.all, (tasks) =>
+        tasks?.map((task) => (task.id === taskId ? { ...task, ...(input.done !== undefined && { done: input.done, doneAt: input.done ? Date.now() : null }) } : task)),
+      );
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(myTaskKeys.all, context.previous);
+    },
+    onSuccess: (task, { projectId }) => {
+      queryClient.setQueryData<MyTaskDTO[]>(myTaskKeys.all, (tasks) => tasks?.map((item) => (item.id === task.id ? { ...item, ...task } : item)));
+      patchDetail(queryClient, projectId, (project) => ({ ...project, tasks: project.tasks.map((item) => (item.id === task.id ? task : item)) }));
+      void queryClient.invalidateQueries({ queryKey: projectKeys.all, exact: true });
+    },
   });
 }

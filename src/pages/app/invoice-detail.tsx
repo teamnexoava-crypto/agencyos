@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { ArrowLeft, Ban, Check, CircleDollarSign, Eye, FilePlus2, Link2, MoreHorizontal, Pencil, Printer, RefreshCw, Send, Share2, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ export default function InvoiceDetailPage() {
   const { invoiceId = "" } = useParams();
   const navigate = useNavigate();
   const { data: invoice, isPending, error, refetch } = useInvoice(invoiceId);
+  useDocumentTitle(invoice ? `Invoice ${invoice.number}` : null);
   const action = useInvoiceAction(invoiceId);
   const deleteInvoice = useDeleteInvoice();
   const deletePayment = useDeletePayment(invoiceId);

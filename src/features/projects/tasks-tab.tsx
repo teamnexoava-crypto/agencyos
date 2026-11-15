@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CalendarDays, ListChecks, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ListChecks, LoaderCircle, NotebookText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { MemberSummary, ProjectDetail, TaskDTO } from "@shared/types";
 import { SegmentedControl } from "@/components/shared/segmented-control";
@@ -15,8 +15,9 @@ import { MemberSelect } from "@/features/members/member-select";
 import { errorMessage } from "@/lib/api";
 import { dueLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useCreateTask, useDeleteTask, useUpdateTask } from "./api";
+import { useCreateTask, useDeleteTaskWithUndo, useUpdateTask } from "./api";
 import { DUE_TONE_CLASS } from "./meta";
+import { TaskEditDialog } from "./task-edit-dialog";
 
 type Filter = "all" | "open" | "done";
 
@@ -70,8 +71,9 @@ export function TasksTab({ project, members }: TasksTabProps) {
   // only pick people already on the project – plus owners and admins, who see every project.
   const memberList = canManage ? allMembers : allMembers.filter((member) => member.role !== "member" || project.memberIds.includes(member.id));
   const updateTask = useUpdateTask(project.id);
-  const deleteTask = useDeleteTask(project.id);
+  const deleteTask = useDeleteTaskWithUndo(project.id);
   const [filter, setFilter] = useState<Filter>("all");
+  const [editing, setEditing] = useState<TaskDTO | null>(null);
 
   // Open tasks first (in their own order), completed ones sink to the bottom.
   const sorted = [...project.tasks].sort((a, b) => Number(a.done) - Number(b.done) || a.position - b.position);
@@ -128,27 +130,33 @@ export function TasksTab({ project, members }: TasksTabProps) {
                     >
                       <div className="flex items-center gap-3 px-4 py-3">
                         <Checkbox checked={task.done} onCheckedChange={() => toggle(task)} aria-label={`Mark "${task.title}" as ${task.done ? "not done" : "done"}`} />
-                        <div className="min-w-0 flex-1">
+                        {/* The whole text opens the task for editing. */}
+                        <button type="button" onClick={() => setEditing(task)} className="min-w-0 flex-1 rounded-md text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
                           <p className={cn("text-sm leading-snug break-words transition-colors", task.done && "text-muted-foreground line-through decoration-muted-foreground/50")}>
                             {task.title}
                           </p>
+                          {task.description && (
+                            <p className="mt-0.5 line-clamp-2 flex items-start gap-1 text-xs text-muted-foreground">
+                              <NotebookText className="mt-px size-3 shrink-0" />
+                              {task.description}
+                            </p>
+                          )}
                           {due && (
                             <p className={cn("mt-0.5 flex items-center gap-1 text-xs", DUE_TONE_CLASS[due.tone])}>
                               <CalendarDays className="size-3" />
                               {due.text}
                             </p>
                           )}
-                        </div>
+                        </button>
                         {assignee && <MemberAvatar member={assignee} />}
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Delete task "${task.title}"`}
-                          onClick={() => deleteTask.mutate(task.id, { onError: (error) => toast.error(errorMessage(error, "Could not delete the task.")) })}
-                          className="text-muted-foreground opacity-100 transition-opacity hover:text-destructive sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
-                        >
-                          <Trash2 />
-                        </Button>
+                        <div className="flex shrink-0 items-center opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+                          <Button variant="ghost" size="icon-sm" aria-label={`Edit task "${task.title}"`} onClick={() => setEditing(task)} className="text-muted-foreground hover:text-foreground">
+                            <Pencil />
+                          </Button>
+                          <Button variant="ghost" size="icon-sm" aria-label={`Delete task "${task.title}"`} onClick={() => deleteTask(task)} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 />
+                          </Button>
+                        </div>
                       </div>
                     </motion.li>
                   );
@@ -158,6 +166,14 @@ export function TasksTab({ project, members }: TasksTabProps) {
           )}
         </>
       )}
+
+      <TaskEditDialog
+        task={editing}
+        onOpenChange={(open) => !open && setEditing(null)}
+        members={memberList}
+        onSave={(input) => (editing ? updateTask.mutateAsync({ taskId: editing.id, input }) : Promise.resolve())}
+        onDelete={deleteTask}
+      />
     </>
   );
 }

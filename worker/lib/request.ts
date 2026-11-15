@@ -41,13 +41,22 @@ export function userAgent(c: Context<AppEnv>): string | null {
 }
 
 /**
- * Only allow same-site relative paths as post-login redirects (prevents open redirects):
- * must start with a single "/" and must not be protocol-relative or contain a backslash.
+ * Only allow same-site relative paths as post-login redirects (prevents open redirects): must start
+ * with a single "/", must not be protocol-relative, and must not contain a backslash, whitespace or
+ * control characters (browsers drop tabs and newlines from addresses, so "/\t/evil.com" would become
+ * "//evil.com"). As a last check, the path must stay on our own origin when resolved.
  */
 export function safeRedirectPath(value: string | undefined | null, fallback = "/app"): string {
   if (!value) return fallback;
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0020\u007F-\u00A0\u2028\u2029]/.test(value)) return fallback;
   if (value.startsWith("/api/")) return fallback;
+  try {
+    if (new URL(value, "https://same.invalid").origin !== "https://same.invalid") return fallback;
+  } catch {
+    return fallback;
+  }
   return value;
 }
 

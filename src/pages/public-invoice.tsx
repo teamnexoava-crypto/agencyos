@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { CircleCheckBig, Clock, FileX2, Printer, Smartphone } from "lucide-react";
 import { useParams } from "react-router";
 import { invoiceDisplayStatus, upiPaymentUrl } from "@shared/invoice";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 export default function PublicInvoicePage() {
   const { token = "" } = useParams();
   const { data: invoice, isPending } = usePublicInvoice(token);
+  useDocumentTitle(invoice ? `Invoice ${invoice.number} · ${invoice.from.name}` : null, { brand: false });
 
   if (isPending) {
     return (

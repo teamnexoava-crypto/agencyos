@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_DISPLAY } from "@shared/constants";
+import { BUSINESS, SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_DISPLAY } from "@shared/constants";
 import { TRIAL_DAYS } from "@shared/plans";
 import { BrandLogo } from "@/components/shared/brand";
 import { WhatsAppSupportButton } from "@/components/shared/whatsapp-button";
@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const LAST_UPDATED = "15 November 2026";
 
-function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
+function LegalLayout({ title, children, dated = true }: { title: string; children: ReactNode; dated?: boolean }) {
   return (
     <div className="min-h-dvh bg-background">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5 sm:px-8">
@@ -19,20 +19,25 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
       </header>
       <main className="mx-auto max-w-3xl px-5 pt-6 pb-24 sm:px-8">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+        {dated && <p className="mt-2 text-sm text-muted-foreground">Last updated: {LAST_UPDATED}</p>}
         <div className="mt-10 space-y-8 text-[15px] leading-relaxed text-foreground/90 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-foreground [&_li]:ml-5 [&_li]:list-disc [&_p+p]:mt-3 [&_p+ul]:mt-3 [&_ul]:space-y-1.5 [&_ul+p]:mt-3">
           {children}
         </div>
-        <footer className="mt-14 flex gap-5 border-t pt-6 text-sm text-muted-foreground">
-          <Link to="/privacy" className="hover:text-foreground">
-            Privacy Policy
-          </Link>
-          <Link to="/terms" className="hover:text-foreground">
-            Terms of Service
-          </Link>
-          <Link to="/" className="hover:text-foreground">
-            Home
-          </Link>
+        <footer className="mt-14 flex flex-wrap gap-x-5 gap-y-2 border-t pt-6 text-sm text-muted-foreground">
+          {(
+            [
+              ["/", "Home"],
+              ["/about", "About"],
+              ["/contact", "Contact"],
+              ["/privacy", "Privacy Policy"],
+              ["/terms", "Terms of Service"],
+              ["/refunds", "Cancellation & Refunds"],
+            ] as const
+          ).map(([to, label]) => (
+            <Link key={to} to={to} className="hover:text-foreground">
+              {label}
+            </Link>
+          ))}
         </footer>
       </main>
       <WhatsAppSupportButton />
@@ -40,7 +45,164 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
   );
 }
 
-const CONTACT = `WhatsApp ${SUPPORT_WHATSAPP_DISPLAY} (wa.me/${SUPPORT_WHATSAPP}), or the support email shown on the GrowUpliftOS Google sign-in screen`;
+const CONTACT = `${BUSINESS.email}, or WhatsApp ${SUPPORT_WHATSAPP_DISPLAY} (wa.me/${SUPPORT_WHATSAPP}). Postal address: ${BUSINESS.name}, ${BUSINESS.address}`;
+
+/** The business details block shown on the Contact and About pages. */
+function BusinessDetails() {
+  return (
+    <dl className="grid gap-4 rounded-2xl border bg-card p-6 text-[15px] shadow-soft sm:grid-cols-[10rem_1fr] sm:gap-x-6 [&_dd]:text-foreground [&_dt]:text-sm [&_dt]:text-muted-foreground">
+      <dt>Business name</dt>
+      <dd className="-mt-3 font-medium sm:mt-0">{BUSINESS.name}</dd>
+      <dt>Address</dt>
+      <dd className="-mt-3 sm:mt-0">{BUSINESS.address}</dd>
+      <dt>Email</dt>
+      <dd className="-mt-3 sm:mt-0">
+        <a href={`mailto:${BUSINESS.email}`} className="font-medium text-primary underline-offset-2 hover:underline">
+          {BUSINESS.email}
+        </a>
+      </dd>
+      <dt>Phone / WhatsApp</dt>
+      <dd className="-mt-3 sm:mt-0">
+        <a href={`https://wa.me/${SUPPORT_WHATSAPP}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-2 hover:underline">
+          {SUPPORT_WHATSAPP_DISPLAY}
+        </a>
+      </dd>
+      <dt>Website</dt>
+      <dd className="-mt-3 sm:mt-0">{BUSINESS.website}</dd>
+    </dl>
+  );
+}
+
+export function ContactPage() {
+  return (
+    <LegalLayout title="Contact us" dated={false}>
+      <section>
+        <p>Questions about GrowUpliftOS, your plan, a payment or your data? We're happy to help. WhatsApp is the fastest way to reach us.</p>
+        <p>
+          <a href={`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent("Hi, I need help with GrowUpliftOS.")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft hover:bg-primary/90">
+            Chat with us on WhatsApp
+          </a>
+        </p>
+      </section>
+      <section>
+        <h2>Business details</h2>
+        <BusinessDetails />
+      </section>
+      <section>
+        <h2>Complaints and grievances</h2>
+        <p>
+          If something isn't right – a payment, a privacy concern or anything else – write to {BUSINESS.email} or message us on WhatsApp
+          with your registered email address and a short description. We acknowledge every complaint within 48 hours and aim to resolve it
+          within 30 days.
+        </p>
+      </section>
+      <section>
+        <h2>Billing questions</h2>
+        <p>
+          For cancellations and refunds, see our <Link to="/refunds" className="font-medium text-primary underline-offset-2 hover:underline">Cancellation &amp; Refund Policy</Link>. You can turn off
+          auto-pay any time from Billing inside the app.
+        </p>
+      </section>
+    </LegalLayout>
+  );
+}
+
+export function AboutPage() {
+  return (
+    <LegalLayout title="About GrowUpliftOS" dated={false}>
+      <section>
+        <p>
+          GrowUpliftOS is an all-in-one workspace for agencies, freelancers and service providers. It brings projects, tasks, clients,
+          GST invoices with UPI, e-signed contracts, a client portal, a simple CRM and profit &amp; loss into one place – so small teams can
+          spend their time on client work instead of juggling WhatsApp, Excel and Word.
+        </p>
+        <p>
+          It is built in India, for the way Indian agencies actually work: invoices shared on WhatsApp and paid by UPI, clients who sign on
+          their phones, and one flat price for the whole team. Agencies outside India can use it too, with prices in US dollars.
+        </p>
+      </section>
+      <section>
+        <h2>What you can do with it</h2>
+        <ul>
+          <li>Plan projects with milestones and tasks, and keep your team on the same page</li>
+          <li>Send GST-ready invoices with a UPI QR code and track payments</li>
+          <li>Get contracts signed online, with a full audit trail</li>
+          <li>Give every client a private link to follow their project</li>
+          <li>Track leads, expenses and profit by month, client and project</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Plans</h2>
+        <p>
+          Every new workspace gets {TRIAL_DAYS} days of Premium free, then a Free plan for as long as you like. Paid plans are shown on our{" "}
+          <Link to="/#pricing" className="font-medium text-primary underline-offset-2 hover:underline">pricing page</Link>.
+        </p>
+      </section>
+      <section>
+        <h2>Who we are</h2>
+        <BusinessDetails />
+      </section>
+    </LegalLayout>
+  );
+}
+
+export function RefundPage() {
+  return (
+    <LegalLayout title="Cancellation & Refund Policy">
+      <section>
+        <p>
+          This policy applies to the paid plans of GrowUpliftOS (Growth and Premium), sold by {BUSINESS.name}. It is part of our{" "}
+          <Link to="/terms" className="font-medium text-primary underline-offset-2 hover:underline">Terms of Service</Link>.
+        </p>
+      </section>
+      <section>
+        <h2>Free trial</h2>
+        <p>
+          Every new workspace gets the Premium plan free for {TRIAL_DAYS} days, with no card needed. Nothing is charged during or after the
+          trial unless you choose a paid plan; if you don't, the workspace moves to the Free plan by itself.
+        </p>
+      </section>
+      <section>
+        <h2>Cancelling</h2>
+        <ul>
+          <li>
+            <strong>Monthly plans with auto-pay</strong> can be cancelled any time from Billing inside the app{" "}
+            (or, in India, from your UPI app or bank). No further payments are taken.
+          </li>
+          <li>
+            <strong>Yearly plans and single months</strong> are one payment and never renew by themselves, so there is nothing to cancel.
+          </li>
+          <li>After cancelling, your plan stays active until the end of the period you have already paid for. Then the workspace moves to the Free plan; nothing is deleted.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Refunds</h2>
+        <ul>
+          <li>Because you can try every feature free for {TRIAL_DAYS} days first, payments for a period that has already started are not refunded, in full or in part.</li>
+          <li>
+            If you were charged twice, or charged after you had cancelled, tell us within 7 days of the charge. We will refund the extra
+            amount to the original payment method.
+          </li>
+          <li>Approved refunds are processed within 5–7 working days; your bank or card issuer may take a few more days to show it.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>How to ask for a refund</h2>
+        <p>
+          Write to {BUSINESS.email} or message us on WhatsApp at {SUPPORT_WHATSAPP_DISPLAY} with your registered email address, the date
+          and amount of the payment, and what went wrong.
+        </p>
+      </section>
+      <section>
+        <h2>Delivery of the service</h2>
+        <p>
+          GrowUpliftOS is online software; nothing physical is shipped. Your plan is active as soon as the payment is confirmed, usually
+          within a minute, and you use it in your browser at {BUSINESS.website}.
+        </p>
+      </section>
+    </LegalLayout>
+  );
+}
 
 export function PrivacyPage() {
   return (
@@ -48,7 +210,8 @@ export function PrivacyPage() {
       <section>
         <p>
           GrowUpliftOS is a workspace for agencies, freelancers and service providers to manage projects, team members, invoices and
-          contracts. This policy explains what information we collect, why, and the choices you have.
+          contracts, provided by {BUSINESS.name}, {BUSINESS.address}. This policy explains what information we collect, why, and the
+          choices you have.
         </p>
       </section>
 
@@ -149,8 +312,9 @@ export function TermsPage() {
     <LegalLayout title="Terms of Service">
       <section>
         <p>
-          These terms govern your use of GrowUpliftOS. By creating an account or using the service you agree to them. If you use GrowUpliftOS on
-          behalf of a business, you agree on that business's behalf.
+          These terms govern your use of GrowUpliftOS, a service provided by {BUSINESS.name}, {BUSINESS.address} ({BUSINESS.email}). By
+          creating an account or using the service you agree to them. If you use GrowUpliftOS on behalf of a business, you agree on that
+          business's behalf.
         </p>
       </section>
 
@@ -226,7 +390,8 @@ export function TermsPage() {
           You can turn off auto-pay at any time from Billing, or from your UPI app or bank. No further payments are taken, and the plan
           stays active until the end of the period already paid for. Because the free trial lets you try everything first, payments
           for a period that has started are not refunded. If you were charged twice or charged by mistake, write to us within 7 days
-          and we will refund the extra amount to the original payment method, normally within 5–7 working days.
+          and we will refund the extra amount to the original payment method, normally within 5–7 working days. The full details are in
+          our <Link to="/refunds" className="font-medium text-primary underline-offset-2 hover:underline">Cancellation &amp; Refund Policy</Link>.
         </p>
       </section>
 

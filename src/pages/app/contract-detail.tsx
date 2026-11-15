@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { ArrowLeft, Ban, Check, CopyPlus, Download, Eye, FilePlus2, Link2, LoaderCircle, MoreHorizontal, PenLine, Pencil, Printer, RefreshCw, Send, Share2, Trash2, TriangleAlert } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -200,6 +201,7 @@ export default function ContractDetailPage() {
   const { contractId = "" } = useParams();
   const navigate = useNavigate();
   const { data: contract, isPending, error, refetch } = useContract(contractId);
+  useDocumentTitle(contract?.title);
   const action = useContractAction(contractId);
   const deleteContract = useDeleteContract();
   const [shareOpen, setShareOpen] = useState(false);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { motion } from "motion/react";
 import { ArrowUpRight, CalendarDays, Check, Download, FileSignature, FolderOpen, LinkIcon, LoaderCircle, MessagesSquare, ReceiptText, SendHorizontal } from "lucide-react";
 import { useParams } from "react-router";
@@ -176,6 +177,7 @@ function Messages({ token, comments, agencyName }: { token: string; comments: No
 export default function PublicPortalPage() {
   const { token = "" } = useParams();
   const { data: portal, isPending } = usePortal(token);
+  useDocumentTitle(portal ? `${portal.project.title} · ${portal.agency.name}` : null, { brand: false });
 
   if (isPending) {
     return (

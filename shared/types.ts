@@ -229,12 +229,19 @@ export interface StepDTO {
 export interface TaskDTO {
   id: string;
   title: string;
+  /** Notes on the task, or null. */
+  description: string | null;
   assigneeId: string | null;
   dueDate: string | null;
   done: boolean;
   doneAt: number | null;
   position: number;
   createdAt: number;
+}
+
+/** A task on the "My tasks" page: the task, and the project it belongs to. */
+export interface MyTaskDTO extends TaskDTO {
+  project: { id: string; title: string };
 }
 
 export interface ProjectDetail extends ProjectSummary {

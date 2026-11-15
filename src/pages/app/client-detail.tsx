@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { motion } from "motion/react";
 import { ArrowLeft, FolderKanban, Mail, MapPin, MessageCircle, Pencil, Plus, ReceiptText, StickyNote, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -25,6 +26,7 @@ export default function ClientDetailPage() {
   const navigate = useNavigate();
   const { workspace } = useSession();
   const { data: client, isPending, error, refetch } = useClient(clientId);
+  useDocumentTitle(client?.name);
   const members = useMemberMap();
   const deleteClient = useDeleteClient();
   const invoices = useInvoices({ clientId });
@@ -126,8 +128,9 @@ export default function ClientDetailPage() {
         ))}
       </dl>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-8">
+      {/* minmax(0, …) and min-w-0 let long project names wrap or truncate instead of widening the page on phones. */}
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-8">
           <section aria-labelledby="client-projects">
             <div className="mb-3 flex items-center justify-between">
               <h2 id="client-projects" className="text-sm font-semibold">
@@ -150,9 +153,9 @@ export default function ClientDetailPage() {
                 }
               />
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                 {client.projects.map((project) => (
-                  <li key={project.id}>
+                  <li key={project.id} className="min-w-0">
                     <ProjectCard project={{ ...project, clientName: null }} members={members} className="h-full" />
                   </li>
                 ))}

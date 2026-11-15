@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import type { ApiErrorBody } from "../shared/types";
@@ -24,6 +25,7 @@ import { projectRoutes } from "./routes/projects";
 import { publicRoutes } from "./routes/public";
 import { reportRoutes } from "./routes/reports";
 import { searchRoutes } from "./routes/search";
+import { taskRoutes } from "./routes/tasks";
 import { teamRoutes } from "./routes/team";
 import { workspaceRoutes } from "./routes/workspace";
 import { runScheduledJobs } from "./services/lifecycle";
@@ -53,6 +55,13 @@ app.use(async (c, next) => {
   await next();
   // Nothing below this line may be cached by browsers or intermediaries.
   if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
+});
+// Nothing but a file upload is ever large: refuse any other body over 1 MB before it is read.
+// (Upload routes accept multipart bodies and set their own, larger limits.)
+const defaultBodyLimit = bodyLimit({ maxSize: 1024 * 1024, onError: (c) => c.json({ error: { code: "too_large", message: "That request is too large." } }, 413) });
+app.use(async (c, next) => {
+  if (c.req.method === "GET" || c.req.method === "HEAD" || (c.req.header("Content-Type") ?? "").includes("multipart/form-data")) return next();
+  return defaultBodyLimit(c, next);
 });
 app.use(requestContext);
 // Server-to-server calls carry no Origin header or session, so they sit ahead of the CSRF check and
@@ -85,6 +94,7 @@ app.route("/public", publicRoutes);
 app.route("/clients", clientRoutes);
 app.route("/projects", projectRoutes);
 app.route("/projects", projectPortalRoutes);
+app.route("/tasks", taskRoutes);
 
 app.notFound((c) => {
   const body: ApiErrorBody = { error: { code: "not_found", message: "Route not found." } };

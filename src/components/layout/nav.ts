@@ -1,4 +1,4 @@
-import { CreditCard, FileSignature, FolderKanban, LayoutDashboard, ReceiptText, Settings, UserRoundSearch, Users, UsersRound, Wallet, type LucideIcon } from "lucide-react";
+import { CreditCard, FileSignature, FolderKanban, LayoutDashboard, ListChecks, ReceiptText, Settings, UserRoundSearch, Users, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 import type { Role } from "@shared/constants";
 import type { PlanFeature } from "@shared/plans";
 
@@ -25,7 +25,10 @@ const MANAGERS: readonly Role[] = ["owner", "admin"];
 export const NAV_SECTIONS: NavSection[] = [
   {
     title: null,
-    items: [{ label: "Dashboard", to: "/app", icon: LayoutDashboard, end: true, keywords: "home overview kpi" }],
+    items: [
+      { label: "Dashboard", to: "/app", icon: LayoutDashboard, end: true, keywords: "home overview kpi" },
+      { label: "My tasks", to: "/app/tasks", icon: ListChecks, keywords: "to do todo assigned due overdue" },
+    ],
   },
   {
     title: "Work",

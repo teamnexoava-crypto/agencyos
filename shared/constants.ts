@@ -11,6 +11,14 @@ export const APP_NAME = "GrowUpliftOS";
  */
 export const DEMO_VIDEO_ID = "";
 
+/** Who runs GrowUpliftOS – shown on the Contact, About, Terms and Privacy pages. */
+export const BUSINESS = {
+  name: "GrowUpliftOS",
+  address: "Dakshin Chatra, West Bengal 743247, India",
+  email: "hello@growupliftos.com",
+  website: "growupliftos.com",
+} as const;
+
 /** Support on WhatsApp: the number in international form, digits only (used for wa.me links), and as shown. */
 export const SUPPORT_WHATSAPP = "917908032780";
 export const SUPPORT_WHATSAPP_DISPLAY = "+91 79080 32780";

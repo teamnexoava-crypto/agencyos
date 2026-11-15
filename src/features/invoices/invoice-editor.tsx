@@ -173,7 +173,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <div className={cn("grid gap-5", mobileView === "preview" && "hidden lg:grid")}>
             <Section title="Details">
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -181,7 +181,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                     <FormItem>
                       <div className="flex items-center justify-between gap-3">
                         <FormLabel>Client</FormLabel>
-                        <button type="button" onClick={() => setNewClientOpen(true)} className="-my-1 inline-flex items-center gap-1 rounded-sm text-[13px] leading-none font-medium text-primary hover:underline">
+                        <button type="button" onClick={() => setNewClientOpen(true)} className="-my-1 inline-flex shrink-0 items-center gap-1 rounded-sm text-[13px] leading-none font-medium whitespace-nowrap text-primary hover:underline">
                           <Plus className="size-3.5" /> New client
                         </button>
                       </div>

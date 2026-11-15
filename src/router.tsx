@@ -6,8 +6,15 @@ import { useSession } from "@/features/auth/api";
 import { RedirectIfAuthenticated, RequireAuth } from "@/features/auth/guards";
 import { useIsLocked, type LockedFeature } from "@/features/billing/locked";
 import { UpgradeNotice } from "@/features/billing/upgrade-notice";
+import { useRouteTitle } from "@/lib/document-title";
 import LandingPage from "@/pages/landing";
 import NotFoundPage from "@/pages/not-found";
+
+/** The root of every page: keeps the browser tab named after the page. */
+function Root() {
+  useRouteTitle();
+  return <Outlet />;
+}
 
 function RouteError() {
   const error = useRouteError();
@@ -43,22 +50,26 @@ function RequireFeature({ feature, title, description }: { feature: LockedFeatur
 const page = (load: () => Promise<{ default: ComponentType }>) => async () => ({ Component: (await load()).default });
 export const router = createBrowserRouter([
   {
+    element: <Root />,
     errorElement: <RouteError />,
     // Shown only while the very first lazy chunk downloads on a hard load.
     hydrateFallbackElement: <div className="min-h-dvh bg-background" />,
     children: [
       // The landing page is the front door – keep it in the main bundle so it paints immediately.
       { path: "/", element: <LandingPage /> },
-      { path: "/privacy", lazy: async () => ({ Component: (await import("@/pages/legal")).PrivacyPage }) },
+      { handle: { title: "Privacy Policy" }, path: "/privacy", lazy: async () => ({ Component: (await import("@/pages/legal")).PrivacyPage }) },
       // Public invoice link – what the client opens. No login, no app shell.
-      { path: "/i/:token", lazy: page(() => import("@/pages/public-invoice")) },
+      { handle: { title: "Invoice" }, path: "/i/:token", lazy: page(() => import("@/pages/public-invoice")) },
       // Public contract link – where the client reads and signs.
-      { path: "/c/:token", lazy: page(() => import("@/pages/public-contract")) },
+      { handle: { title: "Contract" }, path: "/c/:token", lazy: page(() => import("@/pages/public-contract")) },
       // Client portal – one private page per project.
-      { path: "/p/:token", lazy: page(() => import("@/pages/public-portal")) },
+      { handle: { title: "Project" }, path: "/p/:token", lazy: page(() => import("@/pages/public-portal")) },
       // Invite links work signed in or out, with or without a workspace – so no guard here.
-      { path: "/invite/:token", lazy: page(() => import("@/pages/invite")) },
-      { path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },
+      { handle: { title: "Join a workspace" }, path: "/invite/:token", lazy: page(() => import("@/pages/invite")) },
+      { handle: { title: "Terms of Service" }, path: "/terms", lazy: async () => ({ Component: (await import("@/pages/legal")).TermsPage }) },
+      { handle: { title: "Cancellation & Refund Policy" }, path: "/refunds", lazy: async () => ({ Component: (await import("@/pages/legal")).RefundPage }) },
+      { handle: { title: "Contact us" }, path: "/contact", lazy: async () => ({ Component: (await import("@/pages/legal")).ContactPage }) },
+      { handle: { title: "About" }, path: "/about", lazy: async () => ({ Component: (await import("@/pages/legal")).AboutPage }) },
       {
         path: "/login",
         element: (
@@ -66,7 +77,7 @@ export const router = createBrowserRouter([
             <Outlet />
           </RedirectIfAuthenticated>
         ),
-        children: [{ index: true, lazy: page(() => import("@/pages/login")) }],
+        children: [{ index: true, handle: { title: "Sign in" }, lazy: page(() => import("@/pages/login")) }],
       },
       {
         path: "/onboarding",
@@ -75,7 +86,7 @@ export const router = createBrowserRouter([
             <Outlet />
           </RequireAuth>
         ),
-        children: [{ index: true, lazy: page(() => import("@/pages/onboarding")) }],
+        children: [{ index: true, handle: { title: "Set up your workspace" }, lazy: page(() => import("@/pages/onboarding")) }],
       },
       {
         path: "/no-workspace",
@@ -97,12 +108,13 @@ export const router = createBrowserRouter([
           {
             lazy: async () => ({ Component: (await import("@/components/layout/app-shell")).AppShell }),
             children: [
-              { index: true, lazy: page(() => import("@/pages/app/dashboard")) },
-              { path: "projects", lazy: page(() => import("@/pages/app/projects")) },
-              { path: "projects/:projectId", lazy: page(() => import("@/pages/app/project-detail")) },
-              { path: "crm", lazy: page(() => import("@/pages/app/crm")) },
-              { path: "team", lazy: page(() => import("@/pages/app/team")) },
-              { path: "team/:memberId", lazy: page(() => import("@/pages/app/member-detail")) },
+              { handle: { title: "Dashboard" }, index: true, lazy: page(() => import("@/pages/app/dashboard")) },
+              { handle: { title: "My tasks" }, path: "tasks", lazy: page(() => import("@/pages/app/my-tasks")) },
+              { handle: { title: "Projects" }, path: "projects", lazy: page(() => import("@/pages/app/projects")) },
+              { handle: { title: "Project" }, path: "projects/:projectId", lazy: page(() => import("@/pages/app/project-detail")) },
+              { handle: { title: "CRM" }, path: "crm", lazy: page(() => import("@/pages/app/crm")) },
+              { handle: { title: "Team" }, path: "team", lazy: page(() => import("@/pages/app/team")) },
+              { handle: { title: "Team member" }, path: "team/:memberId", lazy: page(() => import("@/pages/app/member-detail")) },
               {
                 element: (
                   <ManagersOnly>
@@ -110,28 +122,28 @@ export const router = createBrowserRouter([
                   </ManagersOnly>
                 ),
                 children: [
-                  { path: "clients", lazy: page(() => import("@/pages/app/clients")) },
-                  { path: "clients/:clientId", lazy: page(() => import("@/pages/app/client-detail")) },
-                  { path: "invoices", lazy: page(() => import("@/pages/app/invoices")) },
-                  { path: "invoices/new", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).NewInvoicePage }) },
-                  { path: "invoices/:invoiceId", lazy: page(() => import("@/pages/app/invoice-detail")) },
-                  { path: "invoices/:invoiceId/edit", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).EditInvoicePage }) },
+                  { handle: { title: "Clients" }, path: "clients", lazy: page(() => import("@/pages/app/clients")) },
+                  { handle: { title: "Client" }, path: "clients/:clientId", lazy: page(() => import("@/pages/app/client-detail")) },
+                  { handle: { title: "Invoices" }, path: "invoices", lazy: page(() => import("@/pages/app/invoices")) },
+                  { handle: { title: "New invoice" }, path: "invoices/new", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).NewInvoicePage }) },
+                  { handle: { title: "Invoice" }, path: "invoices/:invoiceId", lazy: page(() => import("@/pages/app/invoice-detail")) },
+                  { handle: { title: "Edit invoice" }, path: "invoices/:invoiceId/edit", lazy: async () => ({ Component: (await import("@/pages/app/invoice-form")).EditInvoicePage }) },
                   {
                     element: <RequireFeature feature="finance" title="Finance" description="Expenses, and profit and loss." />,
-                    children: [{ path: "finance", lazy: page(() => import("@/pages/app/finance")) }],
+                    children: [{ handle: { title: "Finance" }, path: "finance", lazy: page(() => import("@/pages/app/finance")) }],
                   },
-                  { path: "contracts", lazy: page(() => import("@/pages/app/contracts")) },
-                  { path: "contracts/:contractId", lazy: page(() => import("@/pages/app/contract-detail")) },
-                  { path: "settings", lazy: page(() => import("@/pages/app/settings")) },
-                  { path: "billing", lazy: page(() => import("@/pages/app/billing")) },
+                  { handle: { title: "Contracts" }, path: "contracts", lazy: page(() => import("@/pages/app/contracts")) },
+                  { handle: { title: "Contract" }, path: "contracts/:contractId", lazy: page(() => import("@/pages/app/contract-detail")) },
+                  { handle: { title: "Settings" }, path: "settings", lazy: page(() => import("@/pages/app/settings")) },
+                  { handle: { title: "Billing" }, path: "billing", lazy: page(() => import("@/pages/app/billing")) },
                 ],
               },
-              { path: "*", element: <NotFoundPage /> },
+              { path: "*", handle: { title: "Page not found" }, element: <NotFoundPage /> },
             ],
           },
         ],
       },
-      { path: "*", element: <NotFoundPage /> },
+      { path: "*", handle: { title: "Page not found" }, element: <NotFoundPage /> },
     ],
   },
 ]);

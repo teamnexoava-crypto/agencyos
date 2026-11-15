@@ -144,6 +144,7 @@ export function toTaskDTO(row: TaskRow): TaskDTO {
   return {
     id: row.id,
     title: row.title,
+    description: row.description,
     assigneeId: row.assigneeId,
     dueDate: row.dueDate,
     done: row.done,

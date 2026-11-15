@@ -109,7 +109,7 @@ function ClientForm({ client, onOpenChange, onSaved }: Omit<ClientFormDialogProp
                 <FormControl>
                   <Input type="tel" inputMode="tel" placeholder="+91 98765 43210" autoComplete="off" {...field} />
                 </FormControl>
-                <FormDescription>With country code – used for one-tap sharing.</FormDescription>
+                <FormDescription>A 10-digit Indian number is fine; add the country code for other countries. Used for one-tap sharing.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

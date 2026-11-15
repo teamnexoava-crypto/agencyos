@@ -854,11 +854,20 @@ export default function LandingPage() {
             <a href="#pricing" className="hover:text-foreground">
               Pricing
             </a>
+            <Link to="/about" className="hover:text-foreground">
+              About
+            </Link>
+            <Link to="/contact" className="hover:text-foreground">
+              Contact
+            </Link>
             <Link to="/privacy" className="hover:text-foreground">
               Privacy
             </Link>
             <Link to="/terms" className="hover:text-foreground">
               Terms
+            </Link>
+            <Link to="/refunds" className="hover:text-foreground">
+              Refunds
             </Link>
             <a href={whatsappSupportUrl()} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
               WhatsApp {SUPPORT_WHATSAPP_DISPLAY}

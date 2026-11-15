@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import {
   ArrowLeft,
   CalendarDays,
@@ -65,6 +66,7 @@ export default function ProjectDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { canManage } = useSession();
   const { data: project, isPending, error, refetch } = useProject(projectId);
+  useDocumentTitle(project?.title);
   const members = useMemberMap();
   const updateProject = useUpdateProject(projectId);
   const deleteProject = useDeleteProject();

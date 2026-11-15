@@ -59,6 +59,8 @@ export const taskSchema = z.object({
   title: z.string().trim().min(1, "Describe the task").max(200, "Keep the task under 200 characters"),
   assigneeId: optionalIdSchema,
   dueDate: optionalIsoDateSchema,
+  /** Notes: details, links, what "done" means. */
+  description: optionalText(2000).optional(),
 });
 export type TaskInput = z.infer<typeof taskSchema>;
 

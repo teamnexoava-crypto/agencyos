@@ -379,6 +379,7 @@ export const projectRoutes = new Hono<AppEnv>()
         workspaceId: t.workspaceId,
         projectId: project.id,
         title: input.title,
+        description: emptyToNull(input.description ?? ""),
         assigneeId: emptyToNull(input.assigneeId),
         dueDate: emptyToNull(input.dueDate),
         position: (last?.position ?? -1) + 1,
@@ -426,6 +427,7 @@ export const projectRoutes = new Hono<AppEnv>()
       .update(tasks)
       .set({
         ...(input.title !== undefined && { title: input.title }),
+        ...(input.description !== undefined && { description: emptyToNull(input.description) }),
         ...(input.assigneeId !== undefined && { assigneeId: emptyToNull(input.assigneeId) }),
         ...(input.dueDate !== undefined && { dueDate: emptyToNull(input.dueDate) }),
         ...(doneChanged && { done: input.done, doneAt: input.done ? new Date() : null }),

@@ -46,10 +46,40 @@ async function findContract(db: Database, token: string) {
   return row;
 }
 
-/** The contract as shown on the public page: no contact details beyond what is printed on the document itself. */
+/** "r***@gmail.com" – enough to recognise, not enough to copy. */
+const maskEmail = (email: string | null) => {
+  if (!email) return null;
+  const [user = "", domain = ""] = email.split("@");
+  return domain ? `${user.slice(0, 1)}***@${domain}` : "***";
+};
+
+/** "203.0.113.x" or "2001:db8:85a3:…" – the network, not the exact address. */
+const maskIp = (ip: string | null) => {
+  if (!ip) return null;
+  if (ip.includes(".")) return ip.split(".").slice(0, 3).concat("x").join(".");
+  return `${ip.split(":").slice(0, 3).join(":")}:…`;
+};
+
+/** "Chrome on Android" instead of the full browser string. */
+function deviceSummary(userAgent: string | null): string | null {
+  if (!userAgent) return null;
+  const browser = /Edg\//.test(userAgent) ? "Edge" : /OPR\/|Opera/.test(userAgent) ? "Opera" : /Firefox\//.test(userAgent) ? "Firefox" : /Chrome\//.test(userAgent) ? "Chrome" : /Safari\//.test(userAgent) ? "Safari" : "A browser";
+  const system = /Android/.test(userAgent) ? "Android" : /iPhone|iPad|iPod/.test(userAgent) ? "iOS" : /Windows/.test(userAgent) ? "Windows" : /Mac OS X|Macintosh/.test(userAgent) ? "macOS" : /Linux/.test(userAgent) ? "Linux" : "another system";
+  return `${browser} on ${system}`;
+}
+
+/**
+ * The contract as shown on the public page – anyone holding the link can see it, so: no contact
+ * details beyond what is printed on the document itself, and the signers' email, IP address and device
+ * only in part. The agency sees them in full inside the app.
+ */
 async function publicContractDocument(db: Database, bucket: R2Bucket, contract: ContractRow, workspace: WorkspaceRow): Promise<ContractDocument> {
   const { clientWhatsapp: _omit, ...document } = await buildContractDocument(db, bucket, contract, workspace);
-  return { ...document, client: { ...document.client, email: null } };
+  return {
+    ...document,
+    client: { ...document.client, email: null },
+    signatures: document.signatures.map((signature) => ({ ...signature, email: maskEmail(signature.email), ip: maskIp(signature.ip), userAgent: deviceSummary(signature.userAgent) })),
+  };
 }
 
 /**

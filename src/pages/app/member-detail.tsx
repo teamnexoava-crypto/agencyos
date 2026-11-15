@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/lib/document-title";
 import { motion } from "motion/react";
 import { ArrowLeft, CalendarDays, FolderKanban, ListChecks, ListOrdered, Mail, Pencil, Phone } from "lucide-react";
 import { Link, useParams } from "react-router";
@@ -22,6 +23,7 @@ export default function MemberDetailPage() {
   const { memberId = "" } = useParams();
   const { canManage, isOwner, membership, workspace } = useSession();
   const { data, isPending, error, refetch } = useMemberDetail(memberId);
+  useDocumentTitle(data?.member.name);
   const members = useMemberMap();
   const [editOpen, setEditOpen] = useState(false);
 
