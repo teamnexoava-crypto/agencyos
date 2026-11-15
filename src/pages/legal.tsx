@@ -84,7 +84,8 @@ export function PrivacyPage() {
         <h2>Google user data</h2>
         <p>
           GrowUpliftOS requests only your basic Google profile (name, email address and profile picture) and uses it solely to create and
-          identify your account. Our use of information received from Google APIs adheres to the Google API Services User Data Policy,
+          identify your account and to send you emails about your own workspace (a welcome, reminders before a trial or plan ends,
+          and notices about failed payments) – never marketing from others. Our use of information received from Google APIs adheres to the Google API Services User Data Policy,
           including the Limited Use requirements. We do not transfer this data to others except as needed to run the service, and we
           do not use it to train AI models.
         </p>
@@ -106,6 +107,7 @@ export function PrivacyPage() {
           <li>Supabase – the database (hosted in Mumbai, India).</li>
           <li>Google – sign-in.</li>
           <li>Razorpay – payments for your plan in India. We never see or store your card, UPI or bank details.</li>
+          <li>Resend – sends the app's emails to workspace owners (welcome, trial and plan reminders, payment notices).</li>
           <li>Dodo Payments – payments for your plan outside India. Dodo is the seller of record for those payments and handles any sales tax or VAT; we never see or store your card details.</li>
         </ul>
         <p>

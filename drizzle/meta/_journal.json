@@ -50,6 +50,13 @@
       "when": 1794712841579,
       "tag": "0006_payment_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794716854018,
+      "tag": "0007_email_log",
+      "breakpoints": true
     }
   ]
 }

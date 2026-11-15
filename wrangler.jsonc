@@ -70,8 +70,13 @@
     "APP_URL": "",
     // Dodo Payments (payments outside India): "test_mode" or "live_mode". Its API key and webhook
     // secret (DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_WEBHOOK_KEY) are secrets, set like the others.
-    "DODO_PAYMENTS_ENVIRONMENT": "test_mode"
+    "DODO_PAYMENTS_ENVIRONMENT": "test_mode",
+    // Who the app's own emails (welcome, reminders, failed payments) come from. The domain must be
+    // verified in Resend; the API key is the secret RESEND_API_KEY.
+    "EMAIL_FROM": "GrowUpliftOS <hello@growupliftos.com>"
   },
+  // Every 15 minutes: billing check-ups and reminder emails (worker/services/lifecycle.ts).
+  "triggers": { "crons": ["*/15 * * * *"] },
   "observability": {
     "enabled": true
   }

@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import type { ApiErrorBody } from "../shared/types";
+import { createDb } from "./db";
 import { ApiError } from "./lib/errors";
+import { isLocalhost } from "./lib/request";
 import { requestContext } from "./middleware/context";
 import { csrfProtection } from "./middleware/csrf";
 import { assetRoutes } from "./routes/assets";
@@ -24,6 +26,7 @@ import { reportRoutes } from "./routes/reports";
 import { searchRoutes } from "./routes/search";
 import { teamRoutes } from "./routes/team";
 import { workspaceRoutes } from "./routes/workspace";
+import { runScheduledJobs } from "./services/lifecycle";
 import type { AppEnv } from "./types";
 
 /**
@@ -55,6 +58,12 @@ app.use(requestContext);
 // Server-to-server calls carry no Origin header or session, so they sit ahead of the CSRF check and
 // prove themselves with a signature instead.
 app.route("/webhooks", webhookRoutes);
+// Local development only: runs the scheduled job on demand (`?now=<ms>` pretends it is another time).
+app.post("/dev/run-jobs", async (c) => {
+  if (!import.meta.env.DEV || !isLocalhost(c)) return c.json({ error: { code: "not_found", message: "Route not found." } }, 404);
+  const at = Number(c.req.query("now"));
+  return c.json(await runScheduledJobs(c.var.db, c.env, Number.isFinite(at) && at > 0 ? new Date(at) : new Date()));
+});
 app.use(csrfProtection);
 
 app.get("/health", (c) => c.json({ ok: true }));
@@ -97,4 +106,22 @@ app.onError((error, c) => {
   return c.json(body, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  /** The cron trigger in wrangler.jsonc: billing check-ups and reminder emails (worker/services/lifecycle.ts). */
+  scheduled(_controller, env, ctx) {
+    const db = createDb(env.HYPERDRIVE.connectionString);
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const summary = await runScheduledJobs(db, env);
+          console.log("Scheduled jobs finished", summary);
+        } catch (error) {
+          console.error("Scheduled jobs failed", error);
+        } finally {
+          await db.$client.end({ timeout: 5 });
+        }
+      })(),
+    );
+  },
+} satisfies ExportedHandler<Env>;

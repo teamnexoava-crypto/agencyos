@@ -26,6 +26,14 @@ interface Env {
   DODO_PAYMENTS_WEBHOOK_KEY?: string;
   /** Local development only: origin of a stub standing in for Dodo's API. */
   DODO_TEST_ORIGIN?: string;
+  /**
+   * Resend (resend.com → API Keys): sends the welcome, reminder and failed-payment emails. Until it
+   * is set, no email is sent. The sender is EMAIL_FROM (a plain variable in wrangler.jsonc), whose
+   * domain must be verified in Resend.
+   */
+  RESEND_API_KEY?: string;
+  /** Local development only: origin of a stub standing in for api.resend.com. */
+  EMAIL_TEST_ORIGIN?: string;
   /** Local development only: origin of a stub that serves sheet CSV (the real one is docs.google.com). */
   SHEETS_TEST_ORIGIN?: string;
 }

@@ -195,6 +195,26 @@ export const billingSubscriptions = pgTable(
   (t) => [index("billing_subscriptions_ws_idx").on(t.workspaceId, t.createdAt), uniqueIndex("billing_subscriptions_provider_uq").on(t.providerSubscriptionId)],
 ).enableRLS();
 
+/**
+ * Emails the app sends by itself (welcome, trial and plan reminders, failed payments). A row is
+ * claimed before sending, keyed by what the email is about (e.g. the trial's end date), so each one
+ * goes out once even if the scheduled job runs again or twice at the same time.
+ */
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: id(),
+    workspaceId: workspaceRef(),
+    kind: text().notNull(),
+    key: text().notNull(),
+    toEmail: text().notNull(),
+    /** The provider's id for the message, once accepted. */
+    providerId: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("email_log_once_uq").on(t.workspaceId, t.kind, t.key)],
+).enableRLS();
+
 /** One-off facts about this installation, e.g. the moment payments were first switched on. */
 export const appFlags = pgTable("app_flags", {
   key: text().primaryKey(),

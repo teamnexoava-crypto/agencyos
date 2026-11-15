@@ -132,6 +132,15 @@ server-side checks all read from it.
   USD), so travelling or a VPN later doesn't change what it pays. The landing page shows a visitor the
   prices for where they are (`/api/auth/config` → `currency`). Locally there is no edge, so set a
   `dev_country=US` cookie on localhost to try it.
+- **Reminder emails and billing check-ups run on a schedule.** A cron trigger (every 15 minutes,
+  `triggers` in wrangler.jsonc) runs `runScheduledJobs` (`worker/services/lifecycle.ts`): it asks
+  Razorpay / Dodo about workspaces with something pending (a charge due, a payment page or auto-pay
+  set-up still open), then emails owners what is due – welcome, trial ending in 2 days / on the last
+  day / ended, a one-off plan ending in 5 days / ended, auto-pay that failed or stopped. Each email is
+  claimed in `email_log` (one per workspace, kind and date) before sending, so it goes out once.
+  Emails go through **Resend** (`worker/lib/email.ts`): secret `RESEND_API_KEY`, sender `EMAIL_FROM`
+  (wrangler.jsonc), domain verified in Resend. Without the key nothing is sent. Locally,
+  `POST /api/dev/run-jobs` runs the job on demand.
 - **Two payment providers.** Rupees go through **Razorpay** (UPI AutoPay or card); dollars through
   **Dodo Payments** (`worker/lib/dodo.ts`), which is the merchant of record and handles sales tax / VAT.
   Dodo's checkout and subscription are translated into the same shapes Razorpay gives, so the rest of
