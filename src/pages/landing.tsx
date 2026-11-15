@@ -594,8 +594,28 @@ export default function LandingPage() {
               <CheckLine>Paid plans from {fromPrice}/month</CheckLine>
             </motion.p>
           </motion.div>
-          <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }} className="mt-14 sm:mt-20">
-            <DashboardMock />
+          {/* The founder's video, right under the buttons so it is on the first screen; until a video is
+              set, an illustration of the dashboard takes its place. */}
+          <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }} className="mt-12 sm:mt-16">
+            {DEMO_VIDEO_ID ? (
+              <div id="video" className="scroll-mt-24">
+                <div className="relative mx-auto max-w-4xl">
+                  <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-gradient-to-r from-indigo-500/30 to-violet-500/30 blur-2xl sm:-inset-5" />
+                  <div className="relative">
+                    <DemoVideo />
+                  </div>
+                </div>
+                <p className="mx-auto mt-4 max-w-xl text-center text-[13px] text-balance text-muted-foreground">
+                  <span className="font-medium text-foreground">Watch first:</span> why I built GrowUpliftOS, who it's for, and a walk through a real project from first enquiry to final payment.
+                </p>
+                {/* Right after watching, the next step is one tap away. */}
+                <div className="mt-6 flex justify-center">
+                  <GetStarted signedIn={signedIn} />
+                </div>
+              </div>
+            ) : (
+              <DashboardMock />
+            )}
           </motion.div>
         </section>
 
@@ -622,16 +642,6 @@ export default function LandingPage() {
             ))}
           </ul>
         </section>
-
-        {/* Walkthrough video (shown once a video id is set) */}
-        {DEMO_VIDEO_ID && (
-          <section id="video" className="mx-auto max-w-6xl scroll-mt-20 px-5 pt-20 sm:px-8 sm:pt-28">
-            <SectionHeading eyebrow="Watch first" title="Why I built this, and who it's for" text="A few minutes on the problem, and a walk through the whole thing with a real client from first enquiry to final payment." />
-            <Reveal className="mt-10">
-              <DemoVideo />
-            </Reveal>
-          </section>
-        )}
 
         {/* Problem → solution */}
         <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
