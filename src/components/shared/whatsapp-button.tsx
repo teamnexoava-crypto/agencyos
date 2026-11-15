@@ -22,12 +22,14 @@ export function WhatsAppSupportButton({ className }: { className?: string }) {
       rel="noopener noreferrer"
       aria-label="Chat with support on WhatsApp"
       className={cn(
-        "fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex size-14 items-center justify-center gap-2 rounded-full bg-[#25D366] text-white shadow-lg ring-1 ring-black/5 transition hover:scale-105 hover:bg-[#1ebe5b] focus-visible:ring-4 focus-visible:ring-[#25D366]/40 focus-visible:outline-none sm:right-6 sm:bottom-6 sm:h-12 sm:w-auto sm:px-5 print:hidden",
+        "wa-glow fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex size-14 items-center justify-center gap-2 rounded-full bg-[#25D366] text-white ring-1 ring-black/5 transition hover:scale-105 hover:bg-[#1ebe5b] focus-visible:ring-4 focus-visible:ring-[#25D366]/40 focus-visible:outline-none sm:right-6 sm:bottom-6 sm:h-12 sm:w-auto sm:px-5 print:hidden",
         className,
       )}
     >
-      <WhatsAppIcon className="size-7 sm:size-5" />
-      <span className="hidden text-sm font-semibold sm:inline">Need help? Chat on WhatsApp</span>
+      {/* A ring that ripples outward from the button every couple of seconds. */}
+      <span aria-hidden="true" className="wa-ripple pointer-events-none absolute inset-0 rounded-full border-2 border-[#25D366] sm:[--wa-ripple-x:1.08] sm:[--wa-ripple-y:1.4]" />
+      <WhatsAppIcon className="relative size-7 drop-shadow-sm sm:size-5" />
+      <span className="relative hidden text-sm font-semibold sm:inline">Need help? Chat on WhatsApp</span>
     </a>
   );
 }

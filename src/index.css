@@ -217,6 +217,60 @@
   }
 }
 
+/*
+ * The WhatsApp support button glows: a soft green halo breathes around it and a ring ripples outward
+ * every few seconds, so it is easy to notice without being in the way. Still for people who ask for
+ * reduced motion – they keep the steady glow.
+ */
+@utility wa-glow {
+  box-shadow:
+    0 0 0 0 rgb(37 211 102 / 0.55),
+    0 8px 24px -4px rgb(37 211 102 / 0.6),
+    0 0 18px 2px rgb(37 211 102 / 0.45);
+  animation: wa-glow 2.4s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes wa-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(37 211 102 / 0.55),
+      0 8px 24px -4px rgb(37 211 102 / 0.6),
+      0 0 14px 1px rgb(37 211 102 / 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgb(37 211 102 / 0),
+      0 10px 30px -2px rgb(37 211 102 / 0.75),
+      0 0 30px 6px rgb(37 211 102 / 0.6);
+  }
+}
+
+/* The ring that ripples out from the WhatsApp button. A wide button sets a smaller sideways spread
+   (`--wa-ripple-x`), so the ring grows by about the same few pixels on every side. */
+@utility wa-ripple {
+  animation: wa-ripple 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@keyframes wa-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(var(--wa-ripple-x, 1.45), var(--wa-ripple-y, 1.45));
+    opacity: 0;
+  }
+}
+
 /* The unread badge on the bell pops in. */
 @utility pop-in {
   animation: pop-in 0.32s var(--ease-out-soft) both;
