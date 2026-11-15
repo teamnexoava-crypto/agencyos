@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, LoaderCircle, PencilLine, Plus, Trash2, UserPlus } from "lucide-react";
+import { Eye, LoaderCircle, MapPin, PencilLine, Plus, Trash2, UserPlus } from "lucide-react";
 import { Controller, useFieldArray, useForm, useWatch, type FieldPath } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -24,11 +24,13 @@ import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useSaveInvoice } from "./api";
 import { InvoiceDocument } from "./invoice-document";
+import { suggestTaxMode, type TaxSuggestion } from "./tax-mode";
 
 const NO_PROJECT = "__none__";
 const NEW_CLIENT = "__new_client__";
 const DISCOUNT_LABEL = { none: "No discount", percent: "Percent (%)", fixed: "Fixed amount" } as const;
 const TAX_LABEL = { none: "No tax", cgst_sgst: "GST (CGST + SGST)", igst: "GST (IGST)" } as const;
+const TAX_SHORT = { cgst_sgst: "CGST + SGST", igst: "IGST" } as const;
 const optional = <span className="font-normal text-muted-foreground">(optional)</span>;
 
 /** Percent text field backed by basis points (18 ⇄ 1800). */
@@ -53,6 +55,28 @@ function PercentInput({ value, onChange, ...props }: { value: number; onChange: 
         %
       </span>
     </div>
+  );
+}
+
+/** Explains the GST split picked from the two GSTINs – or, when the user picked otherwise, offers it back. */
+function TaxHint({ suggestion, current, onUse }: { suggestion: TaxSuggestion; current: string; onUse: () => void }) {
+  if (suggestion.mode === current) {
+    return (
+      <p className="flex items-start gap-1.5 text-[13px] text-muted-foreground">
+        <MapPin className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          {TAX_SHORT[suggestion.mode]} – {suggestion.reason}
+        </span>
+      </p>
+    );
+  }
+  return (
+    <p className="text-[13px] text-amber-700 dark:text-amber-300">
+      {TAX_SHORT[suggestion.mode]} usually applies – {suggestion.reason}.{" "}
+      <button type="button" onClick={onUse} className="rounded-sm font-medium underline underline-offset-4 hover:no-underline">
+        Use {TAX_SHORT[suggestion.mode]}
+      </button>
+    </p>
   );
 }
 
@@ -82,9 +106,29 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
   const save = useSaveInvoice(invoiceId);
   const [mobileView, setMobileView] = useState<"form" | "preview">("form");
   const [newClientOpen, setNewClientOpen] = useState(false);
+  // Once the user picks a tax mode themselves, the GSTIN rule stops changing it for the rest of this form.
+  const [taxTouched, setTaxTouched] = useState(false);
 
-  const form = useForm<InvoiceInput>({ resolver: zodResolver(invoiceSchema), defaultValues: initialValues });
+  const suggestFor = (client: Pick<ClientDTO, "gstNumber"> | undefined) => suggestTaxMode({ currency: workspace.currency, workspaceGstin: workspace.gstNumber, clientGstin: client?.gstNumber });
+
+  const form = useForm<InvoiceInput>({
+    resolver: zodResolver(invoiceSchema),
+    // A new invoice opens with the rule already applied; a saved one keeps the mode it was saved with.
+    defaultValues: (() => {
+      if (invoiceId || initialValues.taxMode === "none") return initialValues;
+      const suggestion = suggestFor(clients.find((client) => client.id === initialValues.clientId));
+      return suggestion ? { ...initialValues, taxMode: suggestion.mode } : initialValues;
+    })(),
+  });
   const items = useFieldArray({ control: form.control, name: "items" });
+  /**
+   * Same state → CGST + SGST, other state → IGST. Never switches on GST for an invoice set to "No tax"
+   * (it may be exempt work), and falls back to the starting mode when the new client has no GSTIN.
+   */
+  const applyTaxRule = (client: Pick<ClientDTO, "gstNumber"> | undefined) => {
+    if (taxTouched || form.getValues("taxMode") === "none") return;
+    form.setValue("taxMode", suggestFor(client)?.mode ?? initialValues.taxMode, { shouldDirty: true });
+  };
   const values = useWatch({ control: form.control });
 
   const preview = useMemo((): InvoiceDocumentData => {
@@ -130,6 +174,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
     };
   }, [values, clients, projects, workspace, number]);
 
+  const taxSuggestion = values.taxMode && values.taxMode !== "none" ? suggestFor(clients.find((client) => client.id === values.clientId)) : null;
   const clientProjects = projects.filter((project) => !values.clientId || project.clientId === values.clientId || project.id === values.projectId);
 
   const onSubmit = form.handleSubmit(
@@ -173,7 +218,8 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <div className={cn("grid gap-5", mobileView === "preview" && "hidden lg:grid")}>
             <Section title="Details">
-              <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              {/* minmax(0,1fr): a long client or project name truncates instead of pushing the card wider. */}
+              <div className="grid gap-x-8 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -191,6 +237,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                           // "Add a new client" is an action, not a choice: open the form and keep the current selection.
                           if (value === NEW_CLIENT) return setNewClientOpen(true);
                           field.onChange(value);
+                          applyTaxRule(clients.find((client) => client.id === value));
                           // A project belongs to one client – drop it if it no longer matches.
                           const project = projects.find((item) => item.id === form.getValues("projectId"));
                           if (project && project.clientId !== value) form.setValue("projectId", "");
@@ -414,7 +461,8 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                   />
                 )}
               </div>
-              <div className="grid gap-5 sm:grid-cols-2">
+              {/* items-start: the hint under Tax must not stretch the GST rate field next to it. */}
+              <div className="grid items-start gap-5 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="taxMode"
@@ -425,6 +473,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                         value={field.value}
                         onValueChange={(value) => {
                           field.onChange(value);
+                          setTaxTouched(true);
                           if (value !== "none" && form.getValues("taxRate") === 0) form.setValue("taxRate", 1800);
                         }}
                       >
@@ -441,6 +490,16 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                           ))}
                         </SelectContent>
                       </Select>
+                      {taxSuggestion && (
+                        <TaxHint
+                          suggestion={taxSuggestion}
+                          current={field.value}
+                          onUse={() => {
+                            field.onChange(taxSuggestion.mode);
+                            setTaxTouched(true);
+                          }}
+                        />
+                      )}
                     </FormItem>
                   )}
                 />
@@ -460,7 +519,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                   />
                 )}
               </div>
-              <p className="-mt-2 text-[13px] text-muted-foreground">Use CGST + SGST for clients in your state, IGST for clients in another state.</p>
+              {!taxSuggestion && <p className="-mt-2 text-[13px] text-muted-foreground">Use CGST + SGST for clients in your state, IGST for clients in another state.</p>}
             </Section>
 
             <Section title="Payment details & notes">
@@ -526,8 +585,8 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
                   <label className="flex cursor-pointer items-start gap-3 text-sm">
                     <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} className="mt-0.5" />
                     <span>
-                      Remember tax, payment details, notes and terms for new invoices
-                      <span className="block text-[13px] text-muted-foreground">You won't have to type them again next time.</span>
+                      Also save this tax, payment details, notes and terms as my defaults for future invoices
+                      <span className="block text-[13px] text-muted-foreground">Leave unticked to change this invoice only. You can edit your defaults any time in Settings.</span>
                     </span>
                   </label>
                 )}
@@ -566,6 +625,7 @@ export function InvoiceEditor({ invoiceId, number, initialValues, clients, proje
         onOpenChange={setNewClientOpen}
         onSaved={(client) => {
           form.setValue("clientId", client.id, { shouldDirty: true, shouldValidate: true });
+          applyTaxRule(client);
           // A project belongs to one client – a brand-new client has none yet.
           form.setValue("projectId", "");
         }}

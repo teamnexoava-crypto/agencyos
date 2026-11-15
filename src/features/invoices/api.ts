@@ -28,10 +28,11 @@ export function useInvoices(filter: { clientId?: string; projectId?: string } = 
   });
 }
 
-export function useInvoice(id: string) {
+export function useInvoice(id: string, enabled = true) {
   return useQuery({
     queryKey: invoiceKeys.detail(id),
     queryFn: async ({ signal }) => (await api<{ invoice: InvoiceDetail }>(`/api/invoices/${id}`, { signal })).invoice,
+    enabled,
   });
 }
 

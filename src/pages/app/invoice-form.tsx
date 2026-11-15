@@ -1,18 +1,50 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Copy } from "lucide-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router";
 import type { InvoiceInput } from "@shared/schemas/invoice";
+import type { ClientDTO, InvoiceDefaults, InvoiceDetail, ProjectSummary } from "@shared/types";
 import { ErrorState } from "@/components/shared/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClients } from "@/features/clients/api";
 import { useInvoice, useInvoiceDefaults } from "@/features/invoices/api";
 import { InvoiceEditor } from "@/features/invoices/invoice-editor";
 import { useProject, useProjects } from "@/features/projects/api";
+import { ApiError } from "@/lib/api";
 import { todayIso } from "@/lib/format";
 
 function addDays(iso: string, days: number): string {
   const date = new Date(`${iso}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
+/**
+ * Starting values for "Duplicate invoice": the same work, client and pricing, re-dated to today with the
+ * original's payment window. Bank / UPI details come from the current defaults when there are any,
+ * because those may have changed since the original went out.
+ */
+function duplicateValues(source: InvoiceDetail, defaults: InvoiceDefaults, clients: ClientDTO[], projects: ProjectSummary[], today: string): InvoiceInput {
+  const clientId = source.clientId && clients.some((client) => client.id === source.clientId) ? source.clientId : "";
+  // The client or project may have been deleted since – start without them rather than fail to save.
+  const project = projects.find((item) => item.id === source.projectId);
+  const gap = daysBetween(source.issueDate, source.dueDate);
+  return {
+    clientId,
+    projectId: project && (!project.clientId || project.clientId === clientId) ? project.id : "",
+    issueDate: today,
+    dueDate: addDays(today, gap >= 0 ? gap : defaults.dueDays),
+    items: source.items.map((item) => ({ description: item.description, quantity: item.quantity, rate: item.rate })),
+    discountType: source.discountType,
+    discountValue: source.discountValue,
+    taxMode: source.taxMode,
+    taxRate: source.taxMode === "none" ? defaults.taxRate : source.taxRate,
+    notes: source.notes ?? "",
+    terms: source.terms ?? "",
+    bankDetails: defaults.bankDetails ?? source.bankDetails ?? "",
+    upiId: defaults.upiId ?? source.upiId ?? "",
+    saveDefaults: false,
+  };
 }
 
 function FormSkeleton() {
@@ -39,27 +71,57 @@ function Shell({ backTo, title, children }: { backTo: string; title: string; chi
   );
 }
 
-/** /app/invoices/new – optionally `?project=<id>` to pre-fill the client and milestones as line items. */
+/**
+ * /app/invoices/new – optionally `?project=<id>` to pre-fill the client and milestones as line items,
+ * or `?duplicate=<invoiceId>` to start from a copy of an existing invoice.
+ */
 export function NewInvoicePage() {
   const [params] = useSearchParams();
-  const projectId = params.get("project") ?? "";
+  const duplicateId = params.get("duplicate") ?? "";
+  const projectId = duplicateId ? "" : (params.get("project") ?? "");
   const clientId = params.get("client") ?? "";
   const defaults = useInvoiceDefaults();
   const clients = useClients();
   const projects = useProjects();
   const project = useProject(projectId, projectId !== "");
+  const source = useInvoice(duplicateId, duplicateId !== "");
 
   // The form copies its starting values once, so wait for defaults fetched for THIS visit (not a cached
   // copy from before Settings were changed). After that, a failed background refresh must not replace
   // a half-written invoice with an error screen – only a missing first load is an error.
-  const loading = !defaults.isFetchedAfterMount || clients.isPending || projects.isPending || (projectId !== "" && project.isPending);
+  const loading = !defaults.isFetchedAfterMount || clients.isPending || projects.isPending || (projectId !== "" && project.isPending) || (duplicateId !== "" && source.isPending);
   const failed = (defaults.isError && !defaults.isFetchedAfterMount) || (clients.isError && !clients.data) || (projects.isError && !projects.data);
 
   let body;
-  if (failed) {
+  if (duplicateId !== "" && source.isError && !source.data) {
+    const missing = source.error instanceof ApiError && source.error.status === 404;
+    body = missing ? (
+      <ErrorState title="Invoice not found" description="The invoice you wanted to copy may have been deleted." />
+    ) : (
+      <ErrorState onRetry={() => void source.refetch()} />
+    );
+  } else if (failed) {
     body = <ErrorState onRetry={() => void Promise.all([defaults.refetch(), clients.refetch(), projects.refetch()])} />;
   } else if (loading || !defaults.data || !clients.data || !projects.data) {
     body = <FormSkeleton />;
+  } else if (source.data) {
+    body = (
+      <>
+        <p role="status" className="mb-5 flex items-start gap-2.5 rounded-xl border border-primary/25 bg-primary/5 px-3.5 py-3 text-[13px] text-foreground">
+          <Copy className="mt-0.5 size-4 shrink-0 text-primary" />
+          <span>
+            Copied from <span className="tabular font-medium">{source.data.number}</span> – check the dates before sending. It gets its own number when you save.
+          </span>
+        </p>
+        <InvoiceEditor
+          key={source.data.id}
+          number={defaults.data.nextNumber}
+          initialValues={duplicateValues(source.data, defaults.data, clients.data, projects.data, todayIso())}
+          clients={clients.data}
+          projects={projects.data}
+        />
+      </>
+    );
   } else {
     const today = todayIso();
     // Milestones that carry an amount become the line items ("create invoice from a project").
@@ -78,10 +140,11 @@ export function NewInvoicePage() {
       terms: defaults.data.terms ?? "",
       bankDetails: defaults.data.bankDetails ?? "",
       upiId: defaults.data.upiId ?? "",
-      // First invoice: remember what's typed. Afterwards the saved defaults are only changed on request.
-      saveDefaults: !defaults.data.bankDetails && !defaults.data.upiId && !defaults.data.terms,
+      // Never on by default: creating one invoice must not quietly change what every later invoice starts with.
+      saveDefaults: false,
     };
-    body = <InvoiceEditor number={defaults.data.nextNumber} initialValues={initialValues} clients={clients.data} projects={projects.data} />;
+    // Keyed so following a different "new invoice" link (another project, or none) starts a fresh form.
+    body = <InvoiceEditor key={`${projectId}|${clientId}`} number={defaults.data.nextNumber} initialValues={initialValues} clients={clients.data} projects={projects.data} />;
   }
 
   return (

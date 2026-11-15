@@ -137,7 +137,7 @@ export default function InvoicesPage() {
           {visible.length === 0 ? (
             <EmptyState icon={FileSearch} title="No invoices match" description="Try another filter or search term." className="py-12" />
           ) : (
-            <InvoiceRows invoices={visible} />
+            <InvoiceRows invoices={visible} remind />
           )}
         </>
       )}

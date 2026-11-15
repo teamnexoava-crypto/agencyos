@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useDocumentTitle } from "@/lib/document-title";
-import { ArrowLeft, Ban, Check, CircleDollarSign, Eye, FilePlus2, Link2, MoreHorizontal, Pencil, Printer, RefreshCw, Send, Share2, Trash2 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router";
+import { ArrowLeft, Ban, BellRing, Check, CircleDollarSign, Copy, Eye, FilePlus2, Link2, MoreHorizontal, Pencil, Printer, RefreshCw, Send, Share2, Trash2 } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { invoiceDisplayStatus } from "@shared/invoice";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,13 @@ import { useDeleteInvoice, useDeletePayment, useInvoice, useInvoiceAction } from
 import { InvoiceDocument } from "@/features/invoices/invoice-document";
 import { PAYMENT_METHOD_LABEL, invoiceUrl } from "@/features/invoices/meta";
 import { PaymentDialog } from "@/features/invoices/payment-dialog";
+import { canSendReminder, daysOverdue } from "@/features/invoices/reminder";
+import { ReminderDialog } from "@/features/invoices/reminder-dialog";
 import { ShareDialog } from "@/features/invoices/share-dialog";
 import { InvoiceStatusBadge } from "@/features/invoices/status-badge";
 import { ApiError, errorMessage } from "@/lib/api";
 import { copyToClipboard } from "@/lib/clipboard";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const formatInstant = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms));
@@ -33,6 +36,9 @@ export default function InvoiceDetailPage() {
   const deletePayment = useDeletePayment(invoiceId);
   const [shareOpen, setShareOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  // `?remind=1` comes from the "Remind" shortcut on the invoices list.
+  const [params, setParams] = useSearchParams();
+  const [reminderOpen, setReminderOpen] = useState(() => params.get("remind") === "1");
   const [confirm, setConfirm] = useState<Confirm>(null);
 
   const back = (
@@ -67,6 +73,14 @@ export default function InvoiceDetailPage() {
   const isCancelled = invoice.status === "cancelled";
   const editable = invoice.amountPaid === 0 && !isCancelled;
   const canTakePayment = balance > 0 && !isCancelled;
+  const remindable = canSendReminder(invoice);
+  const overdue = invoiceDisplayStatus(invoice, todayIso()) === "overdue";
+  const lateBy = daysOverdue(invoice.dueDate);
+  const onReminderOpenChange = (open: boolean) => {
+    setReminderOpen(open);
+    // Drop the shortcut's flag so a refresh or "back" doesn't pop the dialog open again.
+    if (!open && params.has("remind")) setParams({}, { replace: true });
+  };
   const run = (name: "send" | "cancel" | "link", success: string) =>
     action.mutate(name, { onSuccess: () => toast.success(success), onError: (err) => toast.error(errorMessage(err, "That didn't work. Please try again.")) });
   /** Sharing a draft is what sends it. */
@@ -117,6 +131,12 @@ export default function InvoiceDetailPage() {
               <CircleDollarSign /> Record payment
             </Button>
           )}
+          {/* Overdue is when chasing matters most, so the reminder moves out of the menu and is tinted. */}
+          {remindable && overdue && (
+            <Button variant="outline" onClick={() => setReminderOpen(true)} className="border-rose-500/40 bg-rose-500/10 text-rose-700 hover:bg-rose-500/15 hover:text-rose-800 dark:text-rose-300 dark:hover:text-rose-200">
+              <BellRing /> Send reminder
+            </Button>
+          )}
           {!isCancelled && (
             <Button variant={canTakePayment ? "outline" : "default"} onClick={() => setShareOpen(true)}>
               <Share2 /> Share
@@ -138,6 +158,17 @@ export default function InvoiceDetailPage() {
                   <Link to={`/app/invoices/${invoice.id}/edit`}>
                     <Pencil /> Edit invoice
                   </Link>
+                </DropdownMenuItem>
+              )}
+              {/* Opens a pre-filled new-invoice form; nothing is created until it's saved. */}
+              <DropdownMenuItem asChild>
+                <Link to={`/app/invoices/new?duplicate=${invoice.id}`}>
+                  <Copy /> Duplicate invoice
+                </Link>
+              </DropdownMenuItem>
+              {remindable && !overdue && (
+                <DropdownMenuItem onSelect={() => setReminderOpen(true)}>
+                  <BellRing /> Send payment reminder
                 </DropdownMenuItem>
               )}
               {isDraft && (
@@ -190,6 +221,19 @@ export default function InvoiceDetailPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {formatMoney(invoice.amountPaid, invoice.currency)} of {formatMoney(invoice.total, invoice.currency)} received
               </p>
+            )}
+            {remindable && overdue && (
+              <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-[13px] text-rose-800 dark:text-rose-300">
+                <span>
+                  <span className="font-semibold">
+                    Overdue by {lateBy} day{lateBy === 1 ? "" : "s"}
+                  </span>{" "}
+                  – due {formatDate(invoice.dueDate)}
+                </span>
+                <button type="button" onClick={() => setReminderOpen(true)} className="inline-flex items-center gap-1 rounded-sm font-medium underline-offset-4 hover:underline">
+                  <BellRing className="size-3.5" /> Send reminder
+                </button>
+              </div>
             )}
             {isDraft && <p className="mt-3 rounded-xl bg-muted/60 px-3.5 py-2.5 text-[13px] text-muted-foreground">This is a draft – the client can't see it until you share it or mark it as sent.</p>}
           </section>
@@ -253,6 +297,7 @@ export default function InvoiceDetailPage() {
       </div>
 
       <ShareDialog open={shareOpen} onOpenChange={setShareOpen} invoice={invoice} onShared={markSentIfDraft} />
+      {remindable && <ReminderDialog open={reminderOpen} onOpenChange={onReminderOpenChange} invoice={invoice} />}
       <PaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} invoice={invoice} />
 
       <ConfirmDialog
