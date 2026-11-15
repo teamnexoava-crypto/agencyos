@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { LEAD_STAGES, type LeadStage } from "@shared/constants";
 import type { LeadDTO } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { CountUp } from "@/components/shared/count-up";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -36,7 +37,7 @@ const VIEW_KEY = "aos-crm-view";
 const AUTO_SYNC_AFTER_MS = 10 * 60 * 1000;
 
 type View = "board" | "list";
-const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const shortDate = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
 
 /** YYYY-MM-DD in the person's own time zone (an early-morning lead must not be exported under yesterday's date). */
 function localDay(ms: number): string {
@@ -361,7 +362,8 @@ export default function CrmPage() {
                         </th>
                         <td className="px-4 py-3">
                           <Select value={lead.stage} onValueChange={(value) => move(lead.id, value as LeadStage)}>
-                            <SelectTrigger className={cn("h-7 w-fit gap-1.5 rounded-full border-0 px-2.5 text-xs font-medium shadow-none", STAGE_META[lead.stage].badge)} aria-label={`Stage of ${lead.name}`}>
+                            {/* sm:text-xs because the trigger switches to sm:text-sm from that size up. */}
+                            <SelectTrigger className={cn("h-7 w-fit gap-1.5 rounded-full border-0 px-2.5 text-xs font-medium shadow-none sm:text-xs", STAGE_META[lead.stage].badge)} aria-label={`Stage of ${lead.name}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

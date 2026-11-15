@@ -16,7 +16,7 @@ export function WorkspaceLogo({ name, logoUrl, className }: WorkspaceLogoProps) 
     <span
       aria-hidden="true"
       className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-[13px] font-semibold text-white shadow-soft",
+        "flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-[13px] font-semibold text-primary-foreground shadow-soft",
         className,
       )}
     >

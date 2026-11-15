@@ -1,7 +1,8 @@
-import { Check, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { Check, LogOut, Monitor, Moon, Palette, Settings, Sun } from "lucide-react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { useTheme, type Theme } from "@/components/theme/theme-provider";
+import { AccentSwatches } from "@/features/appearance/appearance-settings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -77,6 +78,16 @@ export function UserMenu() {
           </>
         )}
 
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Accent colour</DropdownMenuLabel>
+        <div className="px-2 pb-2">
+          <AccentSwatches size="sm" />
+        </div>
+        <DropdownMenuItem asChild>
+          <Link to="/app/appearance">
+            <Palette /> Appearance & fonts…
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Theme</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as Theme)}>

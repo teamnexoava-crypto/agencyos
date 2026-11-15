@@ -114,7 +114,7 @@ export function GetStarted({ canManage }: { canManage: boolean }) {
           </Button>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={SETUP_STEPS.length} aria-valuenow={done} aria-label="Setup progress">
-          <motion.div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" initial={false} animate={{ width: `${Math.max(4, (done / SETUP_STEPS.length) * 100)}%` }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} />
+          <motion.div className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70" initial={false} animate={{ width: `${Math.max(4, (done / SETUP_STEPS.length) * 100)}%` }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} />
         </div>
         <motion.ol variants={container} initial="hidden" animate="show" className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {SETUP_STEPS.map((step, index) => {

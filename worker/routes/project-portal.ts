@@ -204,7 +204,7 @@ export const projectPortalRoutes = new Hono<AppEnv>()
       .set({ token: newPublicToken(), viewCount: 0, lastViewedAt: null, updatedAt: new Date() })
       .where(t.where(shareLinks, eq(shareLinks.projectId, project.id)))
       .returning();
-    if (!row) throw notFound("Client link");
+    if (!row) throw notFound("Client portal");
     return c.json({ link: toShareLinkDTO(row) });
   })
 

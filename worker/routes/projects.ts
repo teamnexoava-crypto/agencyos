@@ -306,7 +306,7 @@ export const projectRoutes = new Hono<AppEnv>()
       .from(projectSteps)
       .where(t.where(projectSteps, eq(projectSteps.id, stepId), eq(projectSteps.projectId, project.id)))
       .limit(1);
-    if (!existing) throw notFound("Step");
+    if (!existing) throw notFound("Milestone");
 
     // Members may move a step's status forward/back on their own projects; everything else is for managers.
     const onlyStatus = Object.keys(input).every((key) => key === "status");
@@ -330,7 +330,7 @@ export const projectRoutes = new Hono<AppEnv>()
       })
       .where(t.where(projectSteps, eq(projectSteps.id, existing.id)))
       .returning();
-    if (!step) throw notFound("Step");
+    if (!step) throw notFound("Milestone");
 
     if (statusChanged && step.status === "completed") {
       c.var.defer(
@@ -355,7 +355,7 @@ export const projectRoutes = new Hono<AppEnv>()
       .delete(projectSteps)
       .where(t.where(projectSteps, eq(projectSteps.id, stepId), eq(projectSteps.projectId, project.id)))
       .returning({ id: projectSteps.id });
-    if (deleted.length === 0) throw notFound("Step");
+    if (deleted.length === 0) throw notFound("Milestone");
     return c.json({ ok: true });
   })
 

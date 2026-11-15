@@ -70,7 +70,7 @@ function contentFor(kind: EmailKind, ctx: EmailContext): Content {
           `Your workspace “${ctx.workspaceName}” is ready, with every Premium feature unlocked for ${TRIAL_DAYS} days – no card needed.`,
           "The quickest way to see what it can do is to finish one real job end to end:",
         ],
-        bullets: ["Add a client and a project with a few milestones", "Send them a GST invoice on WhatsApp (with a UPI QR code)", "Get a contract signed from their phone", "Share the client link so they can follow progress"],
+        bullets: ["Add a client and a project with a few milestones", "Send them a GST invoice on WhatsApp (with a UPI QR code)", "Get a contract signed from their phone", "Share the client portal so they can follow progress"],
         cta: { label: "Open my workspace", path: "/app" },
       };
     case "trial_2d":

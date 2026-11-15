@@ -145,12 +145,12 @@ export function StepsTab({ project, members }: StepsTabProps) {
     const from = ids.indexOf(String(active.id));
     const to = ids.indexOf(String(over.id));
     if (from === -1 || to === -1) return;
-    reorder.mutate(arrayMove(ids, from, to), { onError: (error) => toast.error(errorMessage(error, "Could not reorder the steps.")) });
+    reorder.mutate(arrayMove(ids, from, to), { onError: (error) => toast.error(errorMessage(error, "Could not reorder the milestones.")) });
   };
 
   const addButton = canManage && (
     <Button onClick={() => setForm({ open: true })}>
-      <Plus /> Add step
+      <Plus /> Add milestone
     </Button>
   );
 
@@ -159,8 +159,8 @@ export function StepsTab({ project, members }: StepsTabProps) {
       <>
         <EmptyState
           icon={ListOrdered}
-          title="No steps yet"
-          description={canManage ? "Break the project into milestones. Progress is calculated from the steps you complete." : "The project owner hasn't added any steps yet."}
+          title="No milestones yet"
+          description={canManage ? "Break the project into milestones. Progress is calculated from the milestones you complete." : "The project owner hasn't added any milestones yet."}
           action={addButton}
         />
         <StepFormDialog open={form.open} onOpenChange={(open) => setForm((state) => ({ ...state, open }))} projectId={project.id} step={form.step} />
@@ -174,14 +174,14 @@ export function StepsTab({ project, members }: StepsTabProps) {
         <div className="flex-1 sm:max-w-md">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="font-medium">
-              {project.stepsDone} of {project.stepCount} steps completed
+              {project.stepsDone} of {project.stepCount} milestones completed
             </span>
             <span className="tabular flex items-center gap-1.5 text-muted-foreground">
               {reorder.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
               {project.progress}%
             </span>
           </div>
-          <Progress value={project.progress} className="h-2" label="Steps completed" />
+          <Progress value={project.progress} className="h-2" label="Milestones completed" />
         </div>
         {addButton}
       </div>
@@ -200,7 +200,7 @@ export function StepsTab({ project, members }: StepsTabProps) {
                 onToggle={(target) =>
                   updateStep.mutate(
                     { stepId: target.id, input: { status: STEP_STATUS_META[target.status].next } },
-                    { onError: (error) => toast.error(errorMessage(error, "Could not update the step.")) },
+                    { onError: (error) => toast.error(errorMessage(error, "Could not update the milestone.")) },
                   )
                 }
                 onEdit={(target) => setForm({ open: true, step: target })}
@@ -215,13 +215,13 @@ export function StepsTab({ project, members }: StepsTabProps) {
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title="Delete this step?"
+        title="Delete this milestone?"
         description={`"${deleting?.title ?? ""}" will be removed and the project's progress recalculated.`}
         onConfirm={() => {
           if (!deleting) return;
           deleteStep.mutate(deleting.id, {
-            onSuccess: () => toast.success("Step deleted"),
-            onError: (error) => toast.error(errorMessage(error, "Could not delete the step.")),
+            onSuccess: () => toast.success("Milestone deleted"),
+            onError: (error) => toast.error(errorMessage(error, "Could not delete the milestone.")),
           });
           setDeleting(null);
         }}

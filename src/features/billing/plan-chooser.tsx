@@ -4,6 +4,7 @@ import { Check, ExternalLink, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PLANS, formatPlanPrice, type BillingCycle, type Plan, type PlanId, type Tier } from "@shared/plans";
 import type { BillingDTO, PendingSetupDTO } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useAuthConfig } from "@/features/auth/api";
@@ -12,7 +13,7 @@ import { queryKeys } from "@/lib/query-client";
 import { useBillingOverview, useCancelSetup, useCheckout, useSubscribe } from "./api";
 import { CycleSwitch, PlanCards } from "./plan-cards";
 
-const formatDay = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const formatDay = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
 const fingerprint = (billing: BillingDTO) => `${billing.status}|${billing.plan}|${billing.paidUntil}|${billing.autoPay}`;
 
 /** An auto-pay set-up that is waiting to be approved on Razorpay's page (usually open in another tab). */

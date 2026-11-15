@@ -1,4 +1,5 @@
 import type { ContractStatus } from "@shared/constants";
+import { formatIndianDate } from "@shared/dates";
 
 export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; badge: string; dot: string }> = {
   draft: { label: "Draft", badge: "bg-slate-500/10 text-slate-600 dark:text-slate-300", dot: "bg-slate-400" },
@@ -13,4 +14,4 @@ export const contractUrl = (token: string) => `${window.location.origin}/c/${tok
 
 /** Date and time with the time zone spelled out – signing times must be unambiguous. */
 export const formatSignedAt = (ms: number) =>
-  new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(ms));
+  formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });

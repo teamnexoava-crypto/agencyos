@@ -110,6 +110,7 @@ export const router = createBrowserRouter([
             children: [
               { handle: { title: "Dashboard" }, index: true, lazy: page(() => import("@/pages/app/dashboard")) },
               { handle: { title: "My tasks" }, path: "tasks", lazy: page(() => import("@/pages/app/my-tasks")) },
+              { handle: { title: "Appearance" }, path: "appearance", lazy: page(() => import("@/pages/app/appearance")) },
               { handle: { title: "Projects" }, path: "projects", lazy: page(() => import("@/pages/app/projects")) },
               { handle: { title: "Project" }, path: "projects/:projectId", lazy: page(() => import("@/pages/app/project-detail")) },
               { handle: { title: "CRM" }, path: "crm", lazy: page(() => import("@/pages/app/crm")) },

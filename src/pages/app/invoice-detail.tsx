@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatIndianDate } from "@shared/dates";
 import { useDocumentTitle } from "@/lib/document-title";
 import { ArrowLeft, Ban, BellRing, Check, CircleDollarSign, Copy, Eye, FilePlus2, Link2, MoreHorizontal, Pencil, Printer, RefreshCw, Send, Share2, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
@@ -22,7 +23,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const formatInstant = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+const formatInstant = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 type Confirm = "cancel" | "delete" | "link" | { paymentId: string } | null;
 

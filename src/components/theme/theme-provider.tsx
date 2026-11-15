@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { applyAccent, applyFontStyle, readAccent, readFontStyle, type AccentId, type FontStyleId } from "@/lib/appearance";
 
 export type Theme = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
@@ -12,6 +13,11 @@ interface ThemeContextValue {
   resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  /** Accent colour and font style (Settings → Appearance). */
+  accent: AccentId;
+  setAccent: (accent: AccentId) => void;
+  fontStyle: FontStyleId;
+  setFontStyle: (font: FontStyleId) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -63,7 +69,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = useCallback(() => setTheme(resolvedTheme === "dark" ? "light" : "dark"), [resolvedTheme, setTheme]);
 
-  const value = useMemo(() => ({ theme, resolvedTheme, setTheme, toggleTheme }), [theme, resolvedTheme, setTheme, toggleTheme]);
+  const [accent, setAccentState] = useState<AccentId>(readAccent);
+  const [fontStyle, setFontStyleState] = useState<FontStyleId>(readFontStyle);
+  // Covers the first render in case the pre-paint script didn't run (e.g. storage was blocked).
+  useEffect(() => {
+    applyAccent(accent, false);
+    applyFontStyle(fontStyle, false);
+  }, [accent, fontStyle]);
+  const setAccent = useCallback((next: AccentId) => {
+    applyAccent(next);
+    setAccentState(next);
+  }, []);
+  const setFontStyle = useCallback((next: FontStyleId) => {
+    applyFontStyle(next);
+    setFontStyleState(next);
+  }, []);
+
+  const value = useMemo(
+    () => ({ theme, resolvedTheme, setTheme, toggleTheme, accent, setAccent, fontStyle, setFontStyle }),
+    [theme, resolvedTheme, setTheme, toggleTheme, accent, setAccent, fontStyle, setFontStyle],
+  );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

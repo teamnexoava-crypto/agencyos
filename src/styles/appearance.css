@@ -1,0 +1,157 @@
+/*
+ * Appearance: accent colour themes and font styles, chosen in Settings → Appearance (or the profile
+ * menu) and stored per browser. The default (indigo, "modern") lives in index.css; each theme here only
+ * swaps the brand-coloured tokens, so every component follows without changes. Light and dark are both
+ * tuned so buttons keep readable white text.
+ */
+
+:root[data-accent="violet"] {
+  --primary: oklch(0.52 0.24 300);
+  --ring: oklch(0.52 0.24 300 / 0.45);
+  --accent: oklch(0.955 0.014 300);
+  --accent-foreground: oklch(0.32 0.09 300);
+  --sidebar-accent: oklch(0.935 0.018 300);
+  --sidebar-accent-foreground: oklch(0.32 0.12 300);
+}
+:root.dark[data-accent="violet"] {
+  --primary: oklch(0.66 0.2 300);
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.66 0.2 300 / 0.55);
+  --accent: oklch(0.27 0.035 300);
+  --accent-foreground: oklch(0.92 0.04 300);
+  --sidebar-accent: oklch(0.26 0.04 300);
+  --sidebar-accent-foreground: oklch(0.95 0.03 300);
+}
+:root[data-accent="blue"] {
+  --primary: oklch(0.53 0.2 255);
+  --ring: oklch(0.53 0.2 255 / 0.45);
+  --accent: oklch(0.955 0.014 255);
+  --accent-foreground: oklch(0.32 0.09 255);
+  --sidebar-accent: oklch(0.935 0.018 255);
+  --sidebar-accent-foreground: oklch(0.32 0.12 255);
+}
+:root.dark[data-accent="blue"] {
+  --primary: oklch(0.66 0.17 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.66 0.17 255 / 0.55);
+  --accent: oklch(0.27 0.035 255);
+  --accent-foreground: oklch(0.92 0.04 255);
+  --sidebar-accent: oklch(0.26 0.04 255);
+  --sidebar-accent-foreground: oklch(0.95 0.03 255);
+}
+:root[data-accent="teal"] {
+  --primary: oklch(0.5 0.1 192);
+  --ring: oklch(0.5 0.1 192 / 0.45);
+  --accent: oklch(0.955 0.014 192);
+  --accent-foreground: oklch(0.32 0.09 192);
+  --sidebar-accent: oklch(0.935 0.018 192);
+  --sidebar-accent-foreground: oklch(0.32 0.12 192);
+}
+:root.dark[data-accent="teal"] {
+  --primary: oklch(0.72 0.11 192);
+  --primary-foreground: oklch(0.18 0.02 192);
+  --ring: oklch(0.72 0.11 192 / 0.55);
+  --accent: oklch(0.27 0.035 192);
+  --accent-foreground: oklch(0.92 0.04 192);
+  --sidebar-accent: oklch(0.26 0.04 192);
+  --sidebar-accent-foreground: oklch(0.95 0.03 192);
+}
+:root[data-accent="emerald"] {
+  --primary: oklch(0.51 0.14 158);
+  --ring: oklch(0.51 0.14 158 / 0.45);
+  --accent: oklch(0.955 0.014 158);
+  --accent-foreground: oklch(0.32 0.09 158);
+  --sidebar-accent: oklch(0.935 0.018 158);
+  --sidebar-accent-foreground: oklch(0.32 0.12 158);
+}
+:root.dark[data-accent="emerald"] {
+  --primary: oklch(0.72 0.15 158);
+  --primary-foreground: oklch(0.18 0.02 158);
+  --ring: oklch(0.72 0.15 158 / 0.55);
+  --accent: oklch(0.27 0.035 158);
+  --accent-foreground: oklch(0.92 0.04 158);
+  --sidebar-accent: oklch(0.26 0.04 158);
+  --sidebar-accent-foreground: oklch(0.95 0.03 158);
+}
+:root[data-accent="rose"] {
+  --primary: oklch(0.56 0.21 8);
+  --ring: oklch(0.56 0.21 8 / 0.45);
+  --accent: oklch(0.955 0.014 8);
+  --accent-foreground: oklch(0.32 0.09 8);
+  --sidebar-accent: oklch(0.935 0.018 8);
+  --sidebar-accent-foreground: oklch(0.32 0.12 8);
+}
+:root.dark[data-accent="rose"] {
+  --primary: oklch(0.67 0.19 8);
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.67 0.19 8 / 0.55);
+  --accent: oklch(0.27 0.035 8);
+  --accent-foreground: oklch(0.92 0.04 8);
+  --sidebar-accent: oklch(0.26 0.04 8);
+  --sidebar-accent-foreground: oklch(0.95 0.03 8);
+}
+:root[data-accent="saffron"] {
+  --primary: oklch(0.57 0.17 45);
+  --ring: oklch(0.57 0.17 45 / 0.45);
+  --accent: oklch(0.955 0.014 45);
+  --accent-foreground: oklch(0.32 0.09 45);
+  --sidebar-accent: oklch(0.935 0.018 45);
+  --sidebar-accent-foreground: oklch(0.32 0.12 45);
+}
+:root.dark[data-accent="saffron"] {
+  --primary: oklch(0.72 0.16 45);
+  --primary-foreground: oklch(0.18 0.02 45);
+  --ring: oklch(0.72 0.16 45 / 0.55);
+  --accent: oklch(0.27 0.035 45);
+  --accent-foreground: oklch(0.92 0.04 45);
+  --sidebar-accent: oklch(0.26 0.04 45);
+  --sidebar-accent-foreground: oklch(0.95 0.03 45);
+}
+:root[data-accent="graphite"] {
+  --primary: oklch(0.27 0.02 264);
+  --ring: oklch(0.27 0.02 264 / 0.4);
+  --accent: oklch(0.95 0.005 264);
+  --accent-foreground: oklch(0.25 0.02 264);
+  --sidebar-accent: oklch(0.925 0.006 264);
+  --sidebar-accent-foreground: oklch(0.2 0.02 264);
+}
+:root.dark[data-accent="graphite"] {
+  --primary: oklch(0.92 0.005 264);
+  --primary-foreground: oklch(0.18 0.01 264);
+  --ring: oklch(0.92 0.005 264 / 0.5);
+  --accent: oklch(0.27 0.008 264);
+  --accent-foreground: oklch(0.95 0.004 264);
+  --sidebar-accent: oklch(0.26 0.008 264);
+  --sidebar-accent-foreground: oklch(0.97 0.004 264);
+}
+
+/* ---- Font styles. "modern" (default): Geist for text, Plus Jakarta Sans for headings. ---- */
+:root {
+  --font-heading: "Plus Jakarta Sans Variable", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}
+:root[data-font="clean"] {
+  --font-body: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+:root[data-font="friendly"] {
+  --font-body: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+:root[data-font="geometric"] {
+  --font-body: "Manrope Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+}
+:root[data-font] body {
+  font-family: var(--font-body, "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+/* Headings get the display face with slightly tighter spacing – the biggest single lift in polish. */
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: -0.015em;
+}
+h1 {
+  letter-spacing: -0.025em;
+}

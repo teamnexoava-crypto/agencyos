@@ -51,13 +51,13 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "steps", label: "Steps", icon: ListOrdered },
+  { value: "steps", label: "Milestones", icon: ListOrdered },
   { value: "tasks", label: "Tasks", icon: ListChecks },
   { value: "expenses", label: "Expenses", icon: Wallet, managersOnly: true },
   { value: "invoices", label: "Invoices", icon: ReceiptText, managersOnly: true },
   { value: "contract", label: "Contract", icon: FileSignature, managersOnly: true },
   { value: "files", label: "Files", icon: FolderOpen },
-  { value: "client-link", label: "Client Link", icon: Link2, managersOnly: true },
+  { value: "client-link", label: "Client portal", icon: Link2, managersOnly: true },
 ];
 
 export default function ProjectDetailPage() {
@@ -184,18 +184,25 @@ export default function ProjectDetailPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={openTab}>
-        <TabsList aria-label="Project sections">
+        {/* Up to eight sections don't fit across a phone, and a sideways-scrolling strip hides most of
+            them. Below `sm` they become a grid of small tiles (icon over label, two rows of four) so
+            every section is visible at once; from `sm` up it's the usual underlined strip. */}
+        <TabsList aria-label="Project sections" className="max-sm:mx-0 max-sm:grid max-sm:grid-cols-4 max-sm:gap-0.5 max-sm:overflow-visible max-sm:rounded-lg max-sm:border max-sm:bg-card max-sm:p-0.5 max-sm:shadow-soft">
           {tabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="max-sm:min-w-0 max-sm:flex-col max-sm:justify-center max-sm:gap-1 max-sm:rounded-md max-sm:px-1 max-sm:py-2 max-sm:text-xs max-sm:data-[state=active]:bg-accent max-sm:data-[state=active]:text-accent-foreground max-sm:[&>[data-slot=tabs-underline]]:hidden"
+            >
               <tab.icon />
               {tab.label}
               {tab.value === "steps" && project.stepCount > 0 && (
-                <span className="tabular rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">
+                <span className="tabular rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground max-sm:absolute max-sm:top-1 max-sm:right-1 max-sm:px-1 max-sm:text-[10px]">
                   {project.stepsDone}/{project.stepCount}
                 </span>
               )}
               {tab.value === "tasks" && project.taskCount - project.tasksDone > 0 && (
-                <span className="tabular rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">{project.taskCount - project.tasksDone}</span>
+                <span className="tabular rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground max-sm:absolute max-sm:top-1 max-sm:right-1 max-sm:px-1 max-sm:text-[10px]">{project.taskCount - project.tasksDone}</span>
               )}
             </TabsTrigger>
           ))}
@@ -240,7 +247,7 @@ export default function ProjectDetailPage() {
             open={deleteOpen}
             onOpenChange={setDeleteOpen}
             title="Delete this project?"
-            description={`"${project.title}" and its steps and tasks will be removed for everyone.`}
+            description={`"${project.title}" and its milestones and tasks will be removed for everyone.`}
             onConfirm={() =>
               deleteProject.mutate(project.id, {
                 onSuccess: () => {

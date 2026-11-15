@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Bell, BellRing, CheckCheck, CircleDollarSign, Eye, FileSignature, ListChecks, MessageSquare, UserPlus, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { NotificationType } from "@shared/constants";
+import { formatIndianDate } from "@shared/dates";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMarkNotificationsRead, useNotifications } from "@/features/notifications/api";
@@ -23,7 +24,7 @@ function relativeTime(timestamp: number): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 7 * 86_400) return `${Math.floor(seconds / 86_400)}d ago`;
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(timestamp));
+  return formatIndianDate(new Date(timestamp), { day: "numeric", month: "short" });
 }
 
 /** Notification centre: invoice viewed / paid, contract opened / signed, task assigned, client messages. */

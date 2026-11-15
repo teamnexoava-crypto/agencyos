@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AUTOPAY_GRACE_DAYS, PLANS, formatPlanPrice } from "@shared/plans";
 import type { AutoPayDTO, BillingDTO, BillingOverview, BillingPaymentDTO } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,7 +16,7 @@ import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const formatDay = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const formatDay = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
 
 /**
  * One quiet line about how the plan is being paid, with the way to turn auto-pay off. It sits at the

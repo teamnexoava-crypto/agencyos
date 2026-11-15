@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoaderCircle, Plus, UserPlus } from "lucide-react";
 import { useForm, useWatch, type FieldPath } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { STARTER_TEMPLATE_NAME } from "@shared/contract";
 import { contractCreateSchema, type ContractCreateInput } from "@shared/schemas/contract";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,10 +36,21 @@ function CreateForm({ project, onOpenChange }: Omit<CreateContractDialogProps, "
   const create = useCreateContract();
   const [newClientOpen, setNewClientOpen] = useState(false);
 
+  // Start from a ready agreement rather than a blank page: the workspace's copy of our service
+  // agreement if it kept it, otherwise its most recently edited template. Blank only when there are none.
+  const defaultTemplateId = (templates.find((template) => template.name === STARTER_TEMPLATE_NAME) ?? templates[0])?.id ?? "";
+  const pickedTemplate = useRef(false);
+
   const form = useForm<ContractCreateInput>({
     resolver: zodResolver(contractCreateSchema),
-    defaultValues: { title: project ? `${project.title} – agreement` : "", clientId: project?.clientId ?? "", projectId: project?.id ?? "", templateId: "" },
+    defaultValues: { title: project ? `${project.title} – agreement` : "", clientId: project?.clientId ?? "", projectId: project?.id ?? "", templateId: defaultTemplateId },
   });
+
+  // Templates still loading when the dialog opened: apply the default once they arrive, unless the
+  // user has already made a choice.
+  useEffect(() => {
+    if (defaultTemplateId && !pickedTemplate.current && !form.getValues("templateId")) form.setValue("templateId", defaultTemplateId);
+  }, [defaultTemplateId, form]);
   const clientId = useWatch({ control: form.control, name: "clientId" });
   const clientProjects = projects.filter((item) => item.clientId === clientId);
 
@@ -149,7 +161,13 @@ function CreateForm({ project, onOpenChange }: Omit<CreateContractDialogProps, "
           render={({ field }) => (
             <FormItem>
               <FormLabel>Start from</FormLabel>
-              <Select value={field.value || NONE} onValueChange={(value) => field.onChange(value === NONE ? "" : value)}>
+              <Select
+                value={field.value || NONE}
+                onValueChange={(value) => {
+                  pickedTemplate.current = true;
+                  field.onChange(value === NONE ? "" : value);
+                }}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue />

@@ -6,6 +6,7 @@ import { useParams } from "react-router";
 import { toast } from "sonner";
 import type { ContractStatus, ProjectStatus } from "@shared/constants";
 import type { PortalData } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { BrandMark } from "@/components/shared/brand";
 import { CountUp } from "@/components/shared/count-up";
 import { Button } from "@/components/ui/button";
@@ -36,9 +37,18 @@ const CONTRACT_STATUS: Partial<Record<ContractStatus, { label: string; tone: str
   completed: { label: "Signed", tone: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", action: "View" },
 };
 
-const formatInstant = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms));
-const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const formatInstant = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const shortDate = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
+/** The client's name, remembered on this device (for every portal) so they type it only once. */
 const NAME_KEY = "aos-portal-name";
+
+function rememberedName(): string {
+  try {
+    return window.localStorage.getItem(NAME_KEY)?.trim() ?? "";
+  } catch {
+    return ""; // storage blocked (private browsing, strict settings) – they type it each time
+  }
+}
 
 function Section({ icon: Icon, title, count, delay, children }: { icon: typeof ReceiptText; title: string; count?: number; delay: number; children: React.ReactNode }) {
   const id = `portal-${title.toLowerCase().replace(/\s+/g, "-")}`;
@@ -95,13 +105,10 @@ function Timeline({ steps, accent }: { steps: PortalData["steps"]; accent: strin
 
 function Messages({ token, comments, agencyName }: { token: string; comments: NonNullable<PortalData["comments"]>; agencyName: string }) {
   const post = usePortalComment(token);
-  const [name, setName] = useState(() => {
-    try {
-      return window.localStorage.getItem(NAME_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  });
+  const [name, setName] = useState(rememberedName);
+  // With a remembered name the field stays out of the way ("Sending as Priya · Change"). "focus"
+  // when opened with Change; never focus on page load, which would pop up the phone keyboard.
+  const [nameField, setNameField] = useState<"hidden" | "shown" | "focus">(() => (name ? "hidden" : "shown"));
   const [body, setBody] = useState("");
   const [showErrors, setShowErrors] = useState(false);
 
@@ -113,6 +120,7 @@ function Messages({ token, comments, agencyName }: { token: string; comments: No
         onSuccess: () => {
           setBody("");
           setShowErrors(false);
+          setNameField("hidden");
           try {
             window.localStorage.setItem(NAME_KEY, name.trim());
           } catch {
@@ -155,19 +163,31 @@ function Messages({ token, comments, agencyName }: { token: string; comments: No
           send();
         }}
       >
-        <div className="grid gap-1.5 sm:max-w-xs">
-          <Label htmlFor="portal-name">Your name</Label>
-          <Input id="portal-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoComplete="name" aria-invalid={showErrors && !name.trim()} />
-          {showErrors && !name.trim() && <p className="text-[13px] text-destructive">Enter your name</p>}
-        </div>
+        {nameField !== "hidden" && (
+          <div className="grid gap-1.5 sm:max-w-xs">
+            <Label htmlFor="portal-name">Your name</Label>
+            <Input id="portal-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoComplete="name" autoFocus={nameField === "focus"} aria-invalid={showErrors && !name.trim()} />
+            {showErrors && !name.trim() && <p className="text-[13px] text-destructive">Enter your name</p>}
+          </div>
+        )}
         <div className="grid gap-1.5">
           <Label htmlFor="portal-message">Message</Label>
           <Textarea id="portal-message" rows={3} value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={`Write to ${agencyName}…`} aria-invalid={showErrors && !body.trim()} />
           {showErrors && !body.trim() && <p className="text-[13px] text-destructive">Write a message</p>}
         </div>
-        <Button type="submit" disabled={post.isPending} className="w-full sm:w-fit">
-          {post.isPending ? <LoaderCircle className="animate-spin" /> : <SendHorizontal />} Send message
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button type="submit" disabled={post.isPending} className="w-full sm:w-fit">
+            {post.isPending ? <LoaderCircle className="animate-spin" /> : <SendHorizontal />} Send message
+          </Button>
+          {nameField === "hidden" && (
+            <p className="min-w-0 text-[13px] text-muted-foreground">
+              Sending as <span className="font-medium break-words text-foreground">{name}</span> ·{" "}
+              <button type="button" onClick={() => setNameField("focus")} className="rounded-sm font-medium text-primary hover:underline">
+                Change<span className="sr-only"> your name</span>
+              </button>
+            </p>
+          )}
+        </div>
       </form>
     </>
   );

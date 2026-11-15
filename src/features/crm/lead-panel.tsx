@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import { LEAD_NOTE_KINDS, LEAD_STAGES, SYSTEM_AUTHOR_NAMES, type LeadNoteKind, type LeadStage } from "@shared/constants";
 import type { LeadDetail, MemberSummary } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import { useAddLeadNote, useConvertLead, useDeleteLead, useDeleteLeadNote, useLe
 import { LeadFormDialog } from "./lead-form-dialog";
 import { NOTE_META, STAGE_META, followUpLabel } from "./meta";
 
-const formatInstant = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+const formatInstant = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 const WRITABLE_KINDS = LEAD_NOTE_KINDS.filter((kind): kind is Exclude<LeadNoteKind, "system"> => kind !== "system");
 const NOTE_PLACEHOLDER: Record<Exclude<LeadNoteKind, "system">, string> = {
   note: "Anything worth remembering about this lead…",
@@ -303,7 +304,7 @@ function LeadBody({ lead, members, onClose }: { lead: LeadDetail; members: Membe
             </Field>
           )}
           <Field label="Last contacted">{lead.lastContactedAt ? formatInstant(lead.lastContactedAt) : <span className="text-muted-foreground">Not yet</span>}</Field>
-          <Field label="Added">{new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(lead.createdAt))}</Field>
+          <Field label="Added">{formatIndianDate(new Date(lead.createdAt), { day: "numeric", month: "short", year: "numeric" })}</Field>
         </dl>
 
         {extra.length > 0 && (

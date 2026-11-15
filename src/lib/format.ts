@@ -1,3 +1,5 @@
+import { formatIndianDate } from "@shared/dates";
+
 /** "Priya Sharma" → "PS", "acme" → "AC". */
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -44,7 +46,7 @@ export function todayIso(): string {
 export function formatDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00Z`);
   const sameYear = iso.slice(0, 4) === todayIso().slice(0, 4);
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" }).format(date);
+  return formatIndianDate(date, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: "UTC" });
 }
 
 /** Whole days from today to `iso` (negative = in the past). */
@@ -91,7 +93,7 @@ export function timeAgo(timestamp: number, now: number): string {
   if (seconds < 3600) return formatter.format(-Math.floor(seconds / 60), "minute");
   if (seconds < 86_400) return formatter.format(-Math.floor(seconds / 3600), "hour");
   if (seconds < 30 * 86_400) return formatter.format(-Math.floor(seconds / 86_400), "day");
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(timestamp));
+  return formatIndianDate(new Date(timestamp), { day: "numeric", month: "short" });
 }
 
 /** 1536 → "1.5 KB". */

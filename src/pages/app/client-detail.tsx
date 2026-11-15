@@ -88,7 +88,7 @@ export default function ClientDetailPage() {
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-lg font-semibold text-white shadow-soft">
+          <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-lg font-semibold text-primary-foreground shadow-soft">
             {initials(client.name)}
           </span>
           <div className="min-w-0">

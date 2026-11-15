@@ -182,7 +182,7 @@ function ProfitAndLossView({ pnl, range, includeTeam, onIncludeTeam }: { pnl: Pr
             caption="Profit and loss by month"
             firstColumn="Month"
             currency={currency}
-            rows={monthly.map((point) => ({ key: point.month, label: monthLabel(point.month, true), revenue: point.revenue, expenses: point.expenses, profit: point.profit }))}
+            rows={monthly.map((point) => ({ key: point.month, label: monthLabel(point.month, "full"), revenue: point.revenue, expenses: point.expenses, profit: point.profit }))}
           />
         </Panel>
         <Panel title="By project" index={2}>

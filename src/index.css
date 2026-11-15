@@ -352,6 +352,18 @@ html {
   }
 }
 
+/* A tab strip that scrolls sideways fades out at each edge that has more tabs beyond it (TabsList
+   sets the data attributes from its scroll position), so tabs off-screen on a phone are noticed. */
+[data-slot="tabs-list"]:is([data-fade-start], [data-fade-end]) {
+  mask-image: linear-gradient(to right, transparent, #000 var(--tabs-fade-start, 0px), #000 calc(100% - var(--tabs-fade-end, 0px)), transparent);
+}
+[data-slot="tabs-list"][data-fade-start] {
+  --tabs-fade-start: 3rem;
+}
+[data-slot="tabs-list"][data-fade-end] {
+  --tabs-fade-end: 3rem;
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Printing (invoice → "Save as PDF"). App chrome is hidden with Tailwind's `print:hidden`; here we
  * only set up the page and make sure colours and the document itself print faithfully.
@@ -468,6 +480,13 @@ html {
   min-height: var(--editor-min-height, 22rem);
   padding: 1.25rem 1.5rem;
   outline: none;
+}
+/* 16px while editing on phones: iOS Safari zooms into any editable text smaller than that. The
+   signed document and the PDF keep the 15px set on .contract-prose. */
+@media (width < 40rem) {
+  .contract-editor .ProseMirror {
+    font-size: 1rem;
+  }
 }
 .contract-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

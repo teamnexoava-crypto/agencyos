@@ -142,7 +142,7 @@ export function QuickNav({ open, onOpenChange }: QuickNavProps) {
             aria-controls="quick-nav-list"
             aria-activedescendant={results[safeIndex] ? `quick-nav-${safeIndex}` : undefined}
             aria-label="Search"
-            className="h-14 w-full bg-transparent text-[15px] outline-none placeholder:text-muted-foreground/70 focus-visible:outline-none"
+            className="h-14 w-full bg-transparent text-base outline-none sm:text-[15px] placeholder:text-muted-foreground/70 focus-visible:outline-none"
           />
           <kbd className="hidden rounded-md border bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:block">Esc</kbd>
         </div>

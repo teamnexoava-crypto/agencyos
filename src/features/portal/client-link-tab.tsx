@@ -4,6 +4,7 @@ import { Copy, ExternalLink, Eye, Link2, LoaderCircle, MessageCircle, MessagesSq
 import { toast } from "sonner";
 import type { ShareLinkInput } from "@shared/schemas/portal";
 import type { ProjectDetail, ShareLinkDTO } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -21,7 +22,7 @@ import { whatsappUrl } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import { portalUrl, useDeleteComment, usePostComment, useProjectComments, useRegenerateShareLink, useSaveShareLink, useShareLink } from "./api";
 
-const formatInstant = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+const formatInstant = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 const DEFAULTS: ShareLinkInput = { enabled: true, showInvoices: true, showContract: true, showFiles: true, allowComments: true };
 const settingsOf = (link: ShareLinkDTO): ShareLinkInput => ({
@@ -142,12 +143,12 @@ export function ClientLinkTab({ project }: { project: ProjectDetail }) {
 
   if (locked) return <UpgradeNotice feature="portal" />;
   if (isError) return <ErrorState onRetry={() => void refetch()} />;
-  if (isPending) return <Skeleton className="h-64 rounded-2xl" role="status" aria-label="Loading client link" />;
+  if (isPending) return <Skeleton className="h-64 rounded-2xl" role="status" aria-label="Loading client portal" />;
 
   const change = (patch: Partial<ShareLinkInput>, success?: string) =>
     save.mutate(
       { ...(link ? settingsOf(link) : DEFAULTS), ...patch },
-      { onSuccess: () => success && toast.success(success), onError: (error) => toast.error(errorMessage(error, "Could not update the client link.")) },
+      { onSuccess: () => success && toast.success(success), onError: (error) => toast.error(errorMessage(error, "Could not update the client portal.")) },
     );
 
   if (!link) {
@@ -157,8 +158,8 @@ export function ClientLinkTab({ project }: { project: ProjectDetail }) {
         title="Give your client one link for everything"
         description="A private page with live progress, milestones, invoices, the contract and shared files. No login needed – and never any internal costs or notes."
         action={
-          <Button onClick={() => change({}, "Client link created")} disabled={save.isPending}>
-            {save.isPending ? <LoaderCircle className="animate-spin" /> : <Link2 />} Create client link
+          <Button onClick={() => change({}, "Client portal created")} disabled={save.isPending}>
+            {save.isPending ? <LoaderCircle className="animate-spin" /> : <Link2 />} Create client portal
           </Button>
         }
       />
@@ -175,20 +176,20 @@ export function ClientLinkTab({ project }: { project: ProjectDetail }) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="client-link-heading" className="text-sm font-semibold">
-                Client link
+                Client portal
               </h2>
               <p className="mt-0.5 text-[13px] text-muted-foreground">{link.enabled ? "Anyone with this link can open the page – share it only with your client." : "Switched off. The link shows “not available” until you turn it back on."}</p>
             </div>
             <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
-              <Switch checked={link.enabled} onCheckedChange={(enabled) => change({ enabled }, enabled ? "Client link is on" : "Client link is off")} aria-label="Client link enabled" />
+              <Switch checked={link.enabled} onCheckedChange={(enabled) => change({ enabled }, enabled ? "Client portal is on" : "Client portal is off")} aria-label="Client portal on" />
               {link.enabled ? "On" : "Off"}
             </label>
           </div>
 
           <motion.div animate={{ opacity: link.enabled ? 1 : 0.5 }} transition={{ duration: 0.2 }} className="mt-4 grid gap-3">
             <div className="flex gap-2">
-              <Input readOnly value={url} onFocus={(event) => event.target.select()} aria-label="Client link" className="tabular text-[13px]" />
-              <Button variant="outline" className="shrink-0" onClick={() => void copyToClipboard(url, "Client link copied")}>
+              <Input readOnly value={url} onFocus={(event) => event.target.select()} aria-label="Client portal link" className="tabular sm:text-[13px]" />
+              <Button variant="outline" className="shrink-0" onClick={() => void copyToClipboard(url, "Portal link copied")}>
                 <Copy /> Copy
               </Button>
             </div>
@@ -243,7 +244,7 @@ export function ClientLinkTab({ project }: { project: ProjectDetail }) {
       <ConfirmDialog
         open={confirmReset}
         onOpenChange={setConfirmReset}
-        title="Create a new client link?"
+        title="Create a new portal link?"
         description="The current link stops working immediately. You'll need to send the new one to your client."
         confirmLabel="Create new link"
         onConfirm={() => {

@@ -1,10 +1,11 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router";
 import type { ContractListItem } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { cn, staggerIndex } from "@/lib/utils";
 import { ContractStatusBadge } from "./status-badge";
 
-const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const shortDate = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
 
 interface ContractRowsProps {
   contracts: ContractListItem[];

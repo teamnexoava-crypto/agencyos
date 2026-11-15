@@ -4,6 +4,7 @@ import { Download, Eye, EyeOff, FolderOpen, LoaderCircle, Trash2, Upload } from 
 import { toast } from "sonner";
 import { PROJECT_FILE_ACCEPT, PROJECT_FILE_MAX_BYTES } from "@shared/schemas/portal";
 import type { MemberSummary, ProjectDetail, ProjectFileDTO } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useDeleteFile, useProjectFiles, useSetFileShared, useUploadFile } from "./api";
 import { FileIcon } from "./file-icon";
 
-const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const shortDate = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
 
 interface FilesTabProps {
   project: ProjectDetail;

@@ -161,7 +161,7 @@ export default function MemberDetailPage() {
 
         <section aria-labelledby="member-steps">
           <h2 id="member-steps" className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <ListOrdered className="size-4 text-muted-foreground" /> Steps in progress
+            <ListOrdered className="size-4 text-muted-foreground" /> Milestones in progress
           </h2>
           {steps.length === 0 ? (
             <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No milestones assigned right now.</p>

@@ -26,7 +26,7 @@ function InviteReady({ invite, template, onDone }: ShareProps & { onDone: () => 
         </p>
       </div>
       <div className="flex gap-2">
-        <Input readOnly value={share.link} aria-label="Invite link" onFocus={(event) => event.target.select()} className="tabular text-[13px]" />
+        <Input readOnly value={share.link} aria-label="Invite link" onFocus={(event) => event.target.select()} className="tabular sm:text-[13px]" />
         <Button variant="outline" onClick={share.copy} className="shrink-0">
           <Copy /> Copy
         </Button>

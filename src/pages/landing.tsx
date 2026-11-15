@@ -294,7 +294,7 @@ const BEFORE = [
 ];
 const AFTER = [
   "A GST invoice with a UPI QR code, sent on WhatsApp in a minute",
-  "One client link that always shows the latest progress",
+  "One client portal that always shows the latest progress",
   "Contracts signed on the client's phone, with a full audit trail",
   "Every task, file and deadline in one place for the whole team",
   "Profit by month, client and project – worked out for you",
@@ -347,7 +347,7 @@ const AUDIENCE: { icon: LucideIcon; label: string }[] = [
 const STEPS = [
   { title: "Sign in with Google", text: "No passwords, no card. Add your agency name, logo and GST details – it takes about a minute." },
   { title: "Add a client and a project", text: "Break the work into milestones, invite your team and attach files." },
-  { title: "Send, sign, get paid", text: "Share the contract, the invoice and the client link. Watch payments and progress come in." },
+  { title: "Send, sign, get paid", text: "Share the contract, the invoice and the client portal. Watch payments and progress come in." },
 ];
 
 interface Faq {

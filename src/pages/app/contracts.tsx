@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { ContractStatus } from "@shared/constants";
 import { STARTER_TEMPLATE_HTML, STARTER_TEMPLATE_NAME, contractText } from "@shared/contract";
 import type { ContractTemplateDTO } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -32,7 +33,7 @@ const FILTERS: { value: Filter; label: string; statuses: ContractStatus[] }[] = 
   { value: "signed", label: "Signed", statuses: ["completed"] },
 ];
 
-const shortDate = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms));
+const shortDate = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", year: "numeric" });
 
 function ContractsList({ onCreate }: { onCreate: () => void }) {
   const { data: contracts, isPending, isError, refetch } = useContracts();

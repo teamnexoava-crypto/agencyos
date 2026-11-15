@@ -61,7 +61,7 @@ function ShareBody({ invoice, onShared }: Pick<ShareDialogProps, "invoice" | "on
       <div className="grid gap-2">
         <Label htmlFor="share-link">Public link</Label>
         <div className="flex gap-2">
-          <Input id="share-link" readOnly value={link} onFocus={(event) => event.target.select()} className="tabular text-[13px]" />
+          <Input id="share-link" readOnly value={link} onFocus={(event) => event.target.select()} className="tabular sm:text-[13px]" />
           <Button
             variant="outline"
             className="shrink-0"

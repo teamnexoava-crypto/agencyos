@@ -51,10 +51,10 @@ function StepForm({ projectId, step, onOpenChange }: Omit<StepFormDialogProps, "
   const onSubmit = form.handleSubmit((input) => {
     const options = {
       onSuccess: () => {
-        toast.success(step ? "Step updated" : "Step added");
+        toast.success(step ? "Milestone updated" : "Milestone added");
         onOpenChange(false);
       },
-      onError: (error: unknown) => toast.error(errorMessage(error, "Could not save the step.")),
+      onError: (error: unknown) => toast.error(errorMessage(error, "Could not save the milestone.")),
     };
     if (step) update.mutate({ stepId: step.id, input }, options);
     else create.mutate(input, options);
@@ -159,7 +159,7 @@ function StepForm({ projectId, step, onOpenChange }: Omit<StepFormDialogProps, "
           </Button>
           <Button type="submit" disabled={saving}>
             {saving && <LoaderCircle className="animate-spin" />}
-            {step ? "Save changes" : "Add step"}
+            {step ? "Save changes" : "Add milestone"}
           </Button>
         </DialogFooter>
       </form>
@@ -172,8 +172,8 @@ export function StepFormDialog({ open, onOpenChange, projectId, step }: StepForm
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>{step ? "Edit step" : "New step"}</DialogTitle>
-          <DialogDescription>Steps are the milestones your client sees. Completing them moves the project's progress.</DialogDescription>
+          <DialogTitle>{step ? "Edit milestone" : "New milestone"}</DialogTitle>
+          <DialogDescription>Milestones are what your client sees on their portal. Completing them moves the project's progress.</DialogDescription>
         </DialogHeader>
         {open && <StepForm projectId={projectId} step={step} onOpenChange={onOpenChange} />}
       </DialogContent>

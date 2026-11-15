@@ -1,4 +1,5 @@
 import { renderSVG } from "uqr";
+import { formatIndianDate } from "@shared/dates";
 import { computeInvoiceTotals, formatRate, upiPaymentUrl } from "@shared/invoice";
 import type { InvoiceDocument as InvoiceDocumentData } from "@shared/types";
 import { formatMoney, initials } from "@/lib/format";
@@ -8,7 +9,7 @@ import { cn } from "@/lib/utils";
 function longDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+  return formatIndianDate(date, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 const quantityText = (quantity: number) => (Number.isFinite(quantity) ? String(Number(quantity.toFixed(3))) : "");

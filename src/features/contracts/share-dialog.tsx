@@ -55,7 +55,7 @@ function ShareBody({ contract }: { contract: ContractDetail }) {
       <div className="grid gap-2">
         <Label htmlFor="contract-share-link">{signed ? "Client link" : "Signing link"}</Label>
         <div className="flex gap-2">
-          <Input id="contract-share-link" readOnly value={link} onFocus={(event) => event.target.select()} className="tabular text-[13px]" />
+          <Input id="contract-share-link" readOnly value={link} onFocus={(event) => event.target.select()} className="tabular sm:text-[13px]" />
           <Button variant="outline" className="shrink-0" onClick={() => void copyToClipboard(link, "Link copied")}>
             <Copy /> Copy link
           </Button>

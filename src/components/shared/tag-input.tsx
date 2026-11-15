@@ -23,10 +23,11 @@ export function TagInput({ value, onChange, max = 10, placeholder = "Add a tagâ€
     setDraft("");
   };
 
+  // 16px on phones like Input, so iOS Safari does not zoom in when the field is focused.
   return (
     <div
       className={cn(
-        "flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card px-2 py-1.5 text-sm shadow-soft transition-[border-color,box-shadow] duration-150",
+        "flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card px-2 py-1.5 text-base shadow-soft transition-[border-color,box-shadow] duration-150 sm:text-sm",
         "focus-within:border-primary focus-within:ring-[3px] focus-within:ring-ring/60",
         props["aria-invalid"] && "border-destructive",
       )}

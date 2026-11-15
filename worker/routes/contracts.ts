@@ -20,12 +20,13 @@ import { buildContractDocument, contractMessageTemplate, parseSignatureImage, se
 import { notifyManagers } from "../services/invoices";
 import { requireClientId, requireProject } from "../services/projects";
 import type { AppEnv } from "../types";
+import { formatIndianDate } from "../../shared/dates";
 
 const idParam = z.object({ id: idSchema });
 const listQuery = z.object({ clientId: idSchema.optional(), projectId: idSchema.optional() });
 const conflict = (message: string) => new ApiError(409, "conflict", message);
 
-const longDate = (iso: string) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+const longDate = (iso: string) => formatIndianDate(new Date(`${iso}T00:00:00Z`), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const money = (minor: number, currency: string) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: minor % 100 === 0 ? 0 : 2 }).format(minor / 100);
 

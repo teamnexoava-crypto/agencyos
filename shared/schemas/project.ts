@@ -42,7 +42,7 @@ export const projectMembersSchema = z.object({ memberIds: z.array(idSchema).max(
 export type ProjectMembersInput = z.infer<typeof projectMembersSchema>;
 
 export const stepSchema = z.object({
-  title: z.string().trim().min(1, "Give the step a title").max(140, "Keep the title under 140 characters"),
+  title: z.string().trim().min(1, "Give the milestone a title").max(140, "Keep the title under 140 characters"),
   description: optionalText(2000),
   dueDate: optionalIsoDateSchema,
   status: z.enum(STEP_STATUSES),

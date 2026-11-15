@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Check, MessageCircle, ReceiptText, TriangleAlert, UsersRound } from "lucide-react";
+import { Building2, Check, MessageCircle, Palette, ReceiptText, TriangleAlert, UsersRound } from "lucide-react";
 import { useForm, useWatch, type FieldPath, type FieldValues, type UseFormReturn } from "react-hook-form";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/features/auth/api";
 import { LogoUploader } from "@/features/onboarding/logo-uploader";
+import { AppearanceSettings } from "@/features/appearance/appearance-settings";
 import { SampleDataCard } from "@/features/sample-data/sample-data-controls";
 import { useDeleteWorkspace, useSaveSettings, useSettings } from "@/features/settings/api";
 import { SettingsCard } from "@/features/settings/section";
@@ -564,6 +565,7 @@ const TABS = [
   { value: "invoicing", label: "Invoices & tax", icon: ReceiptText },
   { value: "messages", label: "Messages", icon: MessageCircle },
   { value: "team", label: "Team", icon: UsersRound },
+  { value: "appearance", label: "Appearance", icon: Palette },
 ] as const;
 
 export default function SettingsPage() {
@@ -605,6 +607,9 @@ export default function SettingsPage() {
           </TabsContent>
           <TabsContent value="messages" forceMount className="data-[state=inactive]:hidden">
             <MessagesForm settings={settings} />
+          </TabsContent>
+          <TabsContent value="appearance" className="data-[state=inactive]:hidden">
+            <AppearanceSettings />
           </TabsContent>
           <TabsContent value="team" forceMount className="data-[state=inactive]:hidden">
             <SettingsCard title="Team and roles" description="Who can see and do what in this workspace.">

@@ -82,7 +82,7 @@ function MoneyTooltip({ active, payload, label, currency, series }: MoneyTooltip
 
 function useChartRows(data: MonthlyPoint[]) {
   const spansYears = new Set(data.map((point) => point.month.slice(0, 4))).size > 1;
-  return data.map((point) => ({ ...point, label: monthLabel(point.month, spansYears) }));
+  return data.map((point) => ({ ...point, label: monthLabel(point.month, spansYears ? "short" : "none") }));
 }
 
 /** Screen-reader (and no-hover) equivalent of a monthly chart. */

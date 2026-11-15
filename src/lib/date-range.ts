@@ -1,4 +1,5 @@
 import { todayIso } from "./format";
+import { formatIndianDate } from "@shared/dates";
 
 export type RangePreset = "this_month" | "last_3_months" | "last_12_months" | "this_fy" | "custom";
 
@@ -45,8 +46,12 @@ export function resolveRange(selection: RangeSelection, today = todayIso()): { f
 
 export const DEFAULT_RANGE: RangeSelection = { preset: "this_fy", from: "", to: "" };
 
-/** "2026-11" → "Nov" (or "Nov 26" when the range spans years). */
-export function monthLabel(month: string, withYear: boolean): string {
-  const date = new Date(`${month}-01T00:00:00Z`);
-  return new Intl.DateTimeFormat("en-IN", { month: "short", ...(withYear ? { year: "2-digit" } : {}), timeZone: "UTC" }).format(date);
+/**
+ * "2026-09" → "Sep", "Sep '26" (chart axes whose range spans years – a bare "Sep 26" reads like a
+ * date) or "Sep 2026" (tables, where there is room).
+ */
+export function monthLabel(month: string, year: "none" | "short" | "full" = "none"): string {
+  const name = formatIndianDate(new Date(`${month}-01T00:00:00Z`), { month: "short", timeZone: "UTC" });
+  if (year === "none") return name;
+  return year === "short" ? `${name} '${month.slice(2, 4)}` : `${name} ${month.slice(0, 4)}`;
 }

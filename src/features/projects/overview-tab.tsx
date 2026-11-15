@@ -102,7 +102,7 @@ export function OverviewTab({ project, members, onOpenTab }: OverviewTabProps) {
         <div className="flex items-end justify-between gap-4">
           <p className="tabular text-4xl font-semibold tracking-tight">{project.progress}%</p>
           <p className="text-sm text-muted-foreground">
-            {project.stepCount === 0 ? "Add steps to track progress" : `${project.stepsDone} of ${project.stepCount} steps completed`}
+            {project.stepCount === 0 ? "Add milestones to track progress" : `${project.stepsDone} of ${project.stepCount} milestones completed`}
           </p>
         </div>
         <Progress value={project.progress} className="mt-4 h-2.5" label="Project progress" />
@@ -125,7 +125,7 @@ export function OverviewTab({ project, members, onOpenTab }: OverviewTabProps) {
               })}
             </ul>
             <Button variant="link" size="sm" className="mt-1 h-auto px-0" onClick={() => onOpenTab("steps")}>
-              View all steps
+              View all milestones
             </Button>
           </div>
         )}

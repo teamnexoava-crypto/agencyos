@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { unfilledVariables } from "@shared/contract";
 import type { ContractDetail } from "@shared/types";
+import { formatIndianDate } from "@shared/dates";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import { ContractStatusBadge } from "@/features/contracts/status-badge";
 import { ApiError, errorMessage } from "@/lib/api";
 import { copyToClipboard } from "@/lib/clipboard";
 
-const formatInstant = (ms: number) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+const formatInstant = (ms: number) => formatIndianDate(new Date(ms), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 /* ------------------------------------------------------------------------------------------------
  * Draft: the text is still editable

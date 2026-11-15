@@ -13,6 +13,7 @@ import { clients, comments, contracts, expenseCategories, expenses, invoiceItems
 import { ApiError } from "../lib/errors";
 import { newPublicToken } from "../lib/ids";
 import type { WorkspaceRow } from "../types";
+import { formatIndianDate } from "../../shared/dates";
 
 const DAY_MS = 86_400_000;
 /** YYYY-MM-DD, `days` from today, so deadlines always look current. */
@@ -260,7 +261,7 @@ export async function addSampleData(db: Database, ws: WorkspaceRow, ownerMemberI
     );
 
     // A contract out for signature (open its link to try signing as the client) and a draft.
-    const longDay = (iso: string | null) => (iso ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)) : "");
+    const longDay = (iso: string | null) => (iso ? formatIndianDate(new Date(`${iso}T00:00:00Z`), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "");
     for (const [key, sent] of [["portal", true], ["app", false]] as const) {
       const seed = PROJECTS.find((item) => item.key === key);
       const client = CLIENTS.find((item) => item.key === seed?.client);
