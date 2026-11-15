@@ -241,6 +241,15 @@ export interface TaskDTO {
   createdAt: number;
 }
 
+/** The first-day checklist on the dashboard: which of the first real steps are done (sample data doesn't count). */
+export interface SetupProgress {
+  client: boolean;
+  project: boolean;
+  team: boolean;
+  invoice: boolean;
+  contract: boolean;
+}
+
 /** A task on the "My tasks" page: the task, and the project it belongs to. */
 export interface MyTaskDTO extends TaskDTO {
   project: { id: string; title: string };

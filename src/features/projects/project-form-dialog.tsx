@@ -51,7 +51,7 @@ function ProjectForm({ project, defaults, onOpenChange, onSaved }: Omit<ProjectF
       startDate: project?.startDate ?? "",
       dueDate: project?.dueDate ?? "",
       budget: project?.budget ?? 0,
-      status: project?.status ?? defaults?.status ?? "lead",
+      status: project?.status ?? defaults?.status ?? "in_progress",
       priority: project?.priority ?? "medium",
       tags: project?.tags ?? [],
       memberIds: project?.memberIds ?? [],

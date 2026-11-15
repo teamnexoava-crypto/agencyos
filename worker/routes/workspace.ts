@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { and, eq, isNull, max } from "drizzle-orm";
+import { and, eq, isNull, max, ne } from "drizzle-orm";
 import { DEFAULT_WA_CONTRACT_TEMPLATE, DEFAULT_WA_INVITE_TEMPLATE, DEFAULT_WA_INVOICE_TEMPLATE, LOGO_MAX_BYTES } from "../../shared/constants";
 import { deleteWorkspaceSchema, settingsInvoicingSchema, settingsMessagesSchema, settingsProfileSchema } from "../../shared/schemas/settings";
 import { switchWorkspaceSchema } from "../../shared/schemas/team";
 import { createWorkspaceSchema, onboardingSchema } from "../../shared/schemas/workspace";
 import { billingCurrencyFor } from "../../shared/plans";
-import type { WorkspaceMembershipDTO, WorkspaceSettings } from "../../shared/types";
-import { invoices, workspaceMembers, workspaces } from "../db/schema";
+import type { SetupProgress, WorkspaceMembershipDTO, WorkspaceSettings } from "../../shared/types";
+import { clients, contracts, invites, invoices, projects, workspaceMembers, workspaces } from "../db/schema";
 import { ApiError, badRequest, forbidden, notFound } from "../lib/errors";
 import { newId } from "../lib/ids";
 import { sniffImage } from "../lib/images";
@@ -174,6 +174,22 @@ export const workspaceRoutes = new Hono<AppEnv>()
       }
     }
     return c.json({ workspace: toWorkspaceDTO(updated) });
+  })
+
+  /** Which of the first real steps the workspace has done, for the dashboard checklist. */
+  .get("/setup-progress", async (c) => {
+    const t = tenant(c);
+    const has = async (count: Promise<number>) => (await count) > 0;
+    const [client, project, members, openInvites, invoice, contract] = await Promise.all([
+      has(t.db.$count(clients, t.where(clients, eq(clients.isSample, false), isNull(clients.deletedAt)))),
+      has(t.db.$count(projects, t.where(projects, eq(projects.isSample, false), isNull(projects.deletedAt)))),
+      t.db.$count(workspaceMembers, t.where(workspaceMembers, isNull(workspaceMembers.removedAt))),
+      t.db.$count(invites, t.where(invites, isNull(invites.acceptedAt), isNull(invites.revokedAt))),
+      has(t.db.$count(invoices, t.where(invoices, eq(invoices.isSample, false), ne(invoices.status, "draft")))),
+      has(t.db.$count(contracts, t.where(contracts, eq(contracts.isSample, false), ne(contracts.status, "draft")))),
+    ]);
+    const body: SetupProgress = { client, project, team: members > 1 || openInvites > 0, invoice, contract };
+    return c.json(body);
   })
 
   /** Adds example clients, projects, invoices, a contract, leads and expenses to look around with. */
