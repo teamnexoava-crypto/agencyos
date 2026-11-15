@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_DISPLAY } from "@shared/constants";
 import { TRIAL_DAYS } from "@shared/plans";
 import { BrandLogo } from "@/components/shared/brand";
+import { WhatsAppSupportButton } from "@/components/shared/whatsapp-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const LAST_UPDATED = "15 November 2026";
@@ -33,11 +35,12 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
           </Link>
         </footer>
       </main>
+      <WhatsAppSupportButton />
     </div>
   );
 }
 
-const CONTACT = "the support email shown on the GrowUpliftOS Google sign-in screen";
+const CONTACT = `WhatsApp ${SUPPORT_WHATSAPP_DISPLAY} (wa.me/${SUPPORT_WHATSAPP}), or the support email shown on the GrowUpliftOS Google sign-in screen`;
 
 export function PrivacyPage() {
   return (

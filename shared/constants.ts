@@ -11,6 +11,10 @@ export const APP_NAME = "GrowUpliftOS";
  */
 export const DEMO_VIDEO_ID = "";
 
+/** Support on WhatsApp: the number in international form, digits only (used for wa.me links), and as shown. */
+export const SUPPORT_WHATSAPP = "917908032780";
+export const SUPPORT_WHATSAPP_DISPLAY = "+91 79080 32780";
+
 /** Notes written by the app itself carry its name as the author; older ones carry the previous name. */
 export const SYSTEM_AUTHOR_NAMES: readonly string[] = [APP_NAME, "AgencyOS"];
 

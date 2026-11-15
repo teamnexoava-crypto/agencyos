@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { useMe } from "@/features/auth/api";
 import { DemoVideo } from "@/features/landing/demo-video";
 import { Pricing } from "@/features/landing/pricing";
+import { WhatsAppSupportButton } from "@/components/shared/whatsapp-button";
+import { whatsappSupportUrl } from "@/lib/support";
 import { cn } from "@/lib/utils";
 import { DEMO_VIDEO_ID } from "@shared/constants";
 import { TRIAL_DAYS } from "@shared/plans";
@@ -522,9 +524,13 @@ export default function LandingPage() {
             <Link to="/terms" className="hover:text-foreground">
               Terms
             </Link>
+            <a href={whatsappSupportUrl()} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+              Support
+            </a>
           </span>
         </div>
       </footer>
+      <WhatsAppSupportButton />
     </div>
   );
 }
