@@ -218,16 +218,15 @@
 }
 
 /*
- * The WhatsApp support button glows: a soft green halo breathes around it and a ring ripples outward
- * every few seconds, so it is easy to notice without being in the way. Still for people who ask for
- * reduced motion – they keep the steady glow.
+ * The WhatsApp support button: a soft halo in the brand colour gently breathes around it, and a faint
+ * ring drifts outward every few seconds – enough to be noticed, not enough to distract. Still for
+ * people who ask for reduced motion.
  */
 @utility wa-glow {
   box-shadow:
-    0 0 0 0 rgb(37 211 102 / 0.55),
-    0 8px 24px -4px rgb(37 211 102 / 0.6),
-    0 0 18px 2px rgb(37 211 102 / 0.45);
-  animation: wa-glow 2.4s ease-in-out infinite;
+    0 6px 16px -6px color-mix(in oklab, var(--primary) 55%, transparent),
+    0 0 0 0 color-mix(in oklab, var(--primary) 0%, transparent);
+  animation: wa-glow 3.6s ease-in-out infinite;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
@@ -237,22 +236,20 @@
   0%,
   100% {
     box-shadow:
-      0 0 0 0 rgb(37 211 102 / 0.55),
-      0 8px 24px -4px rgb(37 211 102 / 0.6),
-      0 0 14px 1px rgb(37 211 102 / 0.35);
+      0 6px 16px -6px color-mix(in oklab, var(--primary) 55%, transparent),
+      0 0 10px 0 color-mix(in oklab, var(--primary) 18%, transparent);
   }
   50% {
     box-shadow:
-      0 0 0 10px rgb(37 211 102 / 0),
-      0 10px 30px -2px rgb(37 211 102 / 0.75),
-      0 0 30px 6px rgb(37 211 102 / 0.6);
+      0 8px 20px -6px color-mix(in oklab, var(--primary) 60%, transparent),
+      0 0 16px 2px color-mix(in oklab, var(--primary) 28%, transparent);
   }
 }
 
-/* The ring that ripples out from the WhatsApp button. A wide button sets a smaller sideways spread
+/* The ring that drifts out from the WhatsApp button. A wide button sets a smaller sideways spread
    (`--wa-ripple-x`), so the ring grows by about the same few pixels on every side. */
 @utility wa-ripple {
-  animation: wa-ripple 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  animation: wa-ripple 3.6s cubic-bezier(0, 0, 0.2, 1) infinite;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
     opacity: 0;
@@ -262,11 +259,11 @@
 @keyframes wa-ripple {
   0% {
     transform: scale(1);
-    opacity: 0.6;
+    opacity: 0.35;
   }
-  70%,
+  60%,
   100% {
-    transform: scale(var(--wa-ripple-x, 1.45), var(--wa-ripple-y, 1.45));
+    transform: scale(var(--wa-ripple-x, 1.3), var(--wa-ripple-y, 1.3));
     opacity: 0;
   }
 }
