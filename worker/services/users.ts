@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db";
 import { users, workspaceMembers, workspaces } from "../db/schema";
 import type { GoogleProfile } from "../lib/google";
+import type { BillingCurrency } from "../../shared/plans";
 import type { UserRow } from "../types";
 import { createWorkspaceForUser, defaultWorkspaceName } from "./workspaces";
 
@@ -33,7 +34,7 @@ export async function upsertGoogleUser(db: Database, profile: GoogleProfile): Pr
  * Makes sure the user has somewhere to land: returns their first workspace id, creating a fresh
  * workspace (which they own) if they have none. Invite acceptance (Phase 3) runs before this.
  */
-export async function ensureWorkspace(db: Database, user: UserRow): Promise<string> {
+export async function ensureWorkspace(db: Database, user: UserRow, billingCurrency: BillingCurrency): Promise<string> {
   const [membership] = await db
     .select({ workspaceId: workspaceMembers.workspaceId })
     .from(workspaceMembers)
@@ -41,7 +42,7 @@ export async function ensureWorkspace(db: Database, user: UserRow): Promise<stri
     .orderBy(workspaceMembers.createdAt)
     .limit(1);
   if (membership) return membership.workspaceId;
-  return createWorkspaceForUser(db, user, { name: defaultWorkspaceName(user.name) });
+  return createWorkspaceForUser(db, user, { name: defaultWorkspaceName(user.name), billingCurrency });
 }
 
 /** The user's first active workspace, or null – used when signing in to accept an invite (no workspace is created). */

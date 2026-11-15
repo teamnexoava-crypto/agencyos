@@ -17,6 +17,20 @@ export function isLocalhost(c: Context<AppEnv>): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
+/**
+ * The visitor's country (ISO 3166 code, e.g. "IN") as Cloudflare's edge reports it, or null when not
+ * known. Under `npm run dev` on localhost there is no edge, so it comes from a `dev_country` cookie
+ * (handy for trying the dollar prices) and is otherwise null, which counts as India.
+ */
+export function visitorCountry(c: Context<AppEnv>): string | null {
+  if (import.meta.env.DEV && isLocalhost(c)) {
+    const cookie = /(?:^|;\s*)dev_country=([A-Za-z]{2})/.exec(c.req.header("Cookie") ?? "");
+    return cookie?.[1]?.toUpperCase() ?? null;
+  }
+  const country: unknown = (c.req.raw as Request & { cf?: { country?: unknown } }).cf?.country;
+  return typeof country === "string" && country ? country : null;
+}
+
 /** Client IP as reported by Cloudflare. Falls back to a constant locally (no CF edge in front). */
 export function clientIp(c: Context<AppEnv>): string {
   return c.req.header("CF-Connecting-IP") ?? "127.0.0.1";

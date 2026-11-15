@@ -3,6 +3,7 @@ import { Check, Minus } from "lucide-react";
 import { Link } from "react-router";
 import { TIER_LIST, TRIAL_DAYS, formatPlanPrice, type BillingCycle, type Tier } from "@shared/plans";
 import { GoogleIcon } from "@/components/shared/brand";
+import { useAuthConfig, useMe } from "@/features/auth/api";
 import { Button } from "@/components/ui/button";
 import { CycleSwitch, PlanCards } from "@/features/billing/plan-cards";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,10 @@ const COMPARE: { group: string; rows: { label: string; values: Cell[] }[] }[] = 
 /** Public pricing: Free, Growth and Premium with a monthly / yearly switch, and the full comparison underneath. */
 export function Pricing({ signedIn }: { signedIn: boolean }) {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
+  const { data: me } = useMe();
+  const { data: config } = useAuthConfig();
+  // A signed-in workspace pays in its own currency; a visitor sees the one for where they are.
+  const currency = me?.billing?.currency ?? config?.currency ?? "INR";
 
   return (
     <div className="mt-10">
@@ -64,6 +69,7 @@ export function Pricing({ signedIn }: { signedIn: boolean }) {
 
       <PlanCards
         cycle={cycle}
+        currency={currency}
         reveal
         className="mx-auto mt-10 max-w-5xl"
         action={(tier) => (
@@ -79,8 +85,8 @@ export function Pricing({ signedIn }: { signedIn: boolean }) {
         )}
       />
       <p className="mx-auto mt-6 max-w-3xl text-center text-[13px] text-balance text-muted-foreground">
-        Every new account gets {TRIAL_DAYS} days of Premium, with no card needed. After that you stay on Free for as long as you like, or pick a plan. Monthly plans renew by UPI AutoPay or card – turn it
-        off any time. Yearly plans are one payment.
+        Every new account gets {TRIAL_DAYS} days of Premium, with no card needed. After that you stay on Free for as long as you like, or pick a plan. Monthly plans renew by{" "}
+        {currency === "INR" ? "UPI AutoPay or card" : "card"} – turn it off any time. Yearly plans are one payment.{currency === "USD" && " Prices are in US dollars."}
       </p>
 
       <div className="mx-auto mt-16 max-w-5xl">
@@ -95,7 +101,7 @@ export function Pricing({ signedIn }: { signedIn: boolean }) {
                 {TIER_LIST.map((tier) => (
                   <th key={tier.id} scope="col" className={cn("px-1 py-4 text-center font-semibold sm:px-3", tier.popular && "bg-primary/5 text-primary")}>
                     {tier.name}
-                    <span className="tabular block text-[11px] font-normal text-muted-foreground sm:text-xs">{tier.price === null ? "₹0" : `${formatPlanPrice(tier.price[cycle])}/${cycle === "yearly" ? "yr" : "mo"}`}</span>
+                    <span className="tabular block text-[11px] font-normal text-muted-foreground sm:text-xs">{tier.price === null ? formatPlanPrice(0, currency) : `${formatPlanPrice(tier.price[currency][cycle], currency)}/${cycle === "yearly" ? "yr" : "mo"}`}</span>
                   </th>
                 ))}
               </tr>

@@ -37,7 +37,7 @@ import {
   STEP_STATUSES,
   TAX_MODES,
 } from "../../shared/constants";
-import { BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PLAN_IDS, SUBSCRIPTION_STATUSES, TRIAL_DAYS } from "../../shared/plans";
+import { BILLING_CURRENCIES, BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PLAN_IDS, SUBSCRIPTION_STATUSES, TRIAL_DAYS } from "../../shared/plans";
 import { newId } from "../lib/ids";
 
 /* ------------------------------------------------------------------------------------------------
@@ -135,6 +135,8 @@ export const workspaces = pgTable("workspaces", {
   paidUntil: timestamp({ withTimezone: true, mode: "date" }),
   /** Never charged and never locked (e.g. the product owner's own workspace). */
   billingExempt: boolean().notNull().default(false),
+  /** Plans are paid in this currency: INR when the workspace was created in India, USD elsewhere. */
+  billingCurrency: text({ enum: BILLING_CURRENCIES }).notNull().default("INR"),
   /**
    * Auto-pay: the `billing_subscriptions` row that currently pays for this workspace, with a copy of
    * its Razorpay status so the plan state can be worked out from this row alone. NULL = no auto-pay.
@@ -158,8 +160,9 @@ export const billingSubscriptions = pgTable(
     workspaceId: workspaceRef(),
     plan: text({ enum: PLAN_IDS }).notNull(),
     cycle: text({ enum: BILLING_CYCLES }).notNull().default("monthly"),
-    /** Amount of each charge, in paise. Fixed for the life of the subscription. */
+    /** Amount of each charge, in paise or cents. Fixed for the life of the subscription. */
     amount: bigint({ mode: "number" }).notNull(),
+    currency: text({ enum: BILLING_CURRENCIES }).notNull().default("INR"),
     /** Razorpay ids: the subscription (sub_…) and the plan (plan_…) it bills. */
     providerSubscriptionId: text(),
     providerPlanId: text(),
@@ -192,7 +195,8 @@ export const appFlags = pgTable("app_flags", {
 }).enableRLS();
 
 /**
- * Razorpay plan ids we have created, keyed by "<key id>:<plan>:<cycle>:<amount>". A Razorpay plan can't
+ * Razorpay plan ids we have created, keyed by "<key id>:<plan>:<cycle>:<amount>" (with ":USD" before the
+ * amount for dollar plans). A Razorpay plan can't
  * be edited, so a new price simply gets a new one; test and live keys each get their own.
  */
 export const billingProviderPlans = pgTable("billing_provider_plans", {
@@ -215,9 +219,9 @@ export const billingPayments = pgTable(
     cycleNo: integer(),
     plan: text({ enum: PLAN_IDS }).notNull(),
     cycle: text({ enum: BILLING_CYCLES }).notNull(),
-    /** Amount charged, in paise. */
+    /** Amount charged, in paise or cents. */
     amount: bigint({ mode: "number" }).notNull(),
-    currency: text().notNull().default("INR"),
+    currency: text({ enum: BILLING_CURRENCIES }).notNull().default("INR"),
     status: text({ enum: BILLING_PAYMENT_STATUSES }).notNull().default("created"),
     /** Razorpay payment link id (plink_…) and the page the payer is sent to. */
     providerLinkId: text(),

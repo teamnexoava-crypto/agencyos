@@ -8,7 +8,8 @@ import { timingSafeEqual } from "../lib/crypto";
 import { forbidden, notFound } from "../lib/errors";
 import { paymentsMode } from "../lib/razorpay";
 import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured } from "../lib/google";
-import { appOrigin, isHttps, isLocalhost, safeRedirectPath } from "../lib/request";
+import { appOrigin, isHttps, isLocalhost, safeRedirectPath, visitorCountry } from "../lib/request";
+import { billingCurrencyFor } from "../../shared/plans";
 import { createSession, csrfTokenFor, destroySession, purgeExpiredSessions } from "../lib/session";
 import { rateLimit } from "../middleware/rate-limit";
 import { billingOf, refreshBillingIfDue } from "../services/billing";
@@ -47,7 +48,12 @@ export const authRoutes = new Hono<AppEnv>()
   // These two are read on every page load (and on public pages), so they get the generous limit:
   // a whole office behind one IP address must never be locked out of the app by ordinary browsing.
   .get("/config", rateLimit("PUBLIC_LIMITER"), (c) => {
-    const body: AuthConfigResponse = { googleConfigured: isGoogleConfigured(c.env), devLogin: devLoginEnabled(c), payments: paymentsMode(c.env) };
+    const body: AuthConfigResponse = {
+      googleConfigured: isGoogleConfigured(c.env),
+      devLogin: devLoginEnabled(c),
+      payments: paymentsMode(c.env),
+      currency: billingCurrencyFor(visitorCountry(c)),
+    };
     return c.json(body);
   })
 
@@ -102,7 +108,7 @@ export const authRoutes = new Hono<AppEnv>()
       const profile = await exchangeCode(c.env, appOrigin(c), code, codeVerifier);
       const { user } = await upsertGoogleUser(c.var.db, profile);
       // Someone signing in to accept an invite joins that workspace instead – don't create one of their own.
-      const workspaceId = next.startsWith("/invite/") ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user);
+      const workspaceId = next.startsWith("/invite/") ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user, billingCurrencyFor(visitorCountry(c)));
       await createSession(c, user.id, workspaceId);
       c.var.defer(purgeExpiredSessions(c.var.db));
       return c.redirect(next, 302);
@@ -156,7 +162,7 @@ if (import.meta.env.DEV) {
       ).user;
     // `{ "workspace": false }` mimics signing in from an invite link: no workspace is created.
     const skipWorkspace = typeof body === "object" && body !== null && "workspace" in body && body.workspace === false;
-    const workspaceId = skipWorkspace ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user);
+    const workspaceId = skipWorkspace ? await findWorkspaceId(c.var.db, user) : await ensureWorkspace(c.var.db, user, billingCurrencyFor(visitorCountry(c)));
     await createSession(c, user.id, workspaceId);
     return c.json({ ok: true });
   });

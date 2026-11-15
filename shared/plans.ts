@@ -23,6 +23,24 @@ export type TierId = (typeof TIER_IDS)[number];
 export const BILLING_CYCLES = ["monthly", "yearly"] as const;
 export type BillingCycle = (typeof BILLING_CYCLES)[number];
 
+/**
+ * Plans are priced in rupees for India and in US dollars everywhere else. A workspace's currency is
+ * fixed when it is created, from the country it was created in (see `billingCurrencyFor`), so the
+ * price someone saw is the price they pay – travelling or a VPN later does not change it.
+ */
+export const BILLING_CURRENCIES = ["INR", "USD"] as const;
+export type BillingCurrency = (typeof BILLING_CURRENCIES)[number];
+
+/**
+ * The currency for a visitor from `country` (an ISO 3166 code such as "IN" or "US", as Cloudflare
+ * reports it). No country at all (local development) counts as India; an unknown one ("XX", or "T1"
+ * for Tor) does not.
+ */
+export const billingCurrencyFor = (country: string | null | undefined): BillingCurrency => (!country || country.toUpperCase() === "IN" ? "INR" : "USD");
+
+/** A price in each currency, in the smallest unit (paise or cents). */
+export type PlanPrice = Record<BillingCurrency, Record<BillingCycle, number>>;
+
 /** How much of each thing a tier allows. `null` means "no limit". */
 export interface PlanLimits {
   /** People in the workspace, counting the owner and invitations that are still open. */
@@ -63,8 +81,8 @@ export interface Tier {
   id: TierId;
   name: string;
   tagline: string;
-  /** Price in paise; `null` for the Free tier. A year costs ten months. */
-  price: Record<BillingCycle, number> | null;
+  /** Price in paise (INR) and cents (USD); `null` for the Free tier. A year costs ten months. */
+  price: PlanPrice | null;
   limits: PlanLimits;
   features: PlanFeatures;
   popular?: boolean;
@@ -76,7 +94,7 @@ export interface Tier {
 }
 
 /** A tier that is paid for. */
-export type Plan = Tier & { id: PlanId; price: Record<BillingCycle, number> };
+export type Plan = Tier & { id: PlanId; price: PlanPrice };
 
 const MB = 1024 ** 2;
 const GB = 1024 ** 3;
@@ -96,7 +114,7 @@ export const TIERS: { free: Tier; growth: Plan; premium: Plan } = {
     id: "growth",
     name: "Growth",
     tagline: "For freelancers and small agencies getting busy.",
-    price: { monthly: 599_00, yearly: 5_990_00 },
+    price: { INR: { monthly: 599_00, yearly: 5_990_00 }, USD: { monthly: 35_00, yearly: 350_00 } },
     limits: { members: 5, activeProjects: null, clients: null, invoicesPerMonth: null, contractsPerMonth: 15, leads: null, sheets: 2, storageBytes: 10 * GB },
     features: { contracts: true, portal: true, finance: true },
     popular: true,
@@ -107,7 +125,7 @@ export const TIERS: { free: Tier; growth: Plan; premium: Plan } = {
     id: "premium",
     name: "Premium",
     tagline: "For agencies that want no limits.",
-    price: { monthly: 1_299_00, yearly: 12_990_00 },
+    price: { INR: { monthly: 1_299_00, yearly: 12_990_00 }, USD: { monthly: 75_00, yearly: 750_00 } },
     limits: { members: null, activeProjects: null, clients: null, invoicesPerMonth: null, contractsPerMonth: null, leads: null, sheets: null, storageBytes: 100 * GB },
     features: { contracts: true, portal: true, finance: true },
     includes: "Everything in Growth, with no limits",
@@ -179,7 +197,11 @@ export const AUTOPAY_TOTAL_CYCLES = 60;
 /** A paid plan nearing its end shows a reminder this many days ahead. */
 export const RENEWAL_REMINDER_DAYS = 5;
 
-export const formatPlanPrice = (paise: number) => `₹${new Intl.NumberFormat("en-IN").format(paise / 100)}`;
+/** "₹1,299" or "$35" – `amount` is in paise or cents. */
+export function formatPlanPrice(amount: number, currency: BillingCurrency): string {
+  const value = amount / 100;
+  return currency === "INR" ? `₹${new Intl.NumberFormat("en-IN").format(value)}` : `$${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)}`;
+}
 
 /** Moves a date forward by whole calendar months (31 Jan + 1 month = 28/29 Feb), in UTC. */
 export function addMonths(from: Date, months: number): Date {
@@ -202,7 +224,7 @@ const DAY_MS = 86_400_000;
  *    price. Trial days are never converted: they are free on any plan.
  */
 export function nextPaidPeriod(
-  current: { plan: PlanId | null; paidUntil: Date | null; trialEndsAt: Date },
+  current: { plan: PlanId | null; paidUntil: Date | null; trialEndsAt: Date; billingCurrency: BillingCurrency },
   purchase: { plan: PlanId; cycle: BillingCycle },
   now: Date,
 ): { start: Date; end: Date } {
@@ -213,14 +235,15 @@ export function nextPaidPeriod(
     if (current.plan === purchase.plan) {
       start = current.paidUntil;
     } else {
-      const ratio = PLANS[current.plan].price.monthly / PLANS[purchase.plan].price.monthly;
+      const monthly = (plan: PlanId) => PLANS[plan].price[current.billingCurrency].monthly;
+      const ratio = monthly(current.plan) / monthly(purchase.plan);
       start = new Date(free.getTime() + Math.floor(((current.paidUntil.getTime() - free.getTime()) * ratio) / DAY_MS) * DAY_MS);
     }
   }
   return { start, end: addMonths(start, purchase.cycle === "yearly" ? 12 : 1) };
 }
 
-/** How long one payment of `amount` paise lasts on a plan, in milliseconds (a month at the plan's own price). */
-export function paidTimeFor(amount: number, plan: PlanId): number {
-  return Math.floor((30 * amount) / PLANS[plan].price.monthly) * DAY_MS;
+/** How long one payment of `amount` (paise or cents) lasts on a plan, in milliseconds (a month at the plan's own price). */
+export function paidTimeFor(amount: number, plan: PlanId, currency: BillingCurrency): number {
+  return Math.floor((30 * amount) / PLANS[plan].price[currency].monthly) * DAY_MS;
 }

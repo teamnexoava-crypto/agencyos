@@ -183,7 +183,7 @@ async function main() {
     await db.delete(workspaces).where(inArray(workspaces.id, staleIds));
 
     // 3. Workspace + owner membership + default expense categories.
-    await createWorkspaceForUser(db, owner, { id: DEMO_WORKSPACE_ID, name: "Northwind Studio", currency: "INR" });
+    await createWorkspaceForUser(db, owner, { id: DEMO_WORKSPACE_ID, name: "Northwind Studio", currency: "INR", billingCurrency: "INR" });
     await db
       .update(workspaces)
       .set({

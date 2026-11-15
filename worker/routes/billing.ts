@@ -116,7 +116,8 @@ export const billingRoutes = new Hono<AppEnv>()
       if (live?.plan === plan) throw new ApiError(409, "conflict", `Auto-pay is already on for the ${PLANS[plan].name} plan.`);
     }
 
-    const amount = PLANS[plan].price.monthly;
+    const currency = ws.billingCurrency;
+    const amount = PLANS[plan].price[currency].monthly;
     const now = new Date();
 
     // A double click, or coming back to try again, reuses the page that is still open – as long as
@@ -131,6 +132,7 @@ export const billingRoutes = new Hono<AppEnv>()
           eq(billingSubscriptions.status, "created"),
           eq(billingSubscriptions.plan, plan),
           eq(billingSubscriptions.amount, amount),
+          eq(billingSubscriptions.currency, currency),
           isNotNull(billingSubscriptions.shortUrl),
           gt(billingSubscriptions.createdAt, new Date(now.getTime() - CHECKOUT_TTL_MS / 2)),
         ),
@@ -143,14 +145,14 @@ export const billingRoutes = new Hono<AppEnv>()
 
     // Billing starts when the time already covered runs out – the rest of the trial, or days already
     // paid for (converted to the new plan's price). If that is less than an hour away it starts now.
-    const { start } = nextPaidPeriod({ plan: ws.plan, paidUntil: ws.paidUntil, trialEndsAt: ws.trialEndsAt }, { plan, cycle: "monthly" }, now);
+    const { start } = nextPaidPeriod({ plan: ws.plan, paidUntil: ws.paidUntil, trialEndsAt: ws.trialEndsAt, billingCurrency: currency }, { plan, cycle: "monthly" }, now);
     const startAt = start.getTime() - now.getTime() > 3_600_000 ? start : null;
 
-    const providerPlanId = await ensureProviderPlan(t.db, c.env, plan, "monthly", amount).catch((error: unknown) => {
+    const providerPlanId = await ensureProviderPlan(t.db, c.env, plan, "monthly", amount, currency).catch((error: unknown) => {
       throw autoPayProblem(error);
     });
     const id = newId();
-    await t.db.insert(billingSubscriptions).values({ id, workspaceId: t.workspaceId, plan, cycle: "monthly", amount, providerPlanId, startAt, basis, createdBy: t.member.id, createdByName: t.user.name });
+    await t.db.insert(billingSubscriptions).values({ id, workspaceId: t.workspaceId, plan, cycle: "monthly", amount, currency, providerPlanId, startAt, basis, createdBy: t.member.id, createdByName: t.user.name });
     try {
       const created = await createSubscription(c.env, {
         providerPlanId,
@@ -201,7 +203,8 @@ export const billingRoutes = new Hono<AppEnv>()
     const t = tenant(c, { allowLocked: true });
     payer(t, c.env);
     const { plan, cycle } = c.req.valid("json");
-    const amount = PLANS[plan].price[cycle];
+    const currency = (await freshWorkspace(t)).billingCurrency;
+    const amount = PLANS[plan].price[currency][cycle];
 
     // A double click, or coming back to try again, reuses the page that is still open.
     const [open] = await t.db
@@ -214,6 +217,7 @@ export const billingRoutes = new Hono<AppEnv>()
           eq(billingPayments.plan, plan),
           eq(billingPayments.cycle, cycle),
           eq(billingPayments.amount, amount),
+          eq(billingPayments.currency, currency),
           gt(billingPayments.createdAt, new Date(Date.now() - CHECKOUT_TTL_MS / 2)),
         ),
       )
@@ -222,10 +226,11 @@ export const billingRoutes = new Hono<AppEnv>()
     if (open?.providerLinkUrl && isPaymentPage(open.providerLinkUrl, c.env)) return c.json({ url: open.providerLinkUrl });
 
     const paymentId = newId();
-    await t.db.insert(billingPayments).values({ id: paymentId, workspaceId: t.workspaceId, plan, cycle, amount, createdBy: t.member.id, createdByName: t.user.name });
+    await t.db.insert(billingPayments).values({ id: paymentId, workspaceId: t.workspaceId, plan, cycle, amount, currency, createdBy: t.member.id, createdByName: t.user.name });
 
     const link = await createPaymentLink(c.env, {
       amount,
+      currency,
       description: `${APP_NAME} ${PLANS[plan].name} plan – ${cycle === "yearly" ? "1 year" : "1 month"} for ${t.workspace.name}`.slice(0, 250),
       referenceId: paymentId,
       customer: { email: t.user.email },

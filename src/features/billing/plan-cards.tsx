@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, X } from "lucide-react";
-import { TIER_LIST, formatPlanPrice, type BillingCycle, type Tier } from "@shared/plans";
+import { TIER_LIST, formatPlanPrice, type BillingCurrency, type BillingCycle, type Tier } from "@shared/plans";
 import { SegmentedControl } from "@/components/shared/segmented-control";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,8 @@ export function CycleSwitch({ value, onChange, className }: { value: BillingCycl
 
 interface PlanCardsProps {
   cycle: BillingCycle;
+  /** Rupees in India, dollars elsewhere. */
+  currency: BillingCurrency;
   /** The button under the price – it differs between the public page and the app, and per tier. */
   action: (tier: Tier) => ReactNode;
   /** Small label shown on a card, e.g. "Your plan". */
@@ -26,11 +28,13 @@ interface PlanCardsProps {
 }
 
 /** Free, Growth and Premium side by side. Prices, limits and features come from shared/plans.ts. */
-export function PlanCards({ cycle, action, badge, reveal = false, className }: PlanCardsProps) {
+export function PlanCards({ cycle, currency, action, badge, reveal = false, className }: PlanCardsProps) {
+  const money = (amount: number) => formatPlanPrice(amount, currency);
   return (
     <ul className={cn("grid gap-x-4 gap-y-8 md:grid-cols-3", className)} aria-label="Plans">
       {TIER_LIST.map((tier, index) => {
         const yearly = cycle === "yearly";
+        const price = tier.price?.[currency] ?? null;
         const label = badge?.(tier) ?? (tier.popular ? "Most popular" : null);
         return (
           <motion.li
@@ -46,30 +50,30 @@ export function PlanCards({ cycle, action, badge, reveal = false, className }: P
             <p className="mt-1 text-sm text-muted-foreground">{tier.tagline}</p>
 
             <div className="mt-4 h-[4.25rem]">
-              {tier.price === null ? (
+              {price === null ? (
                 <>
                   <p className="flex items-baseline gap-1.5">
-                    <span className="tabular text-4xl font-semibold tracking-tight">₹0</span>
+                    <span className="tabular text-4xl font-semibold tracking-tight">{money(0)}</span>
                     <span className="text-sm text-muted-foreground">forever</span>
                   </p>
                   <p className="mt-1 text-[13px] text-muted-foreground">No card needed</p>
                 </>
               ) : (
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.div key={cycle} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }}>
+                  <motion.div key={`${currency}-${cycle}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }}>
                     <p className="flex items-baseline gap-1.5">
-                      <span className="tabular text-4xl font-semibold tracking-tight">{formatPlanPrice(tier.price[cycle])}</span>
+                      <span className="tabular text-4xl font-semibold tracking-tight">{money(price[cycle])}</span>
                       <span className="text-sm text-muted-foreground">{yearly ? "per year" : "per month"}</span>
                     </p>
                     <p className="mt-1 text-[13px] text-muted-foreground">
                       {yearly ? (
                         <>
-                          <span className="tabular line-through">{formatPlanPrice(tier.price.monthly * 12)}</span>{" "}
-                          <span className="font-medium text-emerald-700 dark:text-emerald-400">Save {formatPlanPrice(tier.price.monthly * 12 - tier.price.yearly)}</span>
+                          <span className="tabular line-through">{money(price.monthly * 12)}</span>{" "}
+                          <span className="font-medium text-emerald-700 dark:text-emerald-400">Save {money(price.monthly * 12 - price.yearly)}</span>
                         </>
                       ) : (
                         <>
-                          or <span className="tabular">{formatPlanPrice(tier.price.yearly)}</span> a year
+                          or <span className="tabular">{money(price.yearly)}</span> a year
                         </>
                       )}
                     </p>

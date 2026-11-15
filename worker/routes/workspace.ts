@@ -5,6 +5,7 @@ import { DEFAULT_WA_CONTRACT_TEMPLATE, DEFAULT_WA_INVITE_TEMPLATE, DEFAULT_WA_IN
 import { deleteWorkspaceSchema, settingsInvoicingSchema, settingsMessagesSchema, settingsProfileSchema } from "../../shared/schemas/settings";
 import { switchWorkspaceSchema } from "../../shared/schemas/team";
 import { createWorkspaceSchema, onboardingSchema } from "../../shared/schemas/workspace";
+import { billingCurrencyFor } from "../../shared/plans";
 import type { WorkspaceMembershipDTO, WorkspaceSettings } from "../../shared/types";
 import { invoices, workspaceMembers, workspaces } from "../db/schema";
 import { ApiError, badRequest, forbidden } from "../lib/errors";
@@ -12,6 +13,7 @@ import { newId } from "../lib/ids";
 import { sniffImage } from "../lib/images";
 import { setActiveWorkspace } from "../lib/session";
 import { requireUser, tenant, type Tenant } from "../lib/tenant";
+import { visitorCountry } from "../lib/request";
 import { validate } from "../lib/validate";
 import { isBillingConfigured } from "../lib/razorpay";
 import { requireAuth } from "../middleware/context";
@@ -93,7 +95,7 @@ export const workspaceRoutes = new Hono<AppEnv>()
     const auth = requireUser(c);
     if (auth.workspace) throw forbidden("You already belong to a workspace.");
     const { name } = c.req.valid("json");
-    const workspaceId = await createWorkspaceForUser(c.var.db, auth.user, { name });
+    const workspaceId = await createWorkspaceForUser(c.var.db, auth.user, { name, billingCurrency: billingCurrencyFor(visitorCountry(c)) });
     await setActiveWorkspace(c.var.db, auth.sessionId, workspaceId);
     return c.json({ ok: true }, 201);
   })

@@ -17,7 +17,7 @@ import type {
   StepStatus,
   TaxMode,
 } from "./constants";
-import type { AutoPayState, BillingCycle, BillingPaymentStatus, BillingStatus, PlanFeatures, PlanId, PlanLimits, TierId } from "./plans";
+import type { AutoPayState, BillingCurrency, BillingCycle, BillingPaymentStatus, BillingStatus, PlanFeatures, PlanId, PlanLimits, TierId } from "./plans";
 
 /** Shape of every non-2xx API response body. */
 export interface ApiErrorBody {
@@ -78,6 +78,8 @@ export interface BillingDTO {
   status: BillingStatus;
   /** The plan last paid for; `null` before the first payment. */
   plan: PlanId | null;
+  /** What plans are priced and paid in for this workspace (set when it was created). */
+  currency: BillingCurrency;
   trialEndsAt: number;
   paidUntil: number | null;
   /** Whole days left in the trial or the paid period; `null` when neither is running. */
@@ -94,8 +96,9 @@ export interface BillingDTO {
 export interface AutoPayDTO {
   state: AutoPayState;
   plan: PlanId;
-  /** Paise taken each month. */
+  /** Paise or cents taken each month. */
   amount: number;
+  currency: BillingCurrency;
   nextChargeAt: number | null;
 }
 
@@ -103,6 +106,7 @@ export interface AutoPayDTO {
 export interface PendingSetupDTO {
   plan: PlanId;
   amount: number;
+  currency: BillingCurrency;
   /** Razorpay's page for approving the mandate. */
   url: string;
   /** When the first charge will be taken; `null` = as soon as it is approved. */
@@ -113,8 +117,9 @@ export interface BillingPaymentDTO {
   id: string;
   plan: PlanId;
   cycle: BillingCycle;
-  /** Paise. */
+  /** Paise or cents. */
   amount: number;
+  currency: BillingCurrency;
   status: BillingPaymentStatus;
   createdAt: number;
   paidAt: number | null;
@@ -148,6 +153,8 @@ export interface AuthConfigResponse {
   googleConfigured: boolean;
   /** Whether plans can be paid for yet, and if so with test keys (no real money) or live ones. */
   payments: "off" | "test" | "live";
+  /** What a visitor from where this request came from would pay in: INR in India, USD elsewhere. */
+  currency: BillingCurrency;
   /** True only under `npm run dev` on localhost. */
   devLogin: boolean;
 }

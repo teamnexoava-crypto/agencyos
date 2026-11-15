@@ -31,7 +31,7 @@ function PlanNote({ billing, autoPay, warnOnly }: { billing: BillingDTO; autoPay
 
   const planName = autoPay ? PLANS[autoPay.plan].name : billing.plan ? PLANS[billing.plan].name : "";
   const until = formatDay(billing.paidUntil ?? billing.trialEndsAt);
-  const price = autoPay ? formatPlanPrice(autoPay.amount) : "the payment";
+  const price = autoPay ? formatPlanPrice(autoPay.amount, autoPay.currency) : "the payment";
   const lastDay = formatDay((billing.paidUntil ?? billing.trialEndsAt) + AUTOPAY_GRACE_DAYS * 86_400_000);
   const warn = mandate === "retrying" || mandate === "stopped";
   if (warn !== warnOnly) return null;
@@ -40,7 +40,7 @@ function PlanNote({ billing, autoPay, warnOnly }: { billing: BillingDTO; autoPay
     mandate === "on"
       ? `Auto-pay is on: ${autoPay ? `${price} for ${planName}` : "your plan"} is taken on ${formatDay(autoPay?.nextChargeAt ?? billing.paidUntil ?? billing.trialEndsAt)}, then every month.`
       : mandate === "retrying"
-        ? `We couldn't collect ${price}. Razorpay is trying again – look for its message, or a request in your UPI app, and approve it. If it keeps failing you move to the Free plan on ${lastDay}; you can also pay for a month below.`
+        ? `We couldn't collect ${price}. Razorpay is trying again – look for its message${billing.currency === "INR" ? ", or a request in your UPI app," : " or one from your bank"} and approve it. If it keeps failing you move to the Free plan on ${lastDay}; you can also pay for a month below.`
         : mandate === "stopped"
           ? `Auto-pay has stopped – the payment kept failing, or the mandate was paused. Your plan runs until ${until}; choose it again below to restart.`
           : `Your ${planName} plan is paid until ${until}. Nothing is taken automatically.`;
@@ -143,7 +143,7 @@ function Payments({ payments }: { payments: BillingPaymentDTO[] }) {
                   {PLANS[payment.plan].name} · {payment.cycle === "yearly" ? "1 year" : payment.autoPay ? "Auto-pay" : "1 month"}
                 </td>
                 <td className="tabular px-3 py-3 whitespace-nowrap text-muted-foreground">{payment.periodStart && payment.periodEnd ? `${formatDay(payment.periodStart)} – ${formatDay(payment.periodEnd)}` : "—"}</td>
-                <td className="tabular px-3 py-3 text-right whitespace-nowrap">{formatPlanPrice(payment.amount)}</td>
+                <td className="tabular px-3 py-3 text-right whitespace-nowrap">{formatPlanPrice(payment.amount, payment.currency)}</td>
                 <td className="px-5 py-3 text-right">
                   <Badge variant={payment.status === "paid" ? "default" : "secondary"}>{STATUS_LABEL[payment.status]}</Badge>
                 </td>

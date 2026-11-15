@@ -1,4 +1,4 @@
-import type { SubscriptionStatus } from "../../shared/plans";
+import type { BillingCurrency, SubscriptionStatus } from "../../shared/plans";
 import { hmacSha256Hex, timingSafeEqual } from "./crypto";
 import { ApiError } from "./errors";
 
@@ -78,8 +78,9 @@ const LINK_ID = /^plink_[A-Za-z0-9]{6,40}$/;
 export const isPaymentLinkId = (value: string): boolean => LINK_ID.test(value);
 
 interface NewPaymentLink {
-  /** Paise. */
+  /** Paise or cents. */
   amount: number;
+  currency: BillingCurrency;
   description: string;
   /** Our own id for the payment; Razorpay requires it to be unique. */
   referenceId: string;
@@ -96,7 +97,7 @@ interface NewPaymentLink {
 export function createPaymentLink(env: Env, input: NewPaymentLink): Promise<PaymentLink> {
   return call<PaymentLink>(env, "POST", "/payment_links", {
     amount: input.amount,
-    currency: "INR",
+    currency: input.currency,
     accept_partial: false,
     description: input.description,
     reference_id: input.referenceId,
@@ -143,11 +144,11 @@ const SUBSCRIPTION_ID = /^sub_[A-Za-z0-9]{6,40}$/;
 export const isSubscriptionId = (value: unknown): value is string => typeof value === "string" && SUBSCRIPTION_ID.test(value);
 
 /** A Razorpay plan is the fixed "this much, every month" that a subscription bills. Returns its id. */
-export async function createProviderPlan(env: Env, input: { name: string; amount: number; period: "monthly" | "yearly" }): Promise<string> {
+export async function createProviderPlan(env: Env, input: { name: string; amount: number; currency: BillingCurrency; period: "monthly" | "yearly" }): Promise<string> {
   const plan = await call<{ id: string }>(env, "POST", "/plans", {
     period: input.period,
     interval: 1,
-    item: { name: input.name, amount: input.amount, currency: "INR" },
+    item: { name: input.name, amount: input.amount, currency: input.currency },
   });
   return plan.id;
 }

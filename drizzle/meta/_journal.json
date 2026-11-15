@@ -36,6 +36,13 @@
       "when": 1794690754081,
       "tag": "0004_billing_basis",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794702197084,
+      "tag": "0005_billing_currency",
+      "breakpoints": true
     }
   ]
 }

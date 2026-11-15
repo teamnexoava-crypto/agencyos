@@ -1,5 +1,5 @@
 import type { CurrencyCode } from "../../shared/constants";
-import { TRIAL_DAYS } from "../../shared/plans";
+import { TRIAL_DAYS, type BillingCurrency } from "../../shared/plans";
 import type { MembershipDTO, SessionUser, WorkspaceDTO } from "../../shared/types";
 import type { Database } from "../db";
 import { activityLog, expenseCategories, workspaceMembers, workspaces } from "../db/schema";
@@ -56,6 +56,8 @@ interface NewWorkspaceOptions {
   id?: string;
   name: string;
   currency?: CurrencyCode;
+  /** What plans are paid in – decided by where the workspace is created (see `billingCurrencyFor`). */
+  billingCurrency: BillingCurrency;
 }
 
 /**
@@ -67,7 +69,7 @@ export async function createWorkspaceForUser(db: Database, user: UserRow, option
   const memberId = newId();
 
   await db.transaction(async (tx) => {
-    await tx.insert(workspaces).values({ id: workspaceId, name: options.name, currency: options.currency ?? "INR", trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) });
+    await tx.insert(workspaces).values({ id: workspaceId, name: options.name, currency: options.currency ?? "INR", billingCurrency: options.billingCurrency, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) });
     await tx.insert(workspaceMembers).values({ id: memberId, workspaceId, userId: user.id, role: "owner", designation: "Founder" });
     await tx.insert(expenseCategories).values(DEFAULT_EXPENSE_CATEGORIES.map((category) => ({ ...category, workspaceId })));
     await tx.insert(activityLog).values({

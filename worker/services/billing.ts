@@ -14,6 +14,7 @@ import {
   isSubscriptionOver,
   nextPaidPeriod,
   paidTimeFor,
+  type BillingCurrency,
   type BillingCycle,
   type BillingPaymentStatus,
   type PlanFeature,
@@ -50,7 +51,7 @@ const fromUnix = (seconds: number | null | undefined) => (seconds ? new Date(sec
  */
 export function billingOf(env: Env, ws: WorkspaceRow, now = new Date()): BillingDTO {
   const autoPay = autoPayStateOf(ws.subscriptionId ? ws.subscriptionStatus : null);
-  const base = { plan: ws.plan, trialEndsAt: ws.trialEndsAt.getTime(), paidUntil: ws.paidUntil?.getTime() ?? null };
+  const base = { plan: ws.plan, currency: ws.billingCurrency, trialEndsAt: ws.trialEndsAt.getTime(), paidUntil: ws.paidUntil?.getTime() ?? null };
   const unlimited = { tier: TRIAL_PLAN, limits: NO_LIMITS, features: ALL_FEATURES } as const;
   if (!isBillingConfigured(env)) return { ...base, enabled: false, status: "open", daysLeft: null, autoPay: null, ...unlimited };
   if (ws.billingExempt) return { ...base, enabled: true, status: "exempt", daysLeft: null, autoPay: null, ...unlimited };
@@ -234,6 +235,7 @@ export const toPaymentDTO = (row: PaymentRow): BillingPaymentDTO => ({
   plan: row.plan,
   cycle: row.cycle,
   amount: row.amount,
+  currency: row.currency,
   status: row.status,
   createdAt: row.createdAt.getTime(),
   paidAt: row.paidAt?.getTime() ?? null,
@@ -285,7 +287,11 @@ export async function settlePayment(db: Database, env: Env, paymentId: string, o
     if (ws.subscriptionId) throw new ApiError(409, "conflict", "Auto-pay changed while this payment was being confirmed.");
 
     const now = new Date();
-    const period = nextPaidPeriod({ plan: ws.plan, paidUntil: ws.paidUntil, trialEndsAt: ws.trialEndsAt }, { plan: locked.plan, cycle: locked.cycle }, now);
+    const period = nextPaidPeriod(
+      { plan: ws.plan, paidUntil: ws.paidUntil, trialEndsAt: ws.trialEndsAt, billingCurrency: ws.billingCurrency },
+      { plan: locked.plan, cycle: locked.cycle },
+      now,
+    );
     await tx.update(workspaces).set({ plan: locked.plan, paidUntil: period.end }).where(eq(workspaces.id, ws.id));
     await tx
       .update(billingPayments)
@@ -302,13 +308,14 @@ export async function settlePayment(db: Database, env: Env, paymentId: string, o
  * ---------------------------------------------------------------------------------------------- */
 
 /** The Razorpay plan (a fixed amount per month) for one of ours, created the first time it is needed. */
-export async function ensureProviderPlan(db: Database, env: Env, plan: PlanId, cycle: BillingCycle, amount: number): Promise<string> {
-  // Test and live keys have separate plans, and a plan's price can never change, so both are part of the key.
-  const key = `${env.RAZORPAY_KEY_ID?.trim()}:${plan}:${cycle}:${amount}`;
+export async function ensureProviderPlan(db: Database, env: Env, plan: PlanId, cycle: BillingCycle, amount: number, currency: BillingCurrency): Promise<string> {
+  // Test and live keys have separate plans, and a plan's price can never change, so both are part of
+  // the key (rupee plans keep the key they had before dollar prices existed).
+  const key = `${env.RAZORPAY_KEY_ID?.trim()}:${plan}:${cycle}:${currency === "INR" ? "" : `${currency}:`}${amount}`;
   const [known] = await db.select().from(billingProviderPlans).where(eq(billingProviderPlans.key, key)).limit(1);
   if (known) return known.providerPlanId;
 
-  const providerPlanId = await createProviderPlan(env, { name: `${APP_NAME} ${PLANS[plan].name} – ${cycle}`, amount, period: cycle });
+  const providerPlanId = await createProviderPlan(env, { name: `${APP_NAME} ${PLANS[plan].name} – ${cycle}`, amount, currency, period: cycle });
   await db.insert(billingProviderPlans).values({ key, providerPlanId }).onConflictDoNothing();
   const [stored] = await db.select().from(billingProviderPlans).where(eq(billingProviderPlans.key, key)).limit(1);
   return stored?.providerPlanId ?? providerPlanId;
@@ -382,6 +389,7 @@ async function applySubscription(db: Database, subscriptionId: string, entity: P
           plan: sub.plan,
           cycle: sub.cycle,
           amount: sub.amount,
+          currency: sub.currency,
           status: "paid",
           paidAt: now,
           periodStart: start,
@@ -419,7 +427,7 @@ async function applySubscription(db: Database, subscriptionId: string, entity: P
       const target: PlanId = ws.plan ?? sub.plan;
       for (let number = counted + 1; number <= charges; number++) {
         const start = later(later(paidUntil, ws.trialEndsAt), now);
-        const end = new Date(start.getTime() + paidTimeFor(sub.amount, target));
+        const end = new Date(start.getTime() + paidTimeFor(sub.amount, target, sub.currency));
         await record(number, start, end, number === charges ? (options.paymentId ?? null) : null);
         paidUntil = end;
       }
@@ -697,7 +705,7 @@ export async function autoPayOverview(db: Database, ws: WorkspaceRow): Promise<{
   // A set-up priced on a state the workspace has left is not offered again.
   const pending = pendingRows[0] && isSetupFresh(pendingRows[0].basis, ws) ? pendingRows[0] : undefined;
   return {
-    autoPay: live && state ? { state, plan: live.plan, amount: live.amount, nextChargeAt: state === "stopped" ? null : (live.nextChargeAt ?? ws.paidUntil ?? ws.trialEndsAt).getTime() } : null,
-    pendingSetup: pending?.shortUrl ? { plan: pending.plan, amount: pending.amount, url: pending.shortUrl, firstChargeAt: pending.startAt?.getTime() ?? null } : null,
+    autoPay: live && state ? { state, plan: live.plan, amount: live.amount, currency: live.currency, nextChargeAt: state === "stopped" ? null : (live.nextChargeAt ?? ws.paidUntil ?? ws.trialEndsAt).getTime() } : null,
+    pendingSetup: pending?.shortUrl ? { plan: pending.plan, amount: pending.amount, currency: pending.currency, url: pending.shortUrl, firstChargeAt: pending.startAt?.getTime() ?? null } : null,
   };
 }

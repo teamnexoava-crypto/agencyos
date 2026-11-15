@@ -126,6 +126,13 @@ There are three tiers – **Free**, **Growth** and **Premium** – defined in on
 (prices, limits, features, and the wording on the cards). The landing page, the Billing screen and the
 server-side checks all read from it.
 
+- **Rupees in India, dollars elsewhere.** Each tier has an INR and a USD price (Growth ₹599 / $35,
+  Premium ₹1,299 / $75 a month; a year is ten months). A workspace's `billing_currency` is fixed when it
+  is created, from Cloudflare's `request.cf.country` (`billingCurrencyFor`: India → INR, anywhere else →
+  USD), so travelling or a VPN later doesn't change what it pays. The landing page shows a visitor the
+  prices for where they are (`/api/auth/config` → `currency`). Charging in USD needs **International
+  Payments** enabled on the Razorpay account; dollar payments are card-only (no UPI) and Razorpay settles
+  them in rupees. Locally there is no edge, so set a `dev_country=US` cookie on localhost to try it.
 - **Every new workspace starts with 7 days of Premium** (`TRIAL_DAYS`, `TRIAL_PLAN`), no card needed.
 - **Then it is on Free, by itself.** Nothing is locked away or deleted. Free is for one person and has
   limits (active projects, clients, invoices a month, leads, storage) and no team members, contracts,

@@ -17,7 +17,8 @@ const fingerprint = (billing: BillingDTO) => `${billing.status}|${billing.plan}|
 
 /** An auto-pay set-up that is waiting to be approved on Razorpay's page (usually open in another tab). */
 function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
-  const price = formatPlanPrice(setup.amount);
+  const price = formatPlanPrice(setup.amount, setup.currency);
+  const india = setup.currency === "INR";
   const withdraw = useCancelSetup();
   return (
     <section role="status" className="mx-auto mb-8 flex max-w-2xl items-start gap-3 rounded-2xl border-2 border-primary/40 bg-primary/5 p-5">
@@ -25,9 +26,9 @@ function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
       <div className="min-w-0 flex-1">
         <h3 className="font-semibold tracking-tight">Finish setting up auto-pay for {PLANS[setup.plan].name}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Approve it on Razorpay's page with UPI AutoPay or a card.{" "}
+          Approve it on Razorpay's page with {india ? "UPI AutoPay or a card" : "a card"}.{" "}
           {setup.firstChargeAt
-            ? `Your first ${price} is taken on ${formatDay(setup.firstChargeAt)}, not today – Razorpay may take ₹5 to check your card or UPI and refunds it.`
+            ? `Your first ${price} is taken on ${formatDay(setup.firstChargeAt)}, not today – Razorpay may take ${india ? "₹5" : "a small amount"} to check your ${india ? "card or UPI" : "card"} and refunds it.`
             : `${price} is taken now, and then every month.`}{" "}
           This page updates by itself once it's done.
         </p>
@@ -73,6 +74,8 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
   // What the workspace is on: its paid plan (or, during the trial, the one auto-pay is set up for), or Free.
   const activeTier = mandatePlan ?? onPlan ?? (current.status === "free" ? "free" : null);
   const isPaid = (tier: Tier): tier is Plan => tier.price !== null;
+  const currency = current.currency;
+  const india = currency === "INR";
   // Stays busy after a one-off checkout succeeds: the browser is on its way to the payment page.
   const busy = checkout.isPending || checkout.isSuccess || subscribe.isPending;
 
@@ -144,7 +147,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
   };
 
   const label = (plan: Plan) => {
-    if (!autoPay) return `Pay ${formatPlanPrice(plan.price[cycle])} for 1 ${cycle === "yearly" ? "year" : "month"}`;
+    if (!autoPay) return `Pay ${formatPlanPrice(plan.price[currency][cycle], currency)} for 1 ${cycle === "yearly" ? "year" : "month"}`;
     return onPlan || mandatePlan ? `Switch to ${plan.name}` : `Upgrade to ${plan.name}`;
   };
 
@@ -169,6 +172,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
       )}
       <PlanCards
         cycle={cycle}
+        currency={currency}
         className={heading ? "mt-7" : "mt-8"}
         badge={(tier) => (tier.id === activeTier ? "Your plan" : null)}
         action={(tier) => {
@@ -216,7 +220,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
             "Online payments are being set up. Everything stays unlocked until then."
           )
         ) : cycle === "yearly" ? (
-          "One payment for the whole year by UPI, card or netbanking on Razorpay's secure page. Nothing renews by itself – we'll remind you before it ends."
+          `One payment for the whole year by ${india ? "UPI, card or netbanking" : "card"} on Razorpay's secure page. Nothing renews by itself – we'll remind you before it ends.${india ? "" : " Prices are in US dollars."}`
         ) : monthByMonth ? (
           <>
             One payment for one month. Nothing renews by itself – we'll remind you before it ends.{" "}
@@ -226,7 +230,8 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
           </>
         ) : (
           <>
-            Monthly plans renew by auto-pay: approve UPI AutoPay or a card once on Razorpay's secure page, and turn it off here whenever you like.{" "}
+            Monthly plans renew by auto-pay: approve {india ? "UPI AutoPay or a card" : "a card"} once on Razorpay's secure page, and turn it off here whenever you like.
+            {india ? "" : " Prices are in US dollars."}{" "}
             <button type="button" className="font-medium text-foreground underline underline-offset-2 hover:no-underline" onClick={() => setMonthByMonth(true)}>
               Pay month by month instead
             </button>

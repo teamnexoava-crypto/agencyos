@@ -4,7 +4,7 @@ import { TRIAL_DAYS } from "@shared/plans";
 import { BrandLogo } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-const LAST_UPDATED = "14 November 2026";
+const LAST_UPDATED = "15 November 2026";
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -188,8 +188,9 @@ export function TermsPage() {
         <p>
           Every new workspace gets the Premium plan free for {TRIAL_DAYS} days. After that it moves to the Free plan by itself and can
           stay there for as long as you like. The Free plan is for one person and has limits; team members, contracts, the client
-          portal, finance and Google Sheet sync are part of the paid plans (Growth and Premium), which are charged in Indian rupees
-          through Razorpay.
+          portal, finance and Google Sheet sync are part of the paid plans (Growth and Premium), which are charged through Razorpay
+          in Indian rupees for workspaces created in India and in US dollars for workspaces created anywhere else. The currency
+          is set when the workspace is created and shown on every price.
         </p>
         <ul>
           <li>

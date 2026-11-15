@@ -313,7 +313,7 @@ const FAQS = [
   },
   {
     q: "How do I pay?",
-    a: "Monthly plans use auto-pay: you approve UPI AutoPay or a card once on Razorpay's secure page, the plan renews each month, and you can turn it off any time from Billing. A yearly plan is a single payment by UPI, card or netbanking, with nothing taken automatically. If you'd rather not use auto-pay, you can also pay month by month.",
+    a: "Monthly plans use auto-pay: you approve a card once (or UPI AutoPay, in India) on Razorpay's secure page, the plan renews each month, and you can turn it off any time from Billing. A yearly plan is a single payment by UPI, card or netbanking, with nothing taken automatically. If you'd rather not use auto-pay, you can also pay month by month.",
   },
   { q: "Do my clients need to create an account?", a: "No. Clients open a private link to view an invoice, sign a contract or follow their project. Nothing to install, nothing to remember." },
   { q: "Does it handle GST invoices?", a: "Yes. Add your GSTIN and choose CGST + SGST or IGST – the split is calculated for you and printed on the invoice. Invoices in other currencies work too." },
