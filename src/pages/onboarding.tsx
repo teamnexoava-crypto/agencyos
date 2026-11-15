@@ -10,6 +10,7 @@ import { formatInvoiceNumber, onboardingSchema, type OnboardingInput } from "@sh
 import { BrandLogo } from "@/components/shared/brand";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +93,7 @@ export default function OnboardingPage() {
       address: workspace?.address ?? "",
       phone: workspace?.phone ?? "",
       invoicePrefix: workspace?.invoicePrefix ?? "INV",
+      sampleData: true,
     },
   });
   const values = useWatch({ control: form.control });
@@ -342,6 +344,23 @@ export default function OnboardingPage() {
                             <span className="text-muted-foreground">…</span>
                           </p>
                         </div>
+                        <FormField
+                          control={form.control}
+                          name="sampleData"
+                          render={({ field }) => (
+                            <FormItem className="flex items-start gap-3 rounded-xl border bg-primary/5 p-4">
+                              <FormControl>
+                                <Checkbox className="mt-0.5" checked={field.value ?? false} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                              </FormControl>
+                              <div className="grid gap-1">
+                                <FormLabel className="!mt-0 font-medium">Start with sample data</FormLabel>
+                                <FormDescription>
+                                  Example clients, projects, invoices, a contract and leads, so you can see what every screen does. Remove it with one click whenever you're ready.
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
                       </>
                     )}
                   </motion.div>

@@ -1,7 +1,11 @@
 import { motion, type Variants } from "motion/react";
-import { ArrowUpRight, FileSignature, FolderKanban, ReceiptText, Users, UsersRound, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, FileSignature, FolderKanban, LoaderCircle, ReceiptText, Sparkles, Users, UsersRound, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAddSampleData } from "@/features/sample-data/api";
+import { errorMessage } from "@/lib/api";
 
 interface SetupStep {
   title: string;
@@ -25,8 +29,31 @@ const item: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0
 /** Onboarding checklist shown on the dashboard until the workspace has its first client or project. */
 export function GetStarted({ canManage }: { canManage: boolean }) {
   const steps = SETUP_STEPS.filter((step) => canManage || !step.managersOnly);
+  const addSample = useAddSampleData();
   return (
     <section aria-labelledby="get-started" className="mb-8">
+      {canManage && (
+        <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-violet-500/30 bg-violet-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="flex items-center gap-2 font-medium">
+              <Sparkles className="size-4 text-violet-600 dark:text-violet-400" /> Want to see it in action first?
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Fill your workspace with example clients, projects, invoices, a contract and leads. Remove them with one click later.</p>
+          </div>
+          <Button
+            className="shrink-0"
+            disabled={addSample.isPending}
+            onClick={() =>
+              addSample.mutate(undefined, {
+                onSuccess: () => toast.success("Sample data added – have a look around."),
+                onError: (error) => toast.error(errorMessage(error, "Could not add the sample data.")),
+              })
+            }
+          >
+            {addSample.isPending ? <LoaderCircle className="animate-spin" /> : <Sparkles />} Add sample data
+          </Button>
+        </div>
+      )}
       <div className="mb-3 flex items-center gap-2">
         <h2 id="get-started" className="text-sm font-semibold">
           Get started

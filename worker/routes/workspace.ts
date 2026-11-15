@@ -8,7 +8,7 @@ import { createWorkspaceSchema, onboardingSchema } from "../../shared/schemas/wo
 import { billingCurrencyFor } from "../../shared/plans";
 import type { WorkspaceMembershipDTO, WorkspaceSettings } from "../../shared/types";
 import { invoices, workspaceMembers, workspaces } from "../db/schema";
-import { ApiError, badRequest, forbidden } from "../lib/errors";
+import { ApiError, badRequest, forbidden, notFound } from "../lib/errors";
 import { newId } from "../lib/ids";
 import { sniffImage } from "../lib/images";
 import { setActiveWorkspace } from "../lib/session";
@@ -19,6 +19,7 @@ import { isDodoConfigured } from "../lib/dodo";
 import { isBillingConfigured } from "../lib/razorpay";
 import { requireAuth } from "../middleware/context";
 import { cancelAllSubscriptions } from "../services/billing";
+import { addSampleData, removeSampleData } from "../services/sample-data";
 import { createWorkspaceForUser, logoUrlFromKey, toWorkspaceDTO } from "../services/workspaces";
 import type { AppEnv, WorkspaceRow } from "../types";
 
@@ -161,7 +162,36 @@ export const workspaceRoutes = new Hono<AppEnv>()
       .returning();
     if (!updated) throw new ApiError(500, "update_failed", "Could not save your workspace.");
 
+    // On first set-up the workspace can start with example data, so every screen shows what it does.
+    if (input.sampleData && !t.workspace.onboardedAt && !updated.sampleDataAt) {
+      try {
+        await addSampleData(t.db, updated, t.member.id);
+        const [withSample] = await t.db.select().from(workspaces).where(eq(workspaces.id, t.workspaceId)).limit(1);
+        if (withSample) return c.json({ workspace: toWorkspaceDTO(withSample) });
+      } catch (error) {
+        // Sample data is a nicety: onboarding still succeeds without it.
+        console.error("Could not add sample data during onboarding", error);
+      }
+    }
     return c.json({ workspace: toWorkspaceDTO(updated) });
+  })
+
+  /** Adds example clients, projects, invoices, a contract, leads and expenses to look around with. */
+  .post("/sample-data", async (c) => {
+    const t = tenant(c, { allowLocked: true });
+    t.requireRole("owner", "admin");
+    const [ws] = await t.db.select().from(workspaces).where(eq(workspaces.id, t.workspaceId)).limit(1);
+    if (!ws) throw notFound("Workspace");
+    await addSampleData(t.db, ws, t.member.id);
+    return c.json({ ok: true }, 201);
+  })
+
+  /** Removes all the example data in one go. Anything the team made itself stays. */
+  .delete("/sample-data", async (c) => {
+    const t = tenant(c, { allowLocked: true });
+    t.requireRole("owner", "admin");
+    await removeSampleData(t.db, t.workspaceId);
+    return c.json({ ok: true });
   })
 
   /**

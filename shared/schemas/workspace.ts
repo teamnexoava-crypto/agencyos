@@ -43,7 +43,10 @@ export const workspaceProfileSchema = z
   });
 
 /** Onboarding collects exactly the workspace profile; the logo is uploaded separately. */
-export const onboardingSchema = workspaceProfileSchema;
+export const onboardingSchema = workspaceProfileSchema.extend({
+  /** Fill the new workspace with example clients, projects and invoices (removable any time). */
+  sampleData: z.boolean().optional(),
+});
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 
 export const createWorkspaceSchema = z.object({

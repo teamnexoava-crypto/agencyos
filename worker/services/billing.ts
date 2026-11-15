@@ -139,13 +139,13 @@ export async function usageOf(db: Database, workspaceId: string, now = new Date(
   const [members, openInvites, activeProjects, clientCount, invoicesThisMonth, leadCount, sheets, contractsThisMonth, storage] = await Promise.all([
     db.$count(workspaceMembers, and(mine(workspaceMembers), isNull(workspaceMembers.removedAt))),
     db.$count(invites, and(mine(invites), isNull(invites.acceptedAt), isNull(invites.revokedAt), gt(invites.expiresAt, now))),
-    db.$count(projects, and(mine(projects), isNull(projects.deletedAt), ACTIVE_PROJECT)),
-    db.$count(clients, and(mine(clients), isNull(clients.deletedAt))),
+    db.$count(projects, and(mine(projects), isNull(projects.deletedAt), eq(projects.isSample, false), ACTIVE_PROJECT)),
+    db.$count(clients, and(mine(clients), isNull(clients.deletedAt), eq(clients.isSample, false))),
     // Deleted invoices and contracts still count, so a monthly allowance can't be reset by deleting and recreating.
-    db.$count(invoices, and(mine(invoices), gte(invoices.createdAt, startOfMonthUtc(now)))),
-    db.$count(leads, and(mine(leads), isNull(leads.deletedAt))),
+    db.$count(invoices, and(mine(invoices), eq(invoices.isSample, false), gte(invoices.createdAt, startOfMonthUtc(now)))),
+    db.$count(leads, and(mine(leads), isNull(leads.deletedAt), eq(leads.isSample, false))),
     db.$count(leadSources, and(mine(leadSources), isNull(leadSources.deletedAt))),
-    db.$count(contracts, and(mine(contracts), gte(contracts.createdAt, startOfMonthUtc(now)))),
+    db.$count(contracts, and(mine(contracts), eq(contracts.isSample, false), gte(contracts.createdAt, startOfMonthUtc(now)))),
     db
       .select({ bytes: sql<string>`coalesce(sum(${files.size}), 0)` })
       .from(files)
@@ -182,7 +182,7 @@ export async function assertProjectAvailable(t: Tenant, env: Env): Promise<void>
   const billing = billingOf(env, t.workspace);
   const limit = billing.limits.activeProjects;
   if (limit === null) return;
-  if ((await t.db.$count(projects, t.where(projects, isNull(projects.deletedAt), ACTIVE_PROJECT))) >= limit) {
+  if ((await t.db.$count(projects, t.where(projects, isNull(projects.deletedAt), eq(projects.isSample, false), ACTIVE_PROJECT))) >= limit) {
     throw limitReached(billing, `${limit} active projects – complete or delete one to start another`);
   }
 }
@@ -191,14 +191,14 @@ export async function assertClientAvailable(t: Tenant, env: Env): Promise<void> 
   const billing = billingOf(env, t.workspace);
   const limit = billing.limits.clients;
   if (limit === null) return;
-  if ((await t.db.$count(clients, t.where(clients, isNull(clients.deletedAt)))) >= limit) throw limitReached(billing, `${limit} clients`);
+  if ((await t.db.$count(clients, t.where(clients, isNull(clients.deletedAt), eq(clients.isSample, false)))) >= limit) throw limitReached(billing, `${limit} clients`);
 }
 
 export async function assertInvoiceAvailable(t: Tenant, env: Env): Promise<void> {
   const billing = billingOf(env, t.workspace);
   const limit = billing.limits.invoicesPerMonth;
   if (limit === null) return;
-  if ((await t.db.$count(invoices, t.where(invoices, gte(invoices.createdAt, startOfMonthUtc())))) >= limit) {
+  if ((await t.db.$count(invoices, t.where(invoices, eq(invoices.isSample, false), gte(invoices.createdAt, startOfMonthUtc())))) >= limit) {
     throw limitReached(billing, `${limit} invoices a month, and this month's are used up`);
   }
 }
@@ -207,7 +207,7 @@ export async function assertLeadAvailable(t: Tenant, env: Env): Promise<void> {
   const billing = billingOf(env, t.workspace);
   const limit = billing.limits.leads;
   if (limit === null) return;
-  if ((await t.db.$count(leads, t.where(leads, isNull(leads.deletedAt)))) >= limit) throw limitReached(billing, `${limit} leads`);
+  if ((await t.db.$count(leads, t.where(leads, isNull(leads.deletedAt), eq(leads.isSample, false)))) >= limit) throw limitReached(billing, `${limit} leads`);
 }
 
 /** `connecting` = a new sheet is being added; otherwise the question is only whether sheet sync is on at all. */
@@ -226,7 +226,7 @@ export async function assertContractAvailable(t: Tenant, env: Env): Promise<void
   const billing = billingOf(env, t.workspace);
   const limit = billing.limits.contractsPerMonth;
   if (limit === null) return;
-  if ((await t.db.$count(contracts, t.where(contracts, gte(contracts.createdAt, startOfMonthUtc())))) >= limit) {
+  if ((await t.db.$count(contracts, t.where(contracts, eq(contracts.isSample, false), gte(contracts.createdAt, startOfMonthUtc())))) >= limit) {
     throw limitReached(billing, `${limit} contracts a month, and this month's are used up`);
   }
 }

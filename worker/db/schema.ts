@@ -123,6 +123,8 @@ export const workspaces = pgTable("workspaces", {
   waInviteTemplate: text(),
 
   onboardedAt: timestamp({ withTimezone: true, mode: "date" }),
+  /** When example data was added (see worker/services/sample-data.ts); NULL when there is none. */
+  sampleDataAt: timestamp({ withTimezone: true, mode: "date" }),
 
   // Subscription (see shared/plans.ts and worker/services/billing.ts)
   /** The free trial runs until this moment. */
@@ -348,6 +350,8 @@ export const clients = pgTable(
     address: text(),
     /** Internal only – never exposed on public pages. */
     notes: text(),
+    /** Example data added to show how the app works; removed together from Settings or the banner. */
+    isSample: boolean().notNull().default(false),
     ...timestamps(),
     deletedAt: deletedAt(),
   },
@@ -371,6 +375,8 @@ export const projects = pgTable(
     /** Ordering within a kanban column. */
     position: doublePrecision().notNull().default(0),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    /** Example data added to show how the app works; removed together from Settings or the banner. */
+    isSample: boolean().notNull().default(false),
     ...timestamps(),
     deletedAt: deletedAt(),
   },
@@ -511,6 +517,8 @@ export const expenses = pgTable(
     date: day().notNull(),
     receiptFileId: text().references(() => files.id, { onDelete: "set null" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    /** Example data added to show how the app works; removed together from Settings or the banner. */
+    isSample: boolean().notNull().default(false),
     ...timestamps(),
     deletedAt: deletedAt(),
   },
@@ -561,6 +569,8 @@ export const invoices = pgTable(
     paidAt: timestamp({ withTimezone: true, mode: "date" }),
     cancelledAt: timestamp({ withTimezone: true, mode: "date" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    /** Example data added to show how the app works; removed together from Settings or the banner. */
+    isSample: boolean().notNull().default(false),
     ...timestamps(),
     deletedAt: deletedAt(),
   },
@@ -653,6 +663,8 @@ export const contracts = pgTable(
     lockedAt: timestamp({ withTimezone: true, mode: "date" }),
     signedPdfFileId: text().references(() => files.id, { onDelete: "set null" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    /** Example data added to show how the app works; removed together from Settings or the banner. */
+    isSample: boolean().notNull().default(false),
     ...timestamps(),
     deletedAt: deletedAt(),
   },
@@ -790,6 +802,8 @@ export const leads = pgTable(
     clientId: text().references(() => clients.id, { onDelete: "set null" }),
     closedAt: timestamp({ withTimezone: true, mode: "date" }),
     createdBy: text().references(() => workspaceMembers.id, { onDelete: "set null" }),
+    /** Example data added to show how the app works; removed together from Settings or the banner. */
+    isSample: boolean().notNull().default(false),
     ...timestamps(),
     deletedAt: deletedAt(),
   },

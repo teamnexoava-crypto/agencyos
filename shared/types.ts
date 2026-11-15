@@ -51,6 +51,8 @@ export interface WorkspaceDTO {
   /** Basis points – 1800 = 18%. */
   defaultTaxRate: number;
   onboarded: boolean;
+  /** When example data was added; null when there is none. */
+  sampleDataAt: number | null;
   createdAt: number;
 }
 

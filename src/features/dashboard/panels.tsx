@@ -86,7 +86,7 @@ const DEADLINE_TAB: Record<DeadlineItem["kind"], string> = { project: "", step: 
 export function DeadlinesList({ items }: { items: DeadlineItem[] }) {
   if (items.length === 0) return <EmptyLine>Nothing due in the next two weeks.</EmptyLine>;
   return (
-    <ul className="-mx-2 grid">
+    <ul className="-mx-2 grid grid-cols-[minmax(0,1fr)]">
       {items.map((item) => {
         const Icon = DEADLINE_ICON[item.kind];
         const due = dueLabel(item.dueDate);
@@ -114,7 +114,7 @@ export function DeadlinesList({ items }: { items: DeadlineItem[] }) {
 export function OverdueInvoices({ items, currency }: { items: NonNullable<DashboardData["finance"]>["overdueInvoices"]; currency: string }) {
   if (items.length === 0) return <EmptyLine>No overdue invoices. Nice.</EmptyLine>;
   return (
-    <ul className="-mx-2 grid">
+    <ul className="-mx-2 grid grid-cols-[minmax(0,1fr)]">
       {items.map((invoice) => (
         <li key={invoice.id}>
           <Link to={`/app/invoices/${invoice.id}`} className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50">

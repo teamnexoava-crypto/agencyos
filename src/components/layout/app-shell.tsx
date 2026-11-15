@@ -6,6 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useSession } from "@/features/auth/api";
 import { useBilling } from "@/features/billing/api";
 import { BillingBanner } from "@/features/billing/billing-banner";
+import { SampleDataBanner } from "@/features/sample-data/sample-data-controls";
 import { SeatLock } from "@/features/billing/paywall";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { PageTransition } from "./page-transition";
@@ -86,6 +87,7 @@ export function AppShell() {
         className="flex min-h-dvh min-w-0 flex-col print:min-h-0 print:!pl-0"
       >
         <BillingBanner />
+        <SampleDataBanner />
         <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} onOpenSearch={() => setSearchOpen(true)} />
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-10 print:max-w-none print:p-0">
           <PageTransition />

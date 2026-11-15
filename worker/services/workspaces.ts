@@ -40,6 +40,7 @@ export function toWorkspaceDTO(ws: WorkspaceRow): WorkspaceDTO {
     defaultTaxMode: ws.defaultTaxMode,
     defaultTaxRate: ws.defaultTaxRate,
     onboarded: ws.onboardedAt !== null,
+    sampleDataAt: ws.sampleDataAt?.getTime() ?? null,
     createdAt: ws.createdAt.getTime(),
   };
 }

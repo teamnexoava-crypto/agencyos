@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/features/auth/api";
 import { LogoUploader } from "@/features/onboarding/logo-uploader";
+import { SampleDataCard } from "@/features/sample-data/sample-data-controls";
 import { useDeleteWorkspace, useSaveSettings, useSettings } from "@/features/settings/api";
 import { SettingsCard } from "@/features/settings/section";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -595,6 +596,7 @@ export default function SettingsPage() {
           <TabsContent value="profile" forceMount className="data-[state=inactive]:hidden">
             <div className="grid gap-6">
               <ProfileForm settings={settings} />
+              <SampleDataCard />
               {role === "owner" && <DangerZone name={settings.name} />}
             </div>
           </TabsContent>
