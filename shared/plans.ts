@@ -38,6 +38,11 @@ export type BillingCurrency = (typeof BILLING_CURRENCIES)[number];
  */
 export const billingCurrencyFor = (country: string | null | undefined): BillingCurrency => (!country || country.toUpperCase() === "IN" ? "INR" : "USD");
 
+/** Who takes the money: Razorpay for rupees (India), Dodo Payments for dollars (everywhere else). */
+export const PAYMENT_PROVIDERS = ["razorpay", "dodo"] as const;
+export type PaymentProvider = (typeof PAYMENT_PROVIDERS)[number];
+export const providerFor = (currency: BillingCurrency): PaymentProvider => (currency === "INR" ? "razorpay" : "dodo");
+
 /** A price in each currency, in the smallest unit (paise or cents). */
 export type PlanPrice = Record<BillingCurrency, Record<BillingCycle, number>>;
 

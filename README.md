@@ -130,9 +130,18 @@ server-side checks all read from it.
   Premium ₹1,299 / $75 a month; a year is ten months). A workspace's `billing_currency` is fixed when it
   is created, from Cloudflare's `request.cf.country` (`billingCurrencyFor`: India → INR, anywhere else →
   USD), so travelling or a VPN later doesn't change what it pays. The landing page shows a visitor the
-  prices for where they are (`/api/auth/config` → `currency`). Charging in USD needs **International
-  Payments** enabled on the Razorpay account; dollar payments are card-only (no UPI) and Razorpay settles
-  them in rupees. Locally there is no edge, so set a `dev_country=US` cookie on localhost to try it.
+  prices for where they are (`/api/auth/config` → `currency`). Locally there is no edge, so set a
+  `dev_country=US` cookie on localhost to try it.
+- **Two payment providers.** Rupees go through **Razorpay** (UPI AutoPay or card); dollars through
+  **Dodo Payments** (`worker/lib/dodo.ts`), which is the merchant of record and handles sales tax / VAT.
+  Dodo's checkout and subscription are translated into the same shapes Razorpay gives, so the rest of
+  billing (grace days, crediting each charge once, stale set-ups, cancel before delete…) is shared.
+  A Dodo subscription only exists after its checkout is completed; it is tied to our set-up row through
+  the checkout session (or the `ref` in its metadata), from the webhook or, failing that, on the next
+  look at Billing. Dodo needs the secrets `DODO_PAYMENTS_API_KEY` and `DODO_PAYMENTS_WEBHOOK_KEY` and
+  the variable `DODO_PAYMENTS_ENVIRONMENT` (`test_mode` / `live_mode`, in wrangler.jsonc); its webhook
+  is `POST /api/webhooks/dodo` (events `payment.*` and `subscription.*`). Products are created through
+  the API on first use. Until the API key is set, dollar workspaces are not limited or locked.
 - **Every new workspace starts with 7 days of Premium** (`TRIAL_DAYS`, `TRIAL_PLAN`), no card needed.
 - **Then it is on Free, by itself.** Nothing is locked away or deleted. Free is for one person and has
   limits (active projects, clients, invoices a month, leads, storage) and no team members, contracts,

@@ -67,7 +67,10 @@
   "vars": {
     // Optional: set to your canonical origin (e.g. "https://app.example.com") to pin OAuth redirects
     // and public share links to one domain. When empty, the request origin is used.
-    "APP_URL": ""
+    "APP_URL": "",
+    // Dodo Payments (payments outside India): "test_mode" or "live_mode". Its API key and webhook
+    // secret (DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_WEBHOOK_KEY) are secrets, set like the others.
+    "DODO_PAYMENTS_ENVIRONMENT": "test_mode"
   },
   "observability": {
     "enabled": true

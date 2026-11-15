@@ -17,6 +17,15 @@ interface Env {
   RAZORPAY_WEBHOOK_SECRET?: string;
   /** Local development only: origin of a stub standing in for api.razorpay.com. */
   RAZORPAY_TEST_ORIGIN?: string;
+  /**
+   * Dodo Payments (dashboard → Developer → API keys / Webhooks): takes payments outside India, in US
+   * dollars. Until the API key is set, workspaces outside India are not limited or locked.
+   * `DODO_PAYMENTS_ENVIRONMENT` (a plain variable in wrangler.jsonc) picks test or live mode.
+   */
+  DODO_PAYMENTS_API_KEY?: string;
+  DODO_PAYMENTS_WEBHOOK_KEY?: string;
+  /** Local development only: origin of a stub standing in for Dodo's API. */
+  DODO_TEST_ORIGIN?: string;
   /** Local development only: origin of a stub that serves sheet CSV (the real one is docs.google.com). */
   SHEETS_TEST_ORIGIN?: string;
 }

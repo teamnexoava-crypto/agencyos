@@ -19,6 +19,7 @@ const fingerprint = (billing: BillingDTO) => `${billing.status}|${billing.plan}|
 function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
   const price = formatPlanPrice(setup.amount, setup.currency);
   const india = setup.currency === "INR";
+  const provider = india ? "Razorpay" : "Dodo Payments";
   const withdraw = useCancelSetup();
   return (
     <section role="status" className="mx-auto mb-8 flex max-w-2xl items-start gap-3 rounded-2xl border-2 border-primary/40 bg-primary/5 p-5">
@@ -26,16 +27,16 @@ function PendingSetup({ setup }: { setup: PendingSetupDTO }) {
       <div className="min-w-0 flex-1">
         <h3 className="font-semibold tracking-tight">Finish setting up auto-pay for {PLANS[setup.plan].name}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Approve it on Razorpay's page with {india ? "UPI AutoPay or a card" : "a card"}.{" "}
+          Approve it on {provider}'s page with {india ? "UPI AutoPay or a card" : "a card"}.{" "}
           {setup.firstChargeAt
-            ? `Your first ${price} is taken on ${formatDay(setup.firstChargeAt)}, not today – Razorpay may take ${india ? "₹5" : "a small amount"} to check your ${india ? "card or UPI" : "card"} and refunds it.`
+            ? `Your first ${price} is taken on ${formatDay(setup.firstChargeAt)}, not today – ${provider} may take ${india ? "₹5" : "a small amount"} to check your ${india ? "card or UPI" : "card"} and refunds it.`
             : `${price} is taken now, and then every month.`}{" "}
           This page updates by itself once it's done.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button asChild size="sm">
             <a href={setup.url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink /> Open Razorpay's page
+              <ExternalLink /> Open {provider}'s page
             </a>
           </Button>
           <Button variant="ghost" size="sm" disabled={withdraw.isPending} onClick={() => withdraw.mutate()}>
@@ -76,6 +77,9 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
   const isPaid = (tier: Tier): tier is Plan => tier.price !== null;
   const currency = current.currency;
   const india = currency === "INR";
+  // Rupees are paid through Razorpay; dollars through Dodo Payments (each with its own test/live mode).
+  const provider = india ? "Razorpay" : "Dodo Payments";
+  const testMode = (india ? config?.payments : config?.internationalPayments) === "test";
   // Stays busy after a one-off checkout succeeds: the browser is on its way to the payment page.
   const busy = checkout.isPending || checkout.isSuccess || subscribe.isPending;
 
@@ -134,7 +138,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
       {
         onSuccess: ({ url }) => {
           waitingFor.current = plan.id;
-          if (!tab) return void toast.info("Your browser blocked the new tab. Use “Open Razorpay's page” above to continue.");
+          if (!tab) return void toast.info(`Your browser blocked the new tab. Use “Open ${provider}'s page” above to continue.`);
           tab.opener = null;
           tab.location.replace(url);
         },
@@ -159,8 +163,8 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
         <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <h2 id="plans-heading" className="flex items-center justify-center gap-2.5 text-lg font-semibold tracking-tight sm:justify-start">
             {heading}
-            {config?.payments === "test" && (
-              <span role="note" title="Payments here use Razorpay's test keys, so no real money is taken." className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-xs font-medium tracking-normal text-amber-800 dark:text-amber-300">
+            {testMode && (
+              <span role="note" title={`Payments here use ${provider}'s test keys, so no real money is taken.`} className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-xs font-medium tracking-normal text-amber-800 dark:text-amber-300">
                 Test mode – no real money
               </span>
             )}
@@ -220,7 +224,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
             "Online payments are being set up. Everything stays unlocked until then."
           )
         ) : cycle === "yearly" ? (
-          `One payment for the whole year by ${india ? "UPI, card or netbanking" : "card"} on Razorpay's secure page. Nothing renews by itself – we'll remind you before it ends.${india ? "" : " Prices are in US dollars."}`
+          `One payment for the whole year by ${india ? "UPI, card or netbanking" : "card"} on ${provider}'s secure page. Nothing renews by itself – we'll remind you before it ends.${india ? "" : " Prices are in US dollars."}`
         ) : monthByMonth ? (
           <>
             One payment for one month. Nothing renews by itself – we'll remind you before it ends.{" "}
@@ -230,7 +234,7 @@ export function PlanChooser({ billing, heading }: { billing: BillingDTO; heading
           </>
         ) : (
           <>
-            Monthly plans renew by auto-pay: approve {india ? "UPI AutoPay or a card" : "a card"} once on Razorpay's secure page, and turn it off here whenever you like.
+            Monthly plans renew by auto-pay: approve {india ? "UPI AutoPay or a card" : "a card"} once on {provider}'s secure page, and turn it off here whenever you like.
             {india ? "" : " Prices are in US dollars."}{" "}
             <button type="button" className="font-medium text-foreground underline underline-offset-2 hover:no-underline" onClick={() => setMonthByMonth(true)}>
               Pay month by month instead

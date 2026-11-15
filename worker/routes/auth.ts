@@ -6,6 +6,7 @@ import type { AuthConfigResponse, MeResponse } from "../../shared/types";
 import { users } from "../db/schema";
 import { timingSafeEqual } from "../lib/crypto";
 import { forbidden, notFound } from "../lib/errors";
+import { dodoMode } from "../lib/dodo";
 import { paymentsMode } from "../lib/razorpay";
 import { GoogleAuthError, createAuthorization, exchangeCode, isGoogleConfigured } from "../lib/google";
 import { appOrigin, isHttps, isLocalhost, safeRedirectPath, visitorCountry } from "../lib/request";
@@ -52,6 +53,7 @@ export const authRoutes = new Hono<AppEnv>()
       googleConfigured: isGoogleConfigured(c.env),
       devLogin: devLoginEnabled(c),
       payments: paymentsMode(c.env),
+      internationalPayments: dodoMode(c.env),
       currency: billingCurrencyFor(visitorCountry(c)),
     };
     return c.json(body);

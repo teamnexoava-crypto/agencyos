@@ -1,13 +1,15 @@
 import { Hono } from "hono";
 import { and, desc, eq, gt, isNotNull } from "drizzle-orm";
 import { APP_NAME } from "../../shared/constants";
-import { AUTOPAY_TOTAL_CYCLES, PLANS, nextPaidPeriod } from "../../shared/plans";
-import { checkoutSchema, paymentCallbackQuery, subscribeSchema } from "../../shared/schemas/billing";
+import { AUTOPAY_TOTAL_CYCLES, PLANS, nextPaidPeriod, providerFor } from "../../shared/plans";
+import { checkoutSchema, dodoCallbackQuery, paymentCallbackQuery, subscribeSchema } from "../../shared/schemas/billing";
 import type { BillingOverview } from "../../shared/types";
 import { billingPayments, billingSubscriptions, workspaces } from "../db/schema";
+import { createDodoCheckout, fetchDodoPayment, isDodoConfigured, isDodoId, isValidDodoWebhook } from "../lib/dodo";
 import { ApiError } from "../lib/errors";
 import { newId } from "../lib/ids";
-import { RazorpayError, createPaymentLink, createSubscription, isSubscriptionId, isValidWebhookSignature } from "../lib/razorpay";
+import { createPaymentLink, createSubscription, isSubscriptionId, isValidWebhookSignature } from "../lib/razorpay";
+import { PaymentProviderError } from "../lib/payment-provider";
 import { appOrigin } from "../lib/request";
 import { tenant, type Tenant } from "../lib/tenant";
 import { validate } from "../lib/validate";
@@ -19,21 +21,25 @@ import {
   billingOf,
   cancelPendingSetups,
   cancelSubscription,
+  ensureDodoProduct,
   ensureProviderPlan,
   reconcileBilling,
   settlePayment,
+  syncDodoSubscription,
   syncSubscription,
   toPaymentDTO,
   usageOf,
 } from "../services/billing";
 import type { AppEnv } from "../types";
 
-/** Only ever send people to Razorpay's own payment pages. */
+/** Only ever send people to Razorpay's or Dodo Payments' own payment pages. */
 function isPaymentPage(url: string, env: Env): boolean {
   try {
     const { protocol, hostname, origin } = new URL(url);
     if (import.meta.env.DEV && env.RAZORPAY_TEST_ORIGIN && origin === new URL(env.RAZORPAY_TEST_ORIGIN).origin) return true;
-    return protocol === "https:" && (hostname === "rzp.io" || hostname.endsWith(".rzp.io") || hostname === "razorpay.com" || hostname.endsWith(".razorpay.com"));
+    if (import.meta.env.DEV && env.DODO_TEST_ORIGIN && origin === new URL(env.DODO_TEST_ORIGIN).origin) return true;
+    const on = (domain: string) => hostname === domain || hostname.endsWith(`.${domain}`);
+    return protocol === "https:" && (on("rzp.io") || on("razorpay.com") || on("dodopayments.com"));
   } catch {
     return false;
   }
@@ -46,7 +52,7 @@ const badPage = () => new ApiError(502, "payment_provider_error", "We couldn't o
  * recurring payments are not enabled on the account yet. The person can still pay month by month.
  */
 const autoPayProblem = (error: unknown) =>
-  error instanceof RazorpayError && error.providerStatus >= 400 && error.providerStatus < 500
+  error instanceof PaymentProviderError && error.providerStatus >= 400 && error.providerStatus < 500
     ? new ApiError(502, "autopay_unavailable", "Auto-pay couldn't be started right now. You can use “Pay month by month instead” below, or try again later.")
     : error;
 
@@ -148,6 +154,41 @@ export const billingRoutes = new Hono<AppEnv>()
     const { start } = nextPaidPeriod({ plan: ws.plan, paidUntil: ws.paidUntil, trialEndsAt: ws.trialEndsAt, billingCurrency: currency }, { plan, cycle: "monthly" }, now);
     const startAt = start.getTime() - now.getTime() > 3_600_000 ? start : null;
 
+    if (providerFor(currency) === "dodo") {
+      // Dodo counts the wait before the first charge in whole days ("trial days"); rounding up only
+      // ever adds a few free hours.
+      const trialDays = startAt ? Math.ceil((startAt.getTime() - now.getTime()) / 86_400_000) : 0;
+      const firstCharge = trialDays ? new Date(now.getTime() + trialDays * 86_400_000) : null;
+      const productId = await ensureDodoProduct(t.db, c.env, plan, "monthly", "recurring", amount, currency).catch((error: unknown) => {
+        throw autoPayProblem(error);
+      });
+      const id = newId();
+      await t.db
+        .insert(billingSubscriptions)
+        .values({ id, workspaceId: t.workspaceId, plan, cycle: "monthly", amount, currency, provider: "dodo", providerPlanId: productId, startAt: firstCharge, basis, createdBy: t.member.id, createdByName: t.user.name });
+      try {
+        const checkout = await createDodoCheckout(c.env, {
+          productId,
+          email: t.user.email,
+          returnUrl: `${appOrigin(c)}/app/billing`,
+          metadata: { workspace_id: t.workspaceId, plan, ref: id },
+          trialDays,
+        });
+        if (!isPaymentPage(checkout.url, c.env)) {
+          console.error("Dodo returned an unexpected checkout address");
+          throw badPage();
+        }
+        await t.db
+          .update(billingSubscriptions)
+          .set({ checkoutId: checkout.id, shortUrl: checkout.url })
+          .where(t.where(billingSubscriptions, eq(billingSubscriptions.id, id)));
+        return c.json({ url: checkout.url }, 201);
+      } catch (error) {
+        await t.db.delete(billingSubscriptions).where(t.where(billingSubscriptions, eq(billingSubscriptions.id, id), eq(billingSubscriptions.status, "created")));
+        throw autoPayProblem(error);
+      }
+    }
+
     const providerPlanId = await ensureProviderPlan(t.db, c.env, plan, "monthly", amount, currency).catch((error: unknown) => {
       throw autoPayProblem(error);
     });
@@ -226,7 +267,27 @@ export const billingRoutes = new Hono<AppEnv>()
     if (open?.providerLinkUrl && isPaymentPage(open.providerLinkUrl, c.env)) return c.json({ url: open.providerLinkUrl });
 
     const paymentId = newId();
-    await t.db.insert(billingPayments).values({ id: paymentId, workspaceId: t.workspaceId, plan, cycle, amount, currency, createdBy: t.member.id, createdByName: t.user.name });
+    const provider = providerFor(currency);
+    await t.db.insert(billingPayments).values({ id: paymentId, workspaceId: t.workspaceId, plan, cycle, amount, currency, provider, createdBy: t.member.id, createdByName: t.user.name });
+
+    if (provider === "dodo") {
+      const productId = await ensureDodoProduct(t.db, c.env, plan, cycle, "once", amount, currency);
+      const checkout = await createDodoCheckout(c.env, {
+        productId,
+        email: t.user.email,
+        returnUrl: `${appOrigin(c)}/api/billing/callback?ref=${paymentId}`,
+        metadata: { workspace_id: t.workspaceId, plan, cycle, ref: paymentId },
+      });
+      if (!isPaymentPage(checkout.url, c.env)) {
+        console.error("Dodo returned an unexpected checkout address");
+        throw badPage();
+      }
+      await t.db
+        .update(billingPayments)
+        .set({ providerLinkId: checkout.id, providerLinkUrl: checkout.url })
+        .where(t.where(billingPayments, eq(billingPayments.id, paymentId)));
+      return c.json({ url: checkout.url }, 201);
+    }
 
     const link = await createPaymentLink(c.env, {
       amount,
@@ -256,13 +317,18 @@ export const billingRoutes = new Hono<AppEnv>()
    */
   .get("/callback", rateLimit("PUBLIC_LIMITER"), async (c) => {
     const back = (result: "paid" | "pending" | "failed") => c.redirect(`${appOrigin(c)}/app/billing?payment=${result}`, 302);
-    const query = paymentCallbackQuery.safeParse(c.req.query());
-    if (!query.success) return back("failed");
+    const razorpay = paymentCallbackQuery.safeParse(c.req.query());
+    const dodo = dodoCallbackQuery.safeParse(c.req.query());
+    if (!razorpay.success && !dodo.success) return back("failed");
     try {
       const [payment] = await c.var.db
         .select({ id: billingPayments.id })
         .from(billingPayments)
-        .where(eq(billingPayments.providerLinkId, query.data.razorpay_payment_link_id))
+        .where(
+          razorpay.success
+            ? eq(billingPayments.providerLinkId, razorpay.data.razorpay_payment_link_id)
+            : and(eq(billingPayments.id, dodo.data?.ref ?? ""), eq(billingPayments.provider, "dodo")),
+        )
         .limit(1);
       if (!payment) return back("failed");
       const status = await settlePayment(c.var.db, c.env, payment.id);
@@ -288,7 +354,49 @@ interface WebhookEvent {
  * an event only says "look at this payment link / subscription": amounts and statuses are read from
  * Razorpay. An error answers 5xx, and Razorpay delivers the event again later.
  */
-export const webhookRoutes = new Hono<AppEnv>().post("/razorpay", async (c) => {
+interface DodoWebhookEvent {
+  type?: string;
+  data?: { payment_id?: unknown; subscription_id?: unknown };
+}
+
+export const webhookRoutes = new Hono<AppEnv>()
+  /**
+   * Dodo Payments. Signed with the webhook's secret (Standard Webhooks). Only ids are taken from the
+   * body; the payment or subscription itself is then read from Dodo with our own key.
+   */
+  .post("/dodo", async (c) => {
+    if (Number(c.req.header("Content-Length") ?? 0) > 200_000) throw new ApiError(413, "too_large", "Too large.");
+    const raw = await c.req.text();
+    const signed = await isValidDodoWebhook(c.env, raw, { id: c.req.header("webhook-id"), timestamp: c.req.header("webhook-timestamp"), signature: c.req.header("webhook-signature") });
+    if (raw.length > 200_000 || !signed) throw new ApiError(401, "unauthorized", "Invalid signature.");
+    let event: DodoWebhookEvent;
+    try {
+      event = JSON.parse(raw) as DodoWebhookEvent;
+    } catch {
+      return c.json({ ok: true });
+    }
+    if (!isDodoConfigured(c.env)) return c.json({ ok: true });
+    const db = c.var.db;
+
+    if (event.type?.startsWith("payment.") && isDodoId(event.data?.payment_id)) {
+      const payment = await fetchDodoPayment(c.env, event.data.payment_id);
+      if (payment.checkout_session_id && isDodoId(payment.checkout_session_id)) {
+        const [row] = await db
+          .select({ id: billingPayments.id })
+          .from(billingPayments)
+          .where(and(eq(billingPayments.providerLinkId, payment.checkout_session_id), eq(billingPayments.provider, "dodo")))
+          .limit(1);
+        if (row) await settlePayment(db, c.env, row.id);
+      }
+      for (const subscriptionId of payment.subscription_ids ?? []) {
+        if (isDodoId(subscriptionId)) await syncDodoSubscription(db, c.env, subscriptionId, { checkoutId: payment.checkout_session_id ?? null });
+      }
+    } else if (event.type?.startsWith("subscription.") && isDodoId(event.data?.subscription_id)) {
+      await syncDodoSubscription(db, c.env, event.data.subscription_id);
+    }
+    return c.json({ ok: true });
+  })
+  .post("/razorpay", async (c) => {
   // Refuse anything oversized before reading it.
   if (Number(c.req.header("Content-Length") ?? 0) > 200_000) throw new ApiError(413, "too_large", "Too large.");
   const raw = await c.req.text();

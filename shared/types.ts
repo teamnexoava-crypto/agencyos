@@ -153,6 +153,8 @@ export interface AuthConfigResponse {
   googleConfigured: boolean;
   /** Whether plans can be paid for yet, and if so with test keys (no real money) or live ones. */
   payments: "off" | "test" | "live";
+  /** The same for payments outside India (in dollars, through Dodo Payments). */
+  internationalPayments: "off" | "test" | "live";
   /** What a visitor from where this request came from would pay in: INR in India, USD elsewhere. */
   currency: BillingCurrency;
   /** True only under `npm run dev` on localhost. */

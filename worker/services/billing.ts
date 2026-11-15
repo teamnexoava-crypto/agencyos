@@ -14,9 +14,11 @@ import {
   isSubscriptionOver,
   nextPaidPeriod,
   paidTimeFor,
+  providerFor,
   type BillingCurrency,
   type BillingCycle,
   type BillingPaymentStatus,
+  type PaymentProvider,
   type PlanFeature,
   type PlanId,
   type SubscriptionStatus,
@@ -28,12 +30,25 @@ import type { PgColumn } from "drizzle-orm/pg-core";
 import { appFlags, billingPayments, billingProviderPlans, billingSubscriptions, clients, contracts, files, invites, invoices, leadSources, leads, projects, workspaceMembers, workspaces } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import {
-  RazorpayError,
+  cancelDodoSubscription,
+  createDodoProduct,
+  dodoCheckoutAsLink,
+  dodoKeyFingerprint,
+  dodoSubscriptionView,
+  fetchDodoCheckout,
+  fetchDodoPayment,
+  fetchDodoSubscription,
+  isDodoConfigured,
+  isDodoId,
+} from "../lib/dodo";
+import { PaymentProviderError } from "../lib/payment-provider";
+import {
   cancelProviderSubscription,
   createProviderPlan,
   fetchPaymentLink,
   fetchSubscription,
   isBillingConfigured,
+  type PaymentLink,
   type ProviderSubscription,
 } from "../lib/razorpay";
 import type { Tenant } from "../lib/tenant";
@@ -45,6 +60,12 @@ const daysUntil = (end: Date, now: Date) => Math.max(0, Math.ceil((end.getTime()
 const later = (a: Date | null, b: Date) => (a && a > b ? a : b);
 const fromUnix = (seconds: number | null | undefined) => (seconds ? new Date(seconds * 1000) : null);
 
+/** Whether a provider's keys are in place: Razorpay for rupees, Dodo Payments for dollars. */
+export const isProviderReady = (env: Env, provider: PaymentProvider): boolean => (provider === "razorpay" ? isBillingConfigured(env) : isDodoConfigured(env));
+
+/** Whether plans in this currency can be paid for yet. Until then a workspace on it is never limited or locked. */
+export const paymentsReady = (env: Env, currency: BillingCurrency): boolean => isProviderReady(env, providerFor(currency));
+
 /**
  * Where a workspace stands right now. Pure and cheap: it is worked out from the workspace row on
  * every request, so there is no scheduled job that has to "expire" anyone.
@@ -53,7 +74,7 @@ export function billingOf(env: Env, ws: WorkspaceRow, now = new Date()): Billing
   const autoPay = autoPayStateOf(ws.subscriptionId ? ws.subscriptionStatus : null);
   const base = { plan: ws.plan, currency: ws.billingCurrency, trialEndsAt: ws.trialEndsAt.getTime(), paidUntil: ws.paidUntil?.getTime() ?? null };
   const unlimited = { tier: TRIAL_PLAN, limits: NO_LIMITS, features: ALL_FEATURES } as const;
-  if (!isBillingConfigured(env)) return { ...base, enabled: false, status: "open", daysLeft: null, autoPay: null, ...unlimited };
+  if (!paymentsReady(env, ws.billingCurrency)) return { ...base, enabled: false, status: "open", daysLeft: null, autoPay: null, ...unlimited };
   if (ws.billingExempt) return { ...base, enabled: true, status: "exempt", daysLeft: null, autoPay: null, ...unlimited };
   const on = (tier: TierId) => ({ tier, limits: TIERS[tier].limits, features: TIERS[tier].features });
   // An auto-pay charge is taken on the day the covered time ends and may land a little later (and a
@@ -245,6 +266,12 @@ export const toPaymentDTO = (row: PaymentRow): BillingPaymentDTO => ({
   autoPay: row.subscriptionId !== null,
 });
 
+/** A payment page as its provider sees it now (a Dodo checkout is described like a Razorpay payment link). */
+function readPaymentPage(env: Env, payment: PaymentRow & { providerLinkId: string }, timeoutMs?: number): Promise<PaymentLink> {
+  if (payment.provider === "dodo") return dodoCheckoutAsLink(env, payment, timeoutMs);
+  return fetchPaymentLink(env, payment.providerLinkId, timeoutMs);
+}
+
 /**
  * Brings one payment up to date with Razorpay and, if it has been paid, starts the plan.
  *
@@ -258,7 +285,7 @@ export async function settlePayment(db: Database, env: Env, paymentId: string, o
   if (!payment) return "failed";
   if (payment.status !== "created" || !payment.providerLinkId) return payment.status;
 
-  const link = await fetchPaymentLink(env, payment.providerLinkId, options.timeoutMs);
+  const link = await readPaymentPage(env, { ...payment, providerLinkId: payment.providerLinkId }, options.timeoutMs);
   const paidInFull = link.status === "paid" && link.amount_paid >= payment.amount && link.currency === payment.currency && link.reference_id === payment.id;
 
   if (!paidInFull) {
@@ -319,6 +346,106 @@ export async function ensureProviderPlan(db: Database, env: Env, plan: PlanId, c
   await db.insert(billingProviderPlans).values({ key, providerPlanId }).onConflictDoNothing();
   const [stored] = await db.select().from(billingProviderPlans).where(eq(billingProviderPlans.key, key)).limit(1);
   return stored?.providerPlanId ?? providerPlanId;
+}
+
+/**
+ * The Dodo product for one of our plans (a monthly or yearly subscription, or a single payment for a
+ * month or a year), created the first time it is needed.
+ */
+export async function ensureDodoProduct(db: Database, env: Env, plan: PlanId, cycle: BillingCycle, kind: "recurring" | "once", amount: number, currency: BillingCurrency): Promise<string> {
+  const key = `dodo:${await dodoKeyFingerprint(env)}:${plan}:${cycle}:${kind}:${currency}:${amount}`;
+  const [known] = await db.select().from(billingProviderPlans).where(eq(billingProviderPlans.key, key)).limit(1);
+  if (known) return known.providerPlanId;
+  const what = kind === "recurring" ? (cycle === "yearly" ? "yearly" : "monthly") : cycle === "yearly" ? "1 year" : "1 month";
+  const productId = await createDodoProduct(env, { name: `${APP_NAME} ${PLANS[plan].name} – ${what}`, amount, currency, cycle, kind });
+  await db.insert(billingProviderPlans).values({ key, providerPlanId: productId }).onConflictDoNothing();
+  const [stored] = await db.select().from(billingProviderPlans).where(eq(billingProviderPlans.key, key)).limit(1);
+  return stored?.providerPlanId ?? productId;
+}
+
+/** A subscription as its provider sees it now, in Razorpay's shape. */
+async function readSubscription(env: Env, sub: SubscriptionRow & { providerSubscriptionId: string }, timeoutMs?: number): Promise<ProviderSubscription> {
+  if (sub.provider === "dodo") return dodoSubscriptionView(env, await fetchDodoSubscription(env, sub.providerSubscriptionId, timeoutMs), timeoutMs);
+  return fetchSubscription(env, sub.providerSubscriptionId, timeoutMs);
+}
+
+/** Stops a subscription at its provider, now. */
+async function stopSubscription(env: Env, sub: SubscriptionRow & { providerSubscriptionId: string }): Promise<ProviderSubscription> {
+  if (sub.provider === "dodo") return dodoSubscriptionView(env, await cancelDodoSubscription(env, sub.providerSubscriptionId));
+  return cancelProviderSubscription(env, sub.providerSubscriptionId);
+}
+
+/**
+ * A Dodo subscription only comes into being when its checkout is completed. This ties it to the set-up
+ * row that started it – but only once Dodo itself confirms the link, either because the subscription
+ * carries our row's reference, or because it was created by the payment of the checkout we opened.
+ * Returns true when the row now has its subscription.
+ */
+export async function attachDodoSubscription(db: Database, env: Env, rowId: string, providerSubscriptionId: string, options: { viaCheckout?: boolean; timeoutMs?: number } = {}): Promise<boolean> {
+  if (!isDodoId(providerSubscriptionId)) return false;
+  const [row] = await db.select().from(billingSubscriptions).where(and(eq(billingSubscriptions.id, rowId), eq(billingSubscriptions.provider, "dodo"))).limit(1);
+  if (!row) return false;
+  if (row.providerSubscriptionId) return row.providerSubscriptionId === providerSubscriptionId;
+  if (!options.viaCheckout) {
+    const entity = await fetchDodoSubscription(env, providerSubscriptionId, options.timeoutMs);
+    if (entity.metadata?.ref !== row.id || entity.metadata?.workspace_id !== row.workspaceId) return false;
+  }
+  await db
+    .update(billingSubscriptions)
+    .set({ providerSubscriptionId })
+    .where(and(eq(billingSubscriptions.id, row.id), isNull(billingSubscriptions.providerSubscriptionId)));
+  return true;
+}
+
+/**
+ * Brings a Dodo subscription we were told about (by a webhook) up to date. One not yet tied to its
+ * set-up is tied using what Dodo itself says about it (the checkout that created it, or our reference
+ * in its metadata). One whose workspace no longer exists is stopped, so it can never charge again.
+ */
+export async function syncDodoSubscription(db: Database, env: Env, providerSubscriptionId: string, options: { checkoutId?: string | null } = {}): Promise<void> {
+  const find = async () =>
+    (
+      await db
+        .select({ id: billingSubscriptions.id })
+        .from(billingSubscriptions)
+        .where(and(eq(billingSubscriptions.providerSubscriptionId, providerSubscriptionId), eq(billingSubscriptions.provider, "dodo")))
+        .limit(1)
+    )[0];
+  let row = await find();
+  if (!row && options.checkoutId && isDodoId(options.checkoutId)) {
+    const [byCheckout] = await db
+      .select({ id: billingSubscriptions.id })
+      .from(billingSubscriptions)
+      .where(and(eq(billingSubscriptions.checkoutId, options.checkoutId), eq(billingSubscriptions.provider, "dodo")))
+      .limit(1);
+    if (byCheckout) await attachDodoSubscription(db, env, byCheckout.id, providerSubscriptionId, { viaCheckout: true });
+    row = await find();
+  }
+  if (!row) {
+    const entity = await fetchDodoSubscription(env, providerSubscriptionId);
+    const ref = entity.metadata?.ref;
+    if (isDodoId(ref) && (await attachDodoSubscription(db, env, ref, providerSubscriptionId))) {
+      row = await find();
+    } else if (isDodoId(entity.metadata?.workspace_id)) {
+      const [ws] = await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, entity.metadata.workspace_id)).limit(1);
+      if (!ws && entity.status !== "cancelled" && entity.status !== "failed" && entity.status !== "expired") {
+        console.error("Stopped a Dodo subscription whose workspace no longer exists", { providerSubscriptionId });
+        await cancelDodoSubscription(env, providerSubscriptionId);
+      }
+    }
+  }
+  if (row) await syncSubscription(db, env, row.id);
+}
+
+/** Looks through Dodo for the subscription a checkout we opened has created (when no webhook told us). */
+async function findDodoSubscription(db: Database, env: Env, row: Pick<SubscriptionRow, "id" | "checkoutId">, timeoutMs?: number): Promise<void> {
+  if (!row.checkoutId) return;
+  const session = await fetchDodoCheckout(env, row.checkoutId, timeoutMs);
+  if (!isDodoId(session.payment_id)) return;
+  const payment = await fetchDodoPayment(env, session.payment_id, timeoutMs);
+  if (payment.checkout_session_id && payment.checkout_session_id !== row.checkoutId) return;
+  const providerId = payment.subscription_ids?.find(isDodoId);
+  if (providerId) await attachDodoSubscription(db, env, row.id, providerId, { viaCheckout: true, timeoutMs });
 }
 
 /**
@@ -478,7 +605,7 @@ export async function syncSubscription(db: Database, env: Env, subscriptionId: s
   const [sub] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.id, subscriptionId)).limit(1);
   if (!sub?.providerSubscriptionId || isSubscriptionOver(sub.status)) return;
 
-  const entity = await fetchSubscription(env, sub.providerSubscriptionId, options.timeoutMs);
+  const entity = await readSubscription(env, { ...sub, providerSubscriptionId: sub.providerSubscriptionId }, options.timeoutMs);
   if (sub.status !== "created" || !isApproved(entity)) return applySubscription(db, sub.id, entity, { promote: false, paymentId: options.paymentId });
 
   // A set-up has just been approved. Any failure below throws, and the whole step is tried again later.
@@ -528,23 +655,24 @@ export async function cancelSubscription(db: Database, env: Env, subscriptionId:
   // Never reached Razorpay, so there is nothing there to stop.
   if (!sub.providerSubscriptionId) return applySubscription(db, sub.id, gone(), { promote: false });
 
+  const known = { ...sub, providerSubscriptionId: sub.providerSubscriptionId };
   let entity: ProviderSubscription;
   try {
-    entity = await fetchSubscription(env, sub.providerSubscriptionId);
+    entity = await readSubscription(env, known);
   } catch (error) {
     // Razorpay doesn't know this id under the current keys (e.g. it was made with test keys): it can't charge.
-    if (error instanceof RazorpayError && error.rejected) return applySubscription(db, sub.id, gone(), { promote: false });
+    if (error instanceof PaymentProviderError && error.rejected) return applySubscription(db, sub.id, gone(), { promote: false });
     throw error;
   }
   await applySubscription(db, sub.id, entity, { promote: false });
   if (isSubscriptionOver(entity.status)) return;
 
   try {
-    entity = await cancelProviderSubscription(env, sub.providerSubscriptionId);
+    entity = await stopSubscription(env, known);
   } catch (error) {
-    if (!(error instanceof RazorpayError && error.rejected)) throw error;
+    if (!(error instanceof PaymentProviderError && error.rejected)) throw error;
     // Refused: usually because it ended in the meantime. Look again and accept only "it is over".
-    entity = await fetchSubscription(env, sub.providerSubscriptionId);
+    entity = await readSubscription(env, known);
     if (!isSubscriptionOver(entity.status)) throw error;
   }
   await applySubscription(db, sub.id, isSubscriptionOver(entity.status) ? entity : { ...entity, status: "cancelled" }, { promote: false });
@@ -558,6 +686,20 @@ const NOT_OVER = notInArray(billingSubscriptions.status, ["cancelled", "complete
  * if it is ever approved.
  */
 export async function cancelPendingSetups(db: Database, env: Env, workspaceId: string, exceptId?: string): Promise<void> {
+  // A Dodo checkout that was never completed has created nothing yet: stop offering its page. If it is
+  // completed after all, the subscription is still found and, being out of date, stopped and credited.
+  await db
+    .update(billingSubscriptions)
+    .set({ shortUrl: null })
+    .where(
+      and(
+        eq(billingSubscriptions.workspaceId, workspaceId),
+        eq(billingSubscriptions.provider, "dodo"),
+        eq(billingSubscriptions.status, "created"),
+        isNull(billingSubscriptions.providerSubscriptionId),
+        exceptId ? ne(billingSubscriptions.id, exceptId) : undefined,
+      ),
+    );
   const rows = await db
     .select({ id: billingSubscriptions.id })
     .from(billingSubscriptions)
@@ -587,26 +729,53 @@ export async function cancelAllSubscriptions(db: Database, env: Env, workspaceId
  * went through; only then is the workspace marked as checked, so a failed look is repeated soon.
  */
 export async function reconcileBilling(db: Database, env: Env, workspaceId: string, options: { timeoutMs?: number } = {}): Promise<boolean> {
-  if (!isBillingConfigured(env)) return true;
+  if (!isBillingConfigured(env) && !isDodoConfigured(env)) return true;
+  let ok = true;
+  if (isDodoConfigured(env)) {
+    // Dodo set-ups whose checkout may have been completed without us hearing about it.
+    const open = await db
+      .select({ id: billingSubscriptions.id, checkoutId: billingSubscriptions.checkoutId })
+      .from(billingSubscriptions)
+      .where(
+        and(
+          eq(billingSubscriptions.workspaceId, workspaceId),
+          eq(billingSubscriptions.provider, "dodo"),
+          eq(billingSubscriptions.status, "created"),
+          isNull(billingSubscriptions.providerSubscriptionId),
+          isNotNull(billingSubscriptions.checkoutId),
+          gt(billingSubscriptions.createdAt, new Date(Date.now() - 2 * DAY_MS)),
+        ),
+      )
+      .orderBy(desc(billingSubscriptions.createdAt))
+      .limit(3);
+    for (const row of open) {
+      try {
+        await findDodoSubscription(db, env, row, options.timeoutMs);
+      } catch (error) {
+        ok = false;
+        console.error("Could not look up a Dodo checkout", error);
+      }
+    }
+  }
   const [payments, subscriptions, wsRows] = await Promise.all([
     // Every payment page that was opened and not yet seen paid or closed. Pages expire after half an
     // hour, so each of these settles one way or the other the next time it is looked at.
     db
-      .select({ id: billingPayments.id })
+      .select({ id: billingPayments.id, provider: billingPayments.provider })
       .from(billingPayments)
       .where(and(eq(billingPayments.workspaceId, workspaceId), eq(billingPayments.status, "created"), isNotNull(billingPayments.providerLinkId)))
       .orderBy(asc(billingPayments.createdAt))
       .limit(5),
     db
-      .select({ id: billingSubscriptions.id })
+      .select({ id: billingSubscriptions.id, provider: billingSubscriptions.provider })
       .from(billingSubscriptions)
       .where(and(eq(billingSubscriptions.workspaceId, workspaceId), isNotNull(billingSubscriptions.providerSubscriptionId), NOT_OVER))
       .orderBy(desc(billingSubscriptions.createdAt))
       .limit(5),
     db.select({ subscriptionId: workspaces.subscriptionId }).from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1),
   ]);
-  let ok = true;
   for (const payment of payments) {
+    if (!isProviderReady(env, payment.provider)) continue;
     try {
       await settlePayment(db, env, payment.id, { timeoutMs: options.timeoutMs });
     } catch (error) {
@@ -617,7 +786,8 @@ export async function reconcileBilling(db: Database, env: Env, workspaceId: stri
   // The live mandate first (always, however many set-ups there are), then set-ups from the newest:
   // the first one found approved is used, and any older one is then out of date.
   const liveId = wsRows[0]?.subscriptionId ?? null;
-  const ids = [...(liveId ? [liveId] : []), ...subscriptions.map((row) => row.id).filter((id) => id !== liveId)];
+  const ready = subscriptions.filter((row) => isProviderReady(env, row.provider)).map((row) => row.id);
+  const ids = [...(liveId ? [liveId] : []), ...ready.filter((id) => id !== liveId)];
   for (const id of ids) {
     try {
       await syncSubscription(db, env, id, { timeoutMs: options.timeoutMs });
@@ -630,24 +800,26 @@ export async function reconcileBilling(db: Database, env: Env, workspaceId: stri
   return ok;
 }
 
-/** Whether this isolate has already made sure the switch-on step below has run. */
-let switchedOn = false;
+/** Currencies for which this isolate has already made sure the switch-on step below has run. */
+const switchedOn = new Set<BillingCurrency>();
 
 /**
  * The first time payments are found switched on, every workspace that has not paid gets a full trial
  * from that moment – the trial clock should not have been running while nobody could pay. Returns
  * true when it has just done so.
  */
-export async function ensureBillingSwitchedOn(db: Database, env: Env): Promise<boolean> {
-  if (switchedOn || !isBillingConfigured(env)) return false;
-  const first = await db.insert(appFlags).values({ key: "billing_switched_on" }).onConflictDoNothing().returning({ key: appFlags.key });
-  switchedOn = true;
+export async function ensureBillingSwitchedOn(db: Database, env: Env, currency: BillingCurrency): Promise<boolean> {
+  if (switchedOn.has(currency) || !paymentsReady(env, currency)) return false;
+  // Rupee payments came first and keep their original flag name.
+  const key = currency === "INR" ? "billing_switched_on" : `billing_switched_on:${currency}`;
+  const first = await db.insert(appFlags).values({ key }).onConflictDoNothing().returning({ key: appFlags.key });
+  switchedOn.add(currency);
   if (first.length === 0) return false;
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * DAY_MS);
   await db
     .update(workspaces)
     .set({ trialEndsAt })
-    .where(and(isNull(workspaces.plan), eq(workspaces.billingExempt, false), lt(workspaces.trialEndsAt, trialEndsAt)));
+    .where(and(isNull(workspaces.plan), eq(workspaces.billingExempt, false), eq(workspaces.billingCurrency, currency), lt(workspaces.trialEndsAt, trialEndsAt)));
   return true;
 }
 
@@ -663,10 +835,10 @@ const LAZY_CHECK_EVERY_MS = 15 * 60_000;
  * Returns the workspace row to use for this response.
  */
 export async function refreshBillingIfDue(db: Database, env: Env, ws: WorkspaceRow, defer: (task: Promise<unknown>) => void): Promise<WorkspaceRow> {
-  if (!isBillingConfigured(env) || ws.billingExempt) return ws;
+  if (!paymentsReady(env, ws.billingCurrency) || ws.billingExempt) return ws;
   const reload = async () => (await db.select().from(workspaces).where(eq(workspaces.id, ws.id)).limit(1))[0] ?? ws;
   let current = ws;
-  if (await ensureBillingSwitchedOn(db, env)) current = await reload();
+  if (await ensureBillingSwitchedOn(db, env, ws.billingCurrency)) current = await reload();
 
   const now = Date.now();
   if (current.subscriptionSyncedAt && now - current.subscriptionSyncedAt.getTime() < LAZY_CHECK_EVERY_MS) return current;

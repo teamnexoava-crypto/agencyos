@@ -102,7 +102,8 @@ export function PrivacyPage() {
           <li>Cloudflare – application hosting, file storage and network security.</li>
           <li>Supabase – the database (hosted in Mumbai, India).</li>
           <li>Google – sign-in.</li>
-          <li>Razorpay – payments for your plan. We never see or store your card, UPI or bank details.</li>
+          <li>Razorpay – payments for your plan in India. We never see or store your card, UPI or bank details.</li>
+          <li>Dodo Payments – payments for your plan outside India. Dodo is the seller of record for those payments and handles any sales tax or VAT; we never see or store your card details.</li>
         </ul>
         <p>
           Anything you choose to share through a public link (an invoice, a contract or a project page) is visible to whoever has that
@@ -188,9 +189,10 @@ export function TermsPage() {
         <p>
           Every new workspace gets the Premium plan free for {TRIAL_DAYS} days. After that it moves to the Free plan by itself and can
           stay there for as long as you like. The Free plan is for one person and has limits; team members, contracts, the client
-          portal, finance and Google Sheet sync are part of the paid plans (Growth and Premium), which are charged through Razorpay
-          in Indian rupees for workspaces created in India and in US dollars for workspaces created anywhere else. The currency
-          is set when the workspace is created and shown on every price.
+          portal, finance and Google Sheet sync are part of the paid plans (Growth and Premium), which are charged in Indian rupees
+          through Razorpay for workspaces created in India, and in US dollars through Dodo Payments (the seller of record, which
+          adds no tax on top of the price shown) for workspaces created anywhere else. The currency is set when the workspace is
+          created and shown on every price.
         </p>
         <ul>
           <li>

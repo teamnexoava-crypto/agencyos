@@ -15,6 +15,7 @@ import { setActiveWorkspace } from "../lib/session";
 import { requireUser, tenant, type Tenant } from "../lib/tenant";
 import { visitorCountry } from "../lib/request";
 import { validate } from "../lib/validate";
+import { isDodoConfigured } from "../lib/dodo";
 import { isBillingConfigured } from "../lib/razorpay";
 import { requireAuth } from "../middleware/context";
 import { cancelAllSubscriptions } from "../services/billing";
@@ -285,8 +286,8 @@ export const workspaceRoutes = new Hono<AppEnv>()
     if (c.req.valid("json").confirmName.trim() !== t.workspace.name) {
       throw new ApiError(400, "validation_error", "The name doesn't match.", { confirmName: "Type the workspace name exactly" });
     }
-    // Auto-pay must be stopped at Razorpay before the records of it disappear, or it would keep charging.
-    if (isBillingConfigured(c.env)) {
+    // Auto-pay must be stopped at Razorpay / Dodo before the records of it disappear, or it would keep charging.
+    if (isBillingConfigured(c.env) || isDodoConfigured(c.env)) {
       try {
         await cancelAllSubscriptions(t.db, c.env, t.workspaceId);
       } catch (error) {

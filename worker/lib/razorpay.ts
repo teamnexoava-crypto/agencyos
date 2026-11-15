@@ -1,6 +1,7 @@
 import type { BillingCurrency, SubscriptionStatus } from "../../shared/plans";
 import { hmacSha256Hex, timingSafeEqual } from "./crypto";
 import { ApiError } from "./errors";
+import { PaymentProviderError } from "./payment-provider";
 
 /** Payments are switched on only once both API keys are present. */
 export const isBillingConfigured = (env: Env): boolean => Boolean(env.RAZORPAY_KEY_ID?.trim() && env.RAZORPAY_KEY_SECRET?.trim());
@@ -11,24 +12,8 @@ export function paymentsMode(env: Env): "off" | "test" | "live" {
   return env.RAZORPAY_KEY_ID?.trim().startsWith("rzp_test_") ? "test" : "live";
 }
 
-/**
- * A failed call to Razorpay. To the person it is always the same "try again" message; `providerStatus`
- * is for our own code, which sometimes needs to tell "Razorpay said no" (4xx) from "couldn't ask" (0).
- */
-export class RazorpayError extends ApiError {
-  /** HTTP status Razorpay answered with, or 0 when it could not be reached. */
-  readonly providerStatus: number;
-
-  constructor(providerStatus: number) {
-    super(502, "payment_provider_error", "We couldn't reach the payment service. Please try again in a minute.");
-    this.providerStatus = providerStatus;
-  }
-
-  /** Razorpay answers 400/404 for an id that does not exist under these keys, or an action its state doesn't allow. */
-  get rejected(): boolean {
-    return this.providerStatus === 400 || this.providerStatus === 404;
-  }
-}
+/** A failed call to Razorpay. */
+export class RazorpayError extends PaymentProviderError {}
 
 async function call<T>(env: Env, method: "GET" | "POST", path: string, body?: unknown, timeoutMs = 15_000): Promise<T> {
   if (!isBillingConfigured(env)) throw new ApiError(503, "billing_not_configured", "Online payments are not switched on yet.");

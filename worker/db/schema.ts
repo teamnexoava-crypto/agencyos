@@ -37,7 +37,7 @@ import {
   STEP_STATUSES,
   TAX_MODES,
 } from "../../shared/constants";
-import { BILLING_CURRENCIES, BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PLAN_IDS, SUBSCRIPTION_STATUSES, TRIAL_DAYS } from "../../shared/plans";
+import { BILLING_CURRENCIES, BILLING_CYCLES, BILLING_PAYMENT_STATUSES, PAYMENT_PROVIDERS, PLAN_IDS, SUBSCRIPTION_STATUSES, TRIAL_DAYS } from "../../shared/plans";
 import { newId } from "../lib/ids";
 
 /* ------------------------------------------------------------------------------------------------
@@ -163,9 +163,16 @@ export const billingSubscriptions = pgTable(
     /** Amount of each charge, in paise or cents. Fixed for the life of the subscription. */
     amount: bigint({ mode: "number" }).notNull(),
     currency: text({ enum: BILLING_CURRENCIES }).notNull().default("INR"),
-    /** Razorpay ids: the subscription (sub_…) and the plan (plan_…) it bills. */
+    /** Razorpay (rupees) or Dodo Payments (dollars). */
+    provider: text({ enum: PAYMENT_PROVIDERS }).notNull().default("razorpay"),
+    /**
+     * The provider's ids: the subscription (Razorpay sub_…, or Dodo's) and the plan or product it bills.
+     * A Dodo subscription only exists once its checkout is completed, so until then this is NULL and
+     * `checkoutId` (the Dodo checkout session) is how it is found.
+     */
     providerSubscriptionId: text(),
     providerPlanId: text(),
+    checkoutId: text(),
     /** Razorpay's page where the mandate is approved. */
     shortUrl: text(),
     /** Razorpay's status, as last seen. */
@@ -222,8 +229,10 @@ export const billingPayments = pgTable(
     /** Amount charged, in paise or cents. */
     amount: bigint({ mode: "number" }).notNull(),
     currency: text({ enum: BILLING_CURRENCIES }).notNull().default("INR"),
+    /** Razorpay (rupees) or Dodo Payments (dollars). */
+    provider: text({ enum: PAYMENT_PROVIDERS }).notNull().default("razorpay"),
     status: text({ enum: BILLING_PAYMENT_STATUSES }).notNull().default("created"),
-    /** Razorpay payment link id (plink_…) and the page the payer is sent to. */
+    /** Razorpay payment link id (plink_…) or Dodo checkout session id, and the page the payer is sent to. */
     providerLinkId: text(),
     providerLinkUrl: text(),
     /** Razorpay payment id (pay_…), once paid. */

@@ -40,7 +40,7 @@ function PlanNote({ billing, autoPay, warnOnly }: { billing: BillingDTO; autoPay
     mandate === "on"
       ? `Auto-pay is on: ${autoPay ? `${price} for ${planName}` : "your plan"} is taken on ${formatDay(autoPay?.nextChargeAt ?? billing.paidUntil ?? billing.trialEndsAt)}, then every month.`
       : mandate === "retrying"
-        ? `We couldn't collect ${price}. Razorpay is trying again – look for its message${billing.currency === "INR" ? ", or a request in your UPI app," : " or one from your bank"} and approve it. If it keeps failing you move to the Free plan on ${lastDay}; you can also pay for a month below.`
+        ? `We couldn't collect ${price}. ${billing.currency === "INR" ? "Razorpay" : "Dodo Payments"} is trying again – look for its message${billing.currency === "INR" ? ", or a request in your UPI app," : " or one from your bank"} and approve it. If it keeps failing you move to the Free plan on ${lastDay}; you can also pay for a month below.`
         : mandate === "stopped"
           ? `Auto-pay has stopped – the payment kept failing, or the mandate was paused. Your plan runs until ${until}; choose it again below to restart.`
           : `Your ${planName} plan is paid until ${until}. Nothing is taken automatically.`;
