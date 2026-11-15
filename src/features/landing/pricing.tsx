@@ -3,7 +3,7 @@ import { Check, Minus } from "lucide-react";
 import { Link } from "react-router";
 import { TIER_LIST, TRIAL_DAYS, formatPlanPrice, type BillingCycle, type Tier } from "@shared/plans";
 import { GoogleIcon } from "@/components/shared/brand";
-import { useAuthConfig, useMe } from "@/features/auth/api";
+import { useDisplayCurrency } from "./use-display-currency";
 import { Button } from "@/components/ui/button";
 import { CycleSwitch, PlanCards } from "@/features/billing/plan-cards";
 import { cn } from "@/lib/utils";
@@ -58,10 +58,7 @@ const COMPARE: { group: string; rows: { label: string; values: Cell[] }[] }[] = 
 /** Public pricing: Free, Growth and Premium with a monthly / yearly switch, and the full comparison underneath. */
 export function Pricing({ signedIn }: { signedIn: boolean }) {
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
-  const { data: me } = useMe();
-  const { data: config } = useAuthConfig();
-  // A signed-in workspace pays in its own currency; a visitor sees the one for where they are.
-  const currency = me?.billing?.currency ?? config?.currency ?? "INR";
+  const currency = useDisplayCurrency();
 
   return (
     <div className="mt-10">

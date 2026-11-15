@@ -1,33 +1,48 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, type Variants } from "motion/react";
 import {
   ArrowRight,
+  BadgeIndianRupee,
+  Briefcase,
   Check,
-  ChevronDown,
   CircleCheckBig,
+  Clapperboard,
+  Code2,
   FileSignature,
   FolderKanban,
   Link2,
+  Lock,
+  Megaphone,
   MessageCircle,
+  Palette,
   PenLine,
+  PenTool,
+  PlayCircle,
+  Plus,
   ReceiptText,
+  Share2,
   ShieldCheck,
+  Sparkles,
+  Target,
   UsersRound,
   Wallet,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router";
 import { BrandLogo, GoogleIcon } from "@/components/shared/brand";
+import { WhatsAppIcon, WhatsAppSupportButton } from "@/components/shared/whatsapp-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/features/auth/api";
 import { DemoVideo } from "@/features/landing/demo-video";
+import { InAppBrowserNotice } from "@/features/landing/in-app-browser-notice";
 import { Pricing } from "@/features/landing/pricing";
-import { WhatsAppSupportButton } from "@/components/shared/whatsapp-button";
+import { useDisplayCurrency } from "@/features/landing/use-display-currency";
 import { whatsappSupportUrl } from "@/lib/support";
 import { cn } from "@/lib/utils";
-import { DEMO_VIDEO_ID } from "@shared/constants";
-import { TRIAL_DAYS } from "@shared/plans";
+import { DEMO_VIDEO_ID, SUPPORT_WHATSAPP_DISPLAY } from "@shared/constants";
+import { PLANS, TRIAL_DAYS, formatPlanPrice, type BillingCurrency } from "@shared/plans";
 
 const container: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp: Variants = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } } };
@@ -269,84 +284,248 @@ function PortalMock() {
  * Content
  * ---------------------------------------------------------------------------------------------- */
 
+/** The everyday mess the product replaces, and what it looks like afterwards. */
+const BEFORE = [
+  "Invoices made in Word or Excel, and payments tracked in your head",
+  "Clients messaging “any update?” every other day",
+  "Contracts sent as PDFs that nobody prints, signs or sends back",
+  "Team updates lost in five different WhatsApp groups",
+  "No idea which client or project actually made money",
+];
+const AFTER = [
+  "A GST invoice with a UPI QR code, sent on WhatsApp in a minute",
+  "One client link that always shows the latest progress",
+  "Contracts signed on the client's phone, with a full audit trail",
+  "Every task, file and deadline in one place for the whole team",
+  "Profit by month, client and project – worked out for you",
+];
+
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
-  { icon: FolderKanban, title: "Projects and milestones", description: "A kanban board, ordered steps and tasks. Progress updates itself as work gets done." },
-  { icon: ReceiptText, title: "GST-ready invoices", description: "Live preview, PDF, UPI QR code, partial payments and one-tap sharing on WhatsApp." },
-  { icon: FileSignature, title: "Contracts and e-sign", description: "Reusable templates, a signing page for your client and a tamper-evident audit trail." },
-  { icon: Link2, title: "Client portal", description: "One private link per project: progress, invoices, the contract, files and messages." },
-  { icon: Wallet, title: "Profit and loss", description: "Income, expenses and profit by month, project and client – without a spreadsheet." },
-  { icon: UsersRound, title: "Team and roles", description: "Members see only their projects. Budgets and finances stay with owners and admins." },
+  { icon: ReceiptText, title: "GST invoices that get paid", description: "CGST + SGST or IGST worked out, a UPI QR code on every invoice, PDF and one-tap WhatsApp sharing." },
+  { icon: FileSignature, title: "Contracts and e-sign", description: "Fill a template, send a link, and your client signs on their phone. Name, time and IP are recorded." },
+  { icon: Link2, title: "Client portal", description: "One private link per project with progress, invoices, the contract and files. Fewer follow-up calls." },
+  { icon: FolderKanban, title: "Projects and tasks", description: "Milestones, a kanban board, due dates and files. Progress updates itself as work gets done." },
+  { icon: Target, title: "CRM for leads", description: "Track every enquiry to “won”. Leads from your forms flow in from a Google Sheet automatically." },
+  { icon: Wallet, title: "Expenses and profit", description: "Income, expenses and profit by month, project and client – no more spreadsheet at month-end." },
+  { icon: UsersRound, title: "Team with roles", description: "Members see only their own projects. Budgets, invoices and profit stay with owners and admins." },
+  { icon: Palette, title: "Your brand everywhere", description: "Your logo and colour on every invoice, contract and client page, so you look like a bigger agency." },
 ];
 
 const SPOTLIGHTS: { eyebrow: string; title: string; text: string; points: string[]; mock: ReactNode }[] = [
   {
     eyebrow: "Invoices",
-    title: "Send the invoice. Know when it's seen. Get paid.",
-    text: "Create a professional invoice in a minute and share it where your clients already are.",
-    points: ["CGST + SGST or IGST worked out for you", "WhatsApp, email or a simple link", "See when it's opened; record part or full payments"],
+    title: "Send the invoice on WhatsApp. Get paid by UPI.",
+    text: "Make a professional, GST-ready invoice in about a minute and send it where your clients already are.",
+    points: ["CGST + SGST or IGST split worked out for you", "UPI QR code with the exact amount due", "See when it's opened; record part or full payments"],
     mock: <InvoiceMock />,
   },
   {
     eyebrow: "Contracts",
-    title: "Agreements signed from a phone, in minutes.",
-    text: "Start from your own template – client name, project, amount and dates fill themselves in.",
+    title: "Get the contract signed before the work starts.",
+    text: "Start from your template – client name, project, amount and dates fill themselves in. Your client signs from their phone.",
     points: ["Clients sign by drawing or typing – no account needed", "You counter-sign and both get a signed copy", "Name, time, IP address and a fingerprint of the text are recorded"],
     mock: <ContractMock />,
   },
   {
     eyebrow: "Client portal",
-    title: "Stop sending “any update?” replies.",
-    text: "Give each client one link that always shows where their project stands.",
+    title: "Stop answering “any update?” on WhatsApp.",
+    text: "Give each client one link that always shows where their project stands – and looks like your own brand.",
     points: ["Live progress and milestones", "Their invoices, contract and shared files in one place", "Never shows your costs, profit, tasks or internal notes"],
     mock: <PortalMock />,
   },
 ];
 
+const AUDIENCE: { icon: LucideIcon; label: string }[] = [
+  { icon: Megaphone, label: "Digital marketing agencies" },
+  { icon: PenTool, label: "Design and branding studios" },
+  { icon: Code2, label: "Web and app developers" },
+  { icon: Clapperboard, label: "Video and content creators" },
+  { icon: Share2, label: "Social media managers" },
+  { icon: Briefcase, label: "Consultants and freelancers" },
+];
+
 const STEPS = [
-  { title: "Sign in with Google", text: "No passwords. Add your agency name, logo and GST details once." },
-  { title: "Add a client and a project", text: "Break the work into milestones, assign your team, attach files." },
-  { title: "Send, sign, get paid", text: "Share the contract, the invoice and the client link. Watch the dashboard fill in." },
+  { title: "Sign in with Google", text: "No passwords, no card. Add your agency name, logo and GST details – it takes about a minute." },
+  { title: "Add a client and a project", text: "Break the work into milestones, invite your team and attach files." },
+  { title: "Send, sign, get paid", text: "Share the contract, the invoice and the client link. Watch payments and progress come in." },
 ];
 
-const FAQS = [
-  {
-    q: "Is it really free?",
-    a: `Yes. When you sign in you get ${TRIAL_DAYS} days of Premium with everything unlocked, and no card is needed. After that you move to the Free plan by yourself and can stay on it for as long as you like: projects, clients, invoices and a small CRM for one person. Team members, contracts, the client portal, finance and Google Sheet sync are on the paid plans. Nothing you made is ever deleted.`,
-  },
-  {
-    q: "How do I pay?",
-    a: "Monthly plans use auto-pay: you approve a card once (or UPI AutoPay, in India) on Razorpay's secure page, the plan renews each month, and you can turn it off any time from Billing. A yearly plan is a single payment by UPI, card or netbanking, with nothing taken automatically. If you'd rather not use auto-pay, you can also pay month by month.",
-  },
-  { q: "Do my clients need to create an account?", a: "No. Clients open a private link to view an invoice, sign a contract or follow their project. Nothing to install, nothing to remember." },
-  { q: "Does it handle GST invoices?", a: "Yes. Add your GSTIN and choose CGST + SGST or IGST – the split is calculated for you and printed on the invoice. Invoices in other currencies work too." },
-  { q: "Are the e-signatures valid?", a: "Each signature is recorded with the signer's name, the time, their IP address and device, and a fingerprint of the exact text they agreed to. Electronic signatures are widely accepted for ordinary business agreements; for special documents (like property deeds), check what your local law requires." },
-  { q: "What can my team members see?", a: "Members see only the projects they are assigned to. Budgets, invoices, expenses, profit, contracts and client contact details are visible to owners and admins only." },
-  { q: "Is my data safe?", a: "Every agency's data is kept separate, connections are encrypted, files are stored privately, and sign-in is handled by Google – we never see or store a password." },
-];
+interface Faq {
+  q: string;
+  a: ReactNode;
+}
 
-function GetStarted({ signedIn, size = "lg" }: { signedIn: boolean; size?: "lg" | "default" }) {
+/** Common questions, grouped. Prices are shown in the visitor's currency. */
+function faqs(currency: BillingCurrency): { group: string; items: Faq[] }[] {
+  const india = currency === "INR";
+  const growth = formatPlanPrice(PLANS.growth.price[currency].monthly, currency);
+  return [
+    {
+      group: "Getting started",
+      items: [
+        {
+          q: "Who is GrowUpliftOS for?",
+          a: "For anyone who does client work and sends invoices: digital marketing and social media agencies, design studios, web developers, video editors, consultants and freelancers. If your week is a mix of WhatsApp chats, Excel sheets and Word files, it's built for you.",
+        },
+        {
+          q: "How long does it take to set up?",
+          a: "About a minute to sign in and add your agency details, and a few more minutes to add your first client, project and invoice. There is no training or setup call – if you can use WhatsApp, you can use GrowUpliftOS.",
+        },
+        {
+          q: "Do my clients need to create an account or install an app?",
+          a: "No. Clients get a private link to view an invoice, sign a contract or follow their project. It opens on any phone or laptop – nothing to install, nothing to remember.",
+        },
+        {
+          q: "Does it work on my phone?",
+          a: "Yes. GrowUpliftOS runs in the browser on your phone, tablet or laptop, so there is nothing to download. Your clients can sign contracts and pay invoices from their phones too.",
+        },
+      ],
+    },
+    {
+      group: "Plans and payments",
+      items: [
+        {
+          q: "Is it really free?",
+          a: `Yes. When you sign in you get ${TRIAL_DAYS} days of Premium with everything unlocked, and no card is needed. After that you move to the Free plan on your own and can stay on it for as long as you like – projects, clients, invoices and a small CRM for one person. Team members, contracts, the client portal, finance and Google Sheet sync are on the paid plans, from ${growth} a month.`,
+        },
+        {
+          q: `What happens when the ${TRIAL_DAYS}-day trial ends?`,
+          a: "Nothing is charged unless you chose a plan. Your workspace simply moves to the Free plan, and nothing you made is deleted. Upgrade any time and everything is unlocked again straight away.",
+        },
+        {
+          q: "Is the price per user?",
+          a: "No. It's one flat price per workspace. Growth includes up to 5 people and Premium has no limit, so adding a team member never adds to your bill.",
+        },
+        {
+          q: "How do I pay?",
+          a: india
+            ? "Monthly plans use auto-pay: you approve UPI AutoPay or a card once on Razorpay's secure page, and the plan renews each month. A yearly plan is a single payment by UPI, card or netbanking, with nothing taken automatically. You can also pay month by month without auto-pay."
+            : "Monthly plans renew automatically by card on Dodo Payments' secure checkout. A yearly plan is a single payment with nothing taken automatically. Prices are in US dollars, and any sales tax or VAT is already included.",
+        },
+        {
+          q: "Can I cancel any time? What about refunds?",
+          a: `Yes – turn off auto-pay from Billing${india ? ", or from your UPI app or bank" : ""}, in two clicks. Nothing more is charged and your plan stays active until the end of the period you paid for. Because you can try everything free first, a period that has started isn't refunded – but if you are ever charged twice or by mistake, tell us within 7 days and we refund the extra.`,
+        },
+      ],
+    },
+    {
+      group: "Features",
+      items: [
+        {
+          q: "Does it make GST invoices?",
+          a: "Yes. Add your GSTIN and choose CGST + SGST or IGST – the split is worked out and printed on the invoice, with a UPI QR code for the amount due. You can record part payments, and invoices in other currencies work too for clients abroad.",
+        },
+        {
+          q: "Are the e-signatures legally valid?",
+          a: "Electronic signatures are widely accepted for ordinary business agreements such as service contracts. Each signature is saved with the signer's name, the time, their IP address and device, and a fingerprint of the exact text they agreed to. For special documents (like property deeds), check what the law requires.",
+        },
+        {
+          q: "Can I use my own logo and brand?",
+          a: "Yes. Your logo and brand colour appear on your invoices, contracts and every client portal, so clients see your agency – not ours.",
+        },
+        {
+          q: "What can my team members see?",
+          a: "Members see only the projects they are assigned to. Budgets, invoices, expenses, profit, contracts and client contact details stay visible to owners and admins only.",
+        },
+      ],
+    },
+    {
+      group: "Data and support",
+      items: [
+        {
+          q: "Is my data safe?",
+          a: "Every agency's data is kept separate, connections are encrypted, files are stored privately, and sign-in is handled by Google – we never see or store a password.",
+        },
+        {
+          q: "What happens to my data if I stop paying?",
+          a: "Nothing is deleted. Your workspace moves to the Free plan, invoices and contracts you already shared keep working, and everything comes back the moment you upgrade.",
+        },
+        {
+          q: "How do I get help?",
+          a: (
+            <>
+              Message us on{" "}
+              <a href={whatsappSupportUrl()} target="_blank" rel="noopener noreferrer" className="font-medium text-foreground underline underline-offset-2">
+                WhatsApp ({SUPPORT_WHATSAPP_DISPLAY})
+              </a>{" "}
+              – you'll talk to the people who build GrowUpliftOS.
+            </>
+          ),
+        },
+      ],
+    },
+  ];
+}
+
+/** The main sign-up button: Google sign-in for visitors, the dashboard for people already signed in. */
+function GetStarted({ signedIn, size = "lg", className }: { signedIn: boolean; size?: "lg" | "default"; className?: string }) {
   return signedIn ? (
-    <Button asChild size={size}>
+    <Button asChild size={size} className={className}>
       <Link to="/app">
         Open dashboard <ArrowRight />
       </Link>
     </Button>
   ) : (
-    <Button asChild size={size} variant="outline" className="bg-card">
+    <Button asChild size={size} className={cn("shadow-lift", className)}>
       <a href="/api/auth/google">
-        <GoogleIcon /> Continue with Google
+        <span className="flex size-5 items-center justify-center rounded-full bg-white">
+          <GoogleIcon className="size-3.5" />
+        </span>
+        Start free with Google <ArrowRight />
       </a>
     </Button>
   );
 }
 
-/** Public home page: what GrowUpliftOS does, how it works, pricing and common questions. */
+function CheckLine({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <Check className="size-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} /> {children}
+    </span>
+  );
+}
+
+/** On phones, a "Start free" bar stays at the bottom once the hero's button has scrolled away. */
+function MobileStickyCta({ visible }: { visible: boolean }) {
+  return (
+    <div
+      aria-hidden={!visible}
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 px-4 pt-3 pr-24 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl transition-transform duration-300 md:hidden",
+        visible ? "translate-y-0" : "pointer-events-none translate-y-full",
+      )}
+    >
+      <Button asChild className="w-full" tabIndex={visible ? 0 : -1}>
+        <a href="/api/auth/google">
+          Start free – no card <ArrowRight />
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+/** Public home page: what GrowUpliftOS does, who it's for, how it works, pricing and common questions. */
 export default function LandingPage() {
   const { data: me } = useMe();
   const signedIn = Boolean(me);
+  const currency = useDisplayCurrency();
+  const fromPrice = formatPlanPrice(PLANS.growth.price[currency].monthly, currency);
+  const groups = faqs(currency);
+
+  // The sticky phone bar appears once the hero's own button is out of sight.
+  const heroCta = useRef<HTMLDivElement>(null);
+  const [heroCtaVisible, setHeroCtaVisible] = useState(true);
+  useEffect(() => {
+    const target = heroCta.current;
+    if (!target || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setHeroCtaVisible(entry?.isIntersecting ?? true));
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div className="relative min-h-dvh overflow-x-clip bg-background">
+      <InAppBrowserNotice />
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-[44rem] bg-grid [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
       <div aria-hidden="true" className="absolute -top-48 left-1/2 size-[44rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
 
@@ -369,39 +548,84 @@ export default function LandingPage() {
           </nav>
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
-            <Button asChild size="sm">
-              <Link to={signedIn ? "/app" : "/login"}>{signedIn ? "Open dashboard" : "Sign in"}</Link>
-            </Button>
+            {signedIn ? (
+              <Button asChild size="sm">
+                <Link to="/app">Open dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild size="sm" variant="ghost" className="hidden sm:inline-flex">
+                  <Link to="/login">Sign in</Link>
+                </Button>
+                <Button asChild size="sm">
+                  <a href="/api/auth/google">Start free</a>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
       <main className="relative">
         {/* Hero */}
-        <section className="mx-auto max-w-6xl px-5 pb-20 sm:px-8 sm:pb-28">
-          <motion.div variants={container} initial="hidden" animate="show" className="mx-auto max-w-3xl pt-14 text-center sm:pt-20">
-            <motion.p variants={fadeUp} className="mx-auto w-fit rounded-full border bg-card/70 px-3.5 py-1 text-[13px] font-medium text-muted-foreground shadow-soft backdrop-blur">
-              Built for agencies, freelancers and service providers
+        <section className="mx-auto max-w-6xl px-5 pb-16 sm:px-8 sm:pb-24">
+          <motion.div variants={container} initial="hidden" animate="show" className="mx-auto max-w-3xl pt-12 text-center sm:pt-20">
+            <motion.p variants={fadeUp} className="mx-auto flex w-fit items-center gap-2 rounded-full border bg-card/70 px-3.5 py-1 text-[13px] font-medium text-muted-foreground shadow-soft backdrop-blur">
+              <Sparkles className="size-3.5 text-primary" /> Made in India for agencies and freelancers
             </motion.p>
             <motion.h1 variants={fadeUp} className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-              Run your whole agency from <span className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-transparent">one place</span>
+              Run your agency from one place – and <span className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-transparent">get paid faster</span>
             </motion.h1>
-            <motion.p variants={fadeUp} className="mx-auto mt-5 max-w-xl text-base text-balance text-muted-foreground sm:text-lg">
-              Projects, team, invoices, contracts and e-signatures – with a private link your clients will actually use.
+            <motion.p variants={fadeUp} className="mx-auto mt-5 max-w-2xl text-base text-balance text-muted-foreground sm:text-lg">
+              Projects, GST invoices with UPI, e-signed contracts and a client portal in one simple app. Stop juggling WhatsApp, Excel and Word to keep clients happy.
             </motion.p>
-            <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <GetStarted signedIn={signedIn} />
-              <span className="text-[13px] text-muted-foreground">Free plan forever · {TRIAL_DAYS} days of Premium to start · No card</span>
+            <motion.div variants={fadeUp} ref={heroCta} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <GetStarted signedIn={signedIn} className="w-full sm:w-auto" />
+              <Button asChild size="lg" variant="outline" className="w-full bg-card sm:w-auto">
+                <a href={DEMO_VIDEO_ID ? "#video" : "#how-it-works"}>
+                  {DEMO_VIDEO_ID ? <PlayCircle /> : null} {DEMO_VIDEO_ID ? "Watch the demo" : "See how it works"}
+                </a>
+              </Button>
             </motion.div>
+            <motion.p variants={fadeUp} className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
+              <CheckLine>Free plan forever</CheckLine>
+              <CheckLine>{TRIAL_DAYS} days of Premium free</CheckLine>
+              <CheckLine>No card needed</CheckLine>
+              <CheckLine>Paid plans from {fromPrice}/month</CheckLine>
+            </motion.p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }} className="mt-14 sm:mt-20">
             <DashboardMock />
           </motion.div>
         </section>
 
+        {/* What makes it fit */}
+        <section aria-label="Highlights" className="border-y bg-card/60">
+          <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-5 px-5 py-7 text-sm sm:px-8 lg:grid-cols-4">
+            {(
+              [
+                [BadgeIndianRupee, "GST-ready invoices", "CGST, SGST and IGST"],
+                [MessageCircle, "WhatsApp and UPI built in", "Share and get paid faster"],
+                [ShieldCheck, "E-sign with audit trail", "Name, time, IP recorded"],
+                [Lock, "Private and secure", "Encrypted, Google sign-in"],
+              ] as const
+            ).map(([Icon, title, text]) => (
+              <li key={title} className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="size-[18px]" />
+                </span>
+                <span>
+                  <span className="block font-medium">{title}</span>
+                  <span className="block text-[13px] text-muted-foreground">{text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         {/* Walkthrough video (shown once a video id is set) */}
         {DEMO_VIDEO_ID && (
-          <section id="video" className="mx-auto max-w-6xl scroll-mt-20 px-5 pb-20 sm:px-8 sm:pb-28">
+          <section id="video" className="mx-auto max-w-6xl scroll-mt-20 px-5 pt-20 sm:px-8 sm:pt-28">
             <SectionHeading eyebrow="Watch first" title="Why I built this, and who it's for" text="A few minutes on the problem, and a walk through the whole thing with a real client from first enquiry to final payment." />
             <Reveal className="mt-10">
               <DemoVideo />
@@ -409,11 +633,48 @@ export default function LandingPage() {
           </section>
         )}
 
+        {/* Problem → solution */}
+        <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
+          <SectionHeading eyebrow="Sound familiar?" title="Client work is great. The admin around it isn't." text="Most agencies run on WhatsApp chats, Excel sheets and Word files. It works – until a payment slips, a contract never comes back, or a client asks for the fifth update this week." />
+          <div className="mt-12 grid gap-4 lg:grid-cols-2">
+            <Reveal className="h-full">
+              <div className="h-full rounded-2xl border bg-card p-6 shadow-soft sm:p-8">
+                <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">Without GrowUpliftOS</p>
+                <ul className="mt-5 space-y-3.5">
+                  {BEFORE.map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-[15px] text-muted-foreground">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                        <X className="size-3" strokeWidth={3} />
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+            <Reveal delay={0.08} className="h-full">
+              <div className="h-full rounded-2xl border-2 border-primary/40 bg-card p-6 shadow-lift sm:p-8">
+                <p className="text-sm font-semibold text-primary">With GrowUpliftOS</p>
+                <ul className="mt-5 space-y-3.5">
+                  {AFTER.map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-[15px]">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+                        <Check className="size-3" strokeWidth={3} />
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
         {/* Features */}
-        <section id="features" className="scroll-mt-20 border-t bg-muted/30 py-20 sm:py-28">
+        <section id="features" className="scroll-mt-20 border-y bg-muted/30 py-20 sm:py-28">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
-            <SectionHeading eyebrow="Everything in one place" title="Replace five tools and a pile of spreadsheets" text="From the first proposal to the final payment, every part of client work lives in one tidy workspace." />
-            <motion.ul variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Features">
+            <SectionHeading eyebrow="Everything in one place" title="Replace five apps and a pile of spreadsheets" text="From the first enquiry to the final payment, every part of client work lives in one tidy workspace." />
+            <motion.ul variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Features">
               {FEATURES.map((feature) => (
                 <motion.li key={feature.title} variants={fadeUp} whileHover={{ y: -4 }} className="rounded-2xl border bg-card p-6 shadow-soft transition-shadow duration-200 hover:shadow-lift">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -453,65 +714,130 @@ export default function LandingPage() {
           ))}
         </section>
 
-        {/* How it works */}
-        <section id="how-it-works" className="scroll-mt-20 border-y bg-muted/30 py-20 sm:py-28">
+        {/* Who it's for */}
+        <section className="border-y bg-muted/30 py-20 sm:py-28">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
-            <SectionHeading eyebrow="How it works" title="Set up in an afternoon, not a quarter" text="No training, no implementation project. If you can use WhatsApp, you can use GrowUpliftOS." />
-            <ol className="mt-12 grid gap-4 md:grid-cols-3">
-              {STEPS.map((step, index) => (
-                <Reveal key={step.title} delay={index * 0.08}>
-                  <li className="h-full rounded-2xl border bg-card p-6 shadow-soft">
-                    <span className="tabular flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{index + 1}</span>
-                    <h3 className="mt-4 font-semibold tracking-tight">{step.title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground">{step.text}</p>
-                  </li>
-                </Reveal>
+            <SectionHeading eyebrow="Who it's for" title="Made for people who do client work" text="Solo freelancer or a growing team of ten – if you send proposals, deliver projects and raise invoices, GrowUpliftOS fits." />
+            <motion.ul variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3" aria-label="Who it's for">
+              {AUDIENCE.map((item) => (
+                <motion.li key={item.label} variants={fadeUp} className="flex h-full items-center gap-3 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <item.icon className="size-5" />
+                  </span>
+                  <span className="text-sm font-medium sm:text-[15px]">{item.label}</span>
+                </motion.li>
               ))}
-            </ol>
+            </motion.ul>
           </div>
         </section>
 
+        {/* How it works */}
+        <section id="how-it-works" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
+          <SectionHeading eyebrow="How it works" title="Up and running today, not next month" text="No training, no setup call, no implementation project. If you can use WhatsApp, you can use GrowUpliftOS." />
+          <motion.ol variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }} className="mt-12 grid gap-4 md:grid-cols-3">
+            {STEPS.map((step, index) => (
+              <motion.li key={step.title} variants={fadeUp} className="h-full rounded-2xl border bg-card p-6 shadow-soft">
+                <span className="tabular flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{index + 1}</span>
+                <h3 className="mt-4 font-semibold tracking-tight">{step.title}</h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">{step.text}</p>
+              </motion.li>
+            ))}
+          </motion.ol>
+          <Reveal className="mt-10 flex flex-col items-center gap-3">
+            <GetStarted signedIn={signedIn} />
+            {!signedIn && <p className="text-[13px] text-muted-foreground">Takes about a minute · no card needed</p>}
+          </Reveal>
+        </section>
+
         {/* Pricing */}
-        <section id="pricing" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
-          <SectionHeading eyebrow="Pricing" title="Start free. Upgrade when you're ready." text={`Every new account gets ${TRIAL_DAYS} days of Premium. Then stay on Free, or pick one flat price per workspace – no per-user surprises.`} />
-          <Pricing signedIn={signedIn} />
+        <section id="pricing" className="scroll-mt-20 border-t bg-muted/30 py-20 sm:py-28">
+          <div className="mx-auto max-w-6xl px-5 sm:px-8">
+            <SectionHeading eyebrow="Pricing" title="Simple pricing. One flat price for your whole team." text={`Try everything free for ${TRIAL_DAYS} days, then stay on Free or pick a plan. No per-user fees, no setup charges, cancel any time.`} />
+            <Pricing signedIn={signedIn} />
+          </div>
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="scroll-mt-20 border-t bg-muted/30 py-20 sm:py-28">
-          <div className="mx-auto max-w-3xl px-5 sm:px-8">
-            <SectionHeading eyebrow="FAQ" title="Questions, answered" text="The things people ask before they sign in." />
-            <Reveal className="mt-10 divide-y overflow-hidden rounded-2xl border bg-card shadow-soft">
-              {FAQS.map((item) => (
-                <details key={item.q} className="group">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-medium transition-colors hover:bg-accent/40 [&::-webkit-details-marker]:hidden">
-                    {item.q}
-                    <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
-                  </summary>
-                  <p className="px-5 pb-5 text-[15px] text-muted-foreground">{item.a}</p>
-                </details>
-              ))}
+        <section id="faq" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
+          <div className="grid gap-10 lg:grid-cols-[1fr_2fr] lg:gap-16">
+            <Reveal className="lg:sticky lg:top-24 lg:self-start">
+              <p className="text-sm font-semibold text-primary">FAQ</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Questions, answered</h2>
+              <p className="mt-4 text-base text-muted-foreground">Everything people usually ask before they start. Can't find yours?</p>
+              <div className="mt-6 rounded-2xl border bg-card p-5 shadow-soft">
+                <p className="flex items-center gap-2 font-semibold">
+                  <WhatsAppIcon className="size-5 text-[#25D366]" /> Talk to us on WhatsApp
+                </p>
+                <p className="mt-1.5 text-sm text-muted-foreground">Ask anything about plans, features or switching over – you'll hear back from the team that builds it.</p>
+                <Button asChild variant="outline" className="mt-4 w-full">
+                  <a href={whatsappSupportUrl("Hi, I have a question about GrowUpliftOS.")} target="_blank" rel="noopener noreferrer">
+                    Chat on WhatsApp <ArrowRight />
+                  </a>
+                </Button>
+              </div>
             </Reveal>
+            <div className="space-y-10">
+              {groups.map((group, groupIndex) => (
+                <Reveal key={group.group}>
+                  <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{group.group}</h3>
+                  <div className="mt-3 divide-y overflow-hidden rounded-2xl border bg-card shadow-soft">
+                    {group.items.map((item, index) => (
+                      <details key={item.q} className="group" open={groupIndex === 0 && index === 0}>
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-medium transition-colors hover:bg-accent/40 [&::-webkit-details-marker]:hidden">
+                          {item.q}
+                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform duration-200 group-open:rotate-45 group-open:bg-primary/10 group-open:text-primary">
+                            <Plus className="size-4" />
+                          </span>
+                        </summary>
+                        <div className="px-5 pb-5 text-[15px] leading-relaxed text-muted-foreground">{item.a}</div>
+                      </details>
+                    ))}
+                  </div>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </section>
 
         {/* Closing call to action */}
-        <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
-          <Reveal className="relative overflow-hidden rounded-3xl border bg-card px-6 py-14 text-center shadow-lift sm:px-12 sm:py-20">
-            <div aria-hidden="true" className="absolute -top-32 left-1/2 size-[30rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+        <section className="mx-auto max-w-6xl px-5 pb-24 sm:px-8 sm:pb-28">
+          <Reveal className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 px-6 py-14 text-center text-white shadow-lift sm:px-12 sm:py-20">
+            <div aria-hidden="true" className="absolute inset-0 bg-grid opacity-20 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
             <h2 className="relative text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Spend your time on client work, not on admin</h2>
-            <p className="relative mx-auto mt-4 max-w-xl text-base text-muted-foreground">Set up your workspace today. Your first project, invoice and contract are a few minutes away.</p>
-            <div className="relative mt-8 flex justify-center">
-              <GetStarted signedIn={signedIn} />
+            <p className="relative mx-auto mt-4 max-w-xl text-base text-white/80 sm:text-lg">Your first project, invoice and contract are a few minutes away. Start free – you can upgrade whenever you're ready.</p>
+            <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              {signedIn ? (
+                <Button asChild size="lg" variant="secondary">
+                  <Link to="/app">
+                    Open dashboard <ArrowRight />
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild size="lg" variant="secondary" className="shadow-lift">
+                  <a href="/api/auth/google">
+                    <GoogleIcon /> Start free with Google <ArrowRight />
+                  </a>
+                </Button>
+              )}
+              <Button asChild size="lg" variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+                <a href={whatsappSupportUrl()} target="_blank" rel="noopener noreferrer">
+                  <WhatsAppIcon className="size-4" /> Questions? Chat with us
+                </a>
+              </Button>
             </div>
+            <p className="relative mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-white/80">
+              <span>✓ Free plan forever</span>
+              <span>✓ {TRIAL_DAYS} days of Premium free</span>
+              <span>✓ No card needed</span>
+            </p>
           </Reveal>
         </section>
       </main>
 
       <footer className="relative border-t">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:px-8">
-          <span>© {new Date().getFullYear()} GrowUpliftOS</span>
-          <span className="flex gap-5">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-6 pb-24 text-[13px] text-muted-foreground sm:flex-row sm:px-8 md:pb-6">
+          <span>© {new Date().getFullYear()} GrowUpliftOS · Made in India</span>
+          <span className="flex flex-wrap justify-center gap-x-5 gap-y-2">
             <a href="#features" className="hover:text-foreground">
               Features
             </a>
@@ -525,11 +851,12 @@ export default function LandingPage() {
               Terms
             </Link>
             <a href={whatsappSupportUrl()} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-              Support
+              WhatsApp {SUPPORT_WHATSAPP_DISPLAY}
             </a>
           </span>
         </div>
       </footer>
+      {!signedIn && <MobileStickyCta visible={!heroCtaVisible} />}
       <WhatsAppSupportButton />
     </div>
   );
